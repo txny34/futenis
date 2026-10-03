@@ -1,7 +1,5 @@
 package sim
 
-import "math"
-
 // rivalMinTargetX is the closest to the net (|X|) a deviated target may land
 // when the requested target was on the rival half: deviation can make a
 // shot short, never send it back to the striker's own side.
@@ -29,7 +27,7 @@ func deviateTarget(cfg *Config, target, ballXZ Vec3, ps *PartSpec, u float64, h 
 
 	limit := CourtHalfWidth - cfg.TargetWallMargin
 	deviated.Z = clamp(deviated.Z, -limit, limit)
-	deviated.X = keepOnRivalSide(target.X, ballXZ.X, deviated.X)
+	deviated.X = keepOnRivalSide(target.X, ballXZ.X, deviated.X, CourtHalfLength-cfg.TargetWallMargin)
 	return deviated
 }
 
@@ -44,15 +42,17 @@ func shotSpeed(ps *PartSpec, charge, u float64, h uint64, cfg *Config) float64 {
 	return float64(base * (1 + c*cfg.DevPowerMax))
 }
 
-// keepOnRivalSide holds a deviated X on the rival half (at least
-// rivalMinTargetX past the net) when the requested target crossed the net.
-// A target on the striker's own side is returned untouched.
-func keepOnRivalSide(targetX, fromX, x float64) float64 {
+// keepOnRivalSide holds a deviated X inside the rival half when the
+// requested target crossed the net: at least rivalMinTargetX past the net
+// and at most maxAbs (short of the back glass), so even a forced contact
+// lands in the court instead of going straight into the glass. A target on
+// the striker's own side is returned untouched.
+func keepOnRivalSide(targetX, fromX, x, maxAbs float64) float64 {
 	if sideOf(targetX) == sideOf(fromX) {
 		return x
 	}
 	if targetX > 0 {
-		return math.Max(x, rivalMinTargetX)
+		return clamp(x, rivalMinTargetX, maxAbs)
 	}
-	return math.Min(x, -rivalMinTargetX)
+	return clamp(x, -maxAbs, -rivalMinTargetX)
 }

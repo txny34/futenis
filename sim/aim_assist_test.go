@@ -1,9 +1,31 @@
 package sim
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 // clearsRealNet reports whether a ball launched with v from `from` passes
 // over the physical net (no margin) when it crosses sides.
+// landsInRivalCourt flies the ball (no events) until its first floor contact
+// and reports whether it got there without touching a wall, inside the
+// rival half (X > 0).
+func landsInRivalCourt(cfg *Config, from, v Vec3) bool {
+	b := Ball{Pos: from, Vel: v}
+	for i := 0; i < maxSolveTicks; i++ {
+		b.Vel.Y -= float64(cfg.Gravity * Dt)
+		b.Vel = b.Vel.Scale(kScale(cfg))
+		b.Pos = b.Pos.AddScaled(b.Vel, Dt)
+		if math.Abs(b.Pos.X) > CourtHalfLength-BallRadius || math.Abs(b.Pos.Z) > CourtHalfWidth-BallRadius {
+			return false
+		}
+		if b.Pos.Y <= BallRadius {
+			return b.Pos.X > 0
+		}
+	}
+	return false
+}
+
 func clearsRealNet(cfg Config, from, v Vec3) bool {
 	cfg.DriveNetClearance = 0
 	return netClearanceOK(&cfg, from, v)
@@ -11,7 +33,8 @@ func clearsRealNet(cfg Config, from, v Vec3) bool {
 
 // TestStrike_AimAssistAlwaysClearsNet: any drive aimed at the rival half
 // passes over the net, whatever the body part, timing error, charge or
-// distance (the Roblox-style aim assist), never above the part's speed cap. Only aiming at your own side may
+// distance (the Roblox-style aim assist), never above the part's speed cap,
+// and its first contact is the rival floor: never straight into the glass. Only aiming at your own side may
 // end in the net.
 func TestStrike_AimAssistAlwaysClearsNet(t *testing.T) {
 	parts := []BodyPart{PartFoot, PartKnee, PartChest, PartShoulder, PartHead}
@@ -36,6 +59,9 @@ func TestStrike_AimAssistAlwaysClearsNet(t *testing.T) {
 						}
 						if !clearsRealNet(s.Cfg, from, s.Ball.Vel) {
 							t.Fatalf("part=%d u=%.1f from x=%.1f target x=%.1f charge=%.1f: hit the net (v=%+v)", part, u, px, tx, ch, s.Ball.Vel)
+						}
+						if !landsInRivalCourt(&s.Cfg, from, s.Ball.Vel) {
+							t.Errorf("part=%d u=%.1f from x=%.1f target x=%.1f charge=%.1f: first contact is not the rival floor (glass or out)", part, u, px, tx, ch)
 						}
 					}
 				}
@@ -75,6 +101,20 @@ func TestDeviation_StaysOnRivalSide(t *testing.T) {
 		got := deviateTarget(&cfg, Vec3{X: 0.6, Y: BallRadius}, Vec3{X: -5}, ps, 1, Hash64(h))
 		if got.X < rivalMinTargetX {
 			t.Fatalf("h=%d: deviated X=%.3f, want >= %.2f", h, got.X, rivalMinTargetX)
+		}
+	}
+}
+
+// TestDeviation_StaysShortOfBackGlass: a forced contact aimed deep can never
+// deviate past the back-wall margin (it would go straight into the glass).
+func TestDeviation_StaysShortOfBackGlass(t *testing.T) {
+	cfg := DefaultConfig()
+	ps := &cfg.Parts[PartFoot]
+	maxX := CourtHalfLength - cfg.TargetWallMargin
+	for h := uint64(0); h < 2000; h++ {
+		got := deviateTarget(&cfg, Vec3{X: maxX, Y: BallRadius}, Vec3{X: -5}, ps, 1, Hash64(h))
+		if got.X > maxX {
+			t.Fatalf("h=%d: deviated X=%.3f, want <= %.2f", h, got.X, maxX)
 		}
 	}
 }

@@ -90,7 +90,7 @@ La carga deja de vivir en el cliente (`CHARGE_TIME_S` en `input.ts` desaparece).
 |---|---|
 | MoveX/MoveZ | NaN/Inf → 0; clamp −1..1 |
 | Spin | clamp a {−1, 0, +1} |
-| TargetX | NaN/Inf → centro de la cancha rival (`±CourtHalfLength/2`); magnitud clampeada a `[TargetMinFromNet, CourtHalfLength−TargetWallMargin]` conservando el lado; 0 → lado rival. Un objetivo en el **propio** campo se respeta: es el tiro "apuntado muy bajo", sin ayuda de red (termina en la red). Todo objetivo en campo rival pasa la red siempre (ayuda de tiro: `ensureNetClearance` + `liftOverNet`) |
+| TargetX | NaN/Inf → centro de la cancha rival (`±CourtHalfLength/2`); magnitud clampeada a `[TargetMinFromNet, CourtHalfLength−TargetWallMargin]` conservando el lado; 0 → lado rival. Un objetivo en el **propio** campo se respeta: es el tiro "apuntado muy bajo", sin ayuda de red (termina en la red). Todo objetivo en campo rival pasa la red y pica primero dentro del campo rival, nunca directo al vidrio, aun con golpe forzado (ayuda de tiro: `ensureNetClearance`, desvío acotado antes del fondo, `reachWithinCap` bajo el tope de velocidad) |
 | TargetZ | NaN/Inf → 0; clamp `±(CourtHalfWidth−TargetWallMargin)` |
 | Buttons | `& btnMask` (bits desconocidos → 0) |
 | Strike+Lob simultáneos | gana el que se presionó primero (latcheado en `Player.ShotType` al press) |
