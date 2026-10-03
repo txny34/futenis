@@ -48,6 +48,12 @@ type Config struct {
 	ServeTossSpeed  float64 // m/s, optional upward assist on release (default 0)
 	ServiceLineDist float64 // m, net -> service line; the serve must bounce once beyond this before being struck (6.95 m in real padel)
 
+	// ServeTimeLimit (code-review hardening, not in docs/design/contact-v2.md
+	// §7.5 yet): how long, in seconds, the server may sit in PhaseServe
+	// without pressing Strike before the ball auto-drops (tossServe) so a
+	// silent/idle/AI-less server can never hang a match forever.
+	ServeTimeLimit float64 // s, default 8
+
 	// Momentum (§9).
 	MomentumFactor float64 // fraction of player velocity added to a shot
 	MomentumMax    float64 // m/s, momentum contribution cap
@@ -91,10 +97,11 @@ type Config struct {
 	// Derived, cached by Sanitize() so Step never recomputes a ticksOf
 	// conversion on the hot path. Unexported: not part of the live-tuning
 	// wire format (config_layout.go flattens the tunable fields only).
-	stLockTicks    int
-	chargeMaxTicks int
-	bufTicks       int
-	graceTicks     int
+	stLockTicks         int
+	chargeMaxTicks      int
+	bufTicks            int
+	graceTicks          int
+	serveTimeLimitTicks int
 }
 
 // DefaultConfig returns the baseline tuned Config used by a fresh Match.
@@ -130,6 +137,7 @@ func DefaultConfig() Config {
 		ServeTossOffset: 0.5,
 		ServeTossSpeed:  0,
 		ServiceLineDist: 6.95,
+		ServeTimeLimit:  8.0,
 
 		MomentumFactor: 0.35,
 		MomentumMax:    4.0,

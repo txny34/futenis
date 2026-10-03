@@ -1,5 +1,7 @@
 package sim
 
+import "math"
+
 // body.go: ball-vs-player capsule collision (docs/design/contact-v2.md
 // §7.4). Wave1 ownership: emits EvBodyHit, which counts as a touch for the
 // hitter's team -- rules.go (not owned here) is responsible for judging
@@ -27,7 +29,8 @@ func applyBodyCollisions(s *State, ev []Event) []Event {
 func resolveBodyHit(s *State, i int8, ev []Event) []Event {
 	p := &s.Players[i]
 	cfg := &s.Cfg
-	if p.StruckAt != 0 && s.Tick-p.StruckAt < uint32(cfg.graceTicks) {
+	grace := uint32(clampTickCount(cfg.graceTicks, math.MaxInt32))
+	if p.StruckAt != 0 && s.Tick-p.StruckAt < grace {
 		return ev
 	}
 

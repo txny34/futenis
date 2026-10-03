@@ -6,12 +6,21 @@ import { el, slider } from "../ui/dom";
 // frames via engine.setConfig; never touched by the frame loop.
 interface Param { readonly idx: number; readonly label: string; readonly min: number; readonly max: number; readonly step: number }
 
+// Every min/max below is audited against two sources of truth: the field's
+// real unit/sign (see sim/config.go's doc comments) and sim/config_layout.go's
+// Config.Sanitize clamp range -- a default that fell outside its own slider
+// range, or a slider that let the user pick a value Sanitize immediately
+// clamps away, both counted as bugs here (code-review finding #2). Gravity
+// was the broken one: Config.Gravity is positive (defaults to 9.81, applied
+// on -Y by physics.go) and Sanitize bounds it to [minGravity=0.1,
+// maxGravity=50], but the slider offered -20..0 -- every value in its range
+// was invalid and got silently clamped to 0.1 the moment Sanitize ran.
 const PARAMS: readonly Param[] = [
-  { idx: 0, label: "Gravedad", min: -20, max: 0, step: 0.1 },
+  { idx: 0, label: "Gravedad", min: 1, max: 25, step: 0.1 },
   { idx: 1, label: "Rebote piso", min: 0, max: 1, step: 0.01 },
   { idx: 2, label: "Rebote pared", min: 0, max: 1, step: 0.01 },
-  { idx: 5, label: "Vel. jugador", min: 1, max: 12, step: 0.1 },
-  { idx: 6, label: "Vel. sprint", min: 1, max: 15, step: 0.1 },
+  { idx: 5, label: "Vel. jugador", min: 0, max: 12, step: 0.1 },
+  { idx: 6, label: "Vel. sprint", min: 0, max: 15, step: 0.1 },
   { idx: 10, label: "Vel. salto", min: 0, max: 10, step: 0.1 },
   { idx: 15, label: "Carga máx (s)", min: 0.1, max: 2, step: 0.05 },
   { idx: 17, label: "Buffer golpe (s)", min: 0, max: 0.5, step: 0.01 },

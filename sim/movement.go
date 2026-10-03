@@ -1,5 +1,7 @@
 package sim
 
+import "math"
+
 // movement.go: wave1 player movement/body ownership (docs/design/
 // contact-v2.md §4 "Salto", §5 "Movimiento, sprint y stamina", §19.4
 // "Separación de cápsulas entre compañeros"). movePlayers replaces the
@@ -116,7 +118,7 @@ func stepPlayerStamina(p *Player, in PlayerInput, cfg *Config) {
 		p.Stamina -= float64(cfg.StaminaDrain * Dt)
 		if p.Stamina <= 0 {
 			p.Stamina = 0
-			p.StaminaLock = uint16(cfg.stLockTicks)
+			p.StaminaLock = uint16(clampTickCount(cfg.stLockTicks, math.MaxUint16))
 		}
 	case p.StaminaLock > 0:
 		p.StaminaLock--

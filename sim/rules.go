@@ -40,7 +40,8 @@ func applyRules(s *State, ev []Event) []Event {
 	case PhaseServe:
 		// wave1-C: real-padel serve (docs/design/contact-v2.md §7.5) --
 		// judges the pre-strike toss bounce; see serve.go.
-		return judgeServe(s, ev)
+		ev = judgeServe(s, ev)
+		return enforceServeClock(s, ev)
 	case PhasePoint:
 		s.Rally.PauseTicks--
 		if s.Rally.PauseTicks <= 0 {
@@ -48,6 +49,26 @@ func applyRules(s *State, ev []Event) []Event {
 		}
 	}
 	return ev
+}
+
+// enforceServeClock is the §7.5 padel-like serve clock (code-review
+// hardening, Config.ServeTimeLimit): if the server sits in PhaseServe
+// without releasing the ball for ServeTimeLimit seconds, the ball is
+// auto-dropped (tossServe) so an idle/disconnected/AI-less server can never
+// hang the match forever. Runs after judgeServe, so a fault judged this
+// same tick (which replays into a fresh RallyState, ServeWaitTicks back to
+// 0) is never double-counted, and a legal player-initiated toss this same
+// tick (Ball.Tossed already true) resets the clock instead of firing again.
+func enforceServeClock(s *State, ev []Event) []Event {
+	if s.Phase != PhaseServe || s.Ball.Tossed {
+		s.Rally.ServeWaitTicks = 0
+		return ev
+	}
+	s.Rally.ServeWaitTicks++
+	if s.Rally.ServeWaitTicks < s.Cfg.serveTimeLimitTicks {
+		return ev
+	}
+	return append(ev, tossServe(s))
 }
 
 // judgeRally walks the events emitted this tick (in emission order) looking

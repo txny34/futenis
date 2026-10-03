@@ -75,6 +75,13 @@ const (
 	cfgPointsToWin
 	cfgMode
 
+	// cfgServeTimeLimit is appended last (after cfgMode, not grouped with the
+	// rest of the Serve fields above) so every existing scalar index keeps
+	// its wire meaning -- adding a new tunable here never reshuffles
+	// cfgPointsToWin/cfgMode or anything the client/wasm bridge already
+	// addresses by position.
+	cfgServeTimeLimit
+
 	// CfgScalarLen is the number of scalar (non-Parts) tunable floats.
 	CfgScalarLen
 )
@@ -147,6 +154,7 @@ func WriteConfig(c *Config, dst []float64) {
 
 	dst[cfgPointsToWin] = float64(c.PointsToWin)
 	dst[cfgMode] = float64(c.Mode)
+	dst[cfgServeTimeLimit] = c.ServeTimeLimit
 
 	writePartsBlock(c, dst[CfgPartsStart:])
 }
@@ -230,6 +238,7 @@ func ReadConfig(src []float64) Config {
 
 	c.PointsToWin = int(src[cfgPointsToWin])
 	c.Mode = Mode(src[cfgMode])
+	c.ServeTimeLimit = src[cfgServeTimeLimit]
 
 	c.Parts = readPartsBlock(src[CfgPartsStart:])
 	c.Sanitize()
@@ -263,90 +272,4 @@ func boolToFloat(b bool) float64 {
 		return 1
 	}
 	return 0
-}
-
-// Sanitize clamps Config to physically sane bounds and recomputes the
-// cached derived tick counts (docs/design/contact-v2.md §1.1, §13). Called
-// by DefaultConfig and ReadConfig; must also be called after any live edit
-// from the dev panel, between frames (never mid-Step).
-func (c *Config) Sanitize() {
-	c.FloorRestitution = clamp(c.FloorRestitution, 0, 1)
-	c.WallRestitution = clamp(c.WallRestitution, 0, 1)
-	c.BodyRestitution = clamp(c.BodyRestitution, 0, 1)
-	c.ChargeMoveFactor = clamp(c.ChargeMoveFactor, 0, 1)
-	c.DevPowerMax = clamp(c.DevPowerMax, 0, 1)
-
-	if c.PlayerSpeed < 0 {
-		c.PlayerSpeed = 0
-	}
-	if c.SprintSpeed < 0 {
-		c.SprintSpeed = 0
-	}
-	if c.PointsToWin < 1 {
-		c.PointsToWin = 1
-	}
-
-	for i := range c.Parts {
-		p := &c.Parts[i]
-		if p.HIdeal < p.HMin {
-			p.HIdeal = p.HMin
-		}
-		if p.HIdeal > p.HMax {
-			p.HIdeal = p.HMax
-		}
-	}
-
-	c.stLockTicks = ticksOf(c.StaminaLockTime)
-	c.chargeMaxTicks = ticksOf(c.ChargeMaxTime)
-	c.bufTicks = ticksOf(c.StrikeBufferTime)
-	c.graceTicks = ticksOf(c.BodyGraceTime)
-}
-
-// defaultParts returns the §6 contact table. PartNone is left zero-valued
-// (it is a sentinel, never indexed for a real contact).
-func defaultParts() [PartCount]PartSpec {
-	return [PartCount]PartSpec{
-		PartFoot: {
-			HMin: 0.00, HIdeal: 0.20, HMax: 0.45, Reach: 1.00,
-			SpeedMin: 10, SpeedMax: 26,
-			DevBase: 0.15, DevMax: 1.6,
-			SpinMin: -1, SpinMax: 1,
-			AllowLob: true,
-		},
-		PartKnee: {
-			HMin: 0.35, HIdeal: 0.60, HMax: 0.95, Reach: 0.85,
-			SpeedMin: 8, SpeedMax: 18,
-			DevBase: 0.25, DevMax: 2.0,
-			SpinMin: -0.5, SpinMax: 0.5,
-			AllowLob: true,
-		},
-		PartChest: {
-			HMin: 0.95, HIdeal: 1.20, HMax: 1.40, Reach: 0.60,
-			SpeedMin: 5, SpeedMax: 11,
-			DevBase: 0.40, DevMax: 2.2,
-			SpinMin: 0, SpinMax: 0,
-			AllowLob: true,
-		},
-		PartShoulder: {
-			HMin: 1.30, HIdeal: 1.50, HMax: 1.65, Reach: 0.70,
-			SpeedMin: 6, SpeedMax: 14,
-			DevBase: 0.35, DevMax: 2.4,
-			SpinMin: 0, SpinMax: 0,
-			AllowLob: false,
-		},
-		PartHead: {
-			HMin: 1.60, HIdeal: 1.85, HMax: 2.10, Reach: 0.55,
-			SpeedMin: 7, SpeedMax: 17,
-			DevBase: 0.20, DevMax: 1.8,
-			SpinMin: -0.5, SpinMax: 0,
-			AllowLob: true,
-		},
-		PartBicycle: {
-			HMin: 1.70, HIdeal: 2.10, HMax: 2.50, Reach: 0.80,
-			SpeedMin: 16, SpeedMax: 30,
-			DevBase: 0.30, DevMax: 2.8,
-			SpinMin: 1, SpinMax: 1,
-			AllowLob: false,
-		},
-	}
 }

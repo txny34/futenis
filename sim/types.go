@@ -55,6 +55,24 @@ func ticksOf(sec float64) int {
 	return int(math.Round(sec * TickRate))
 }
 
+// clampTickCount bounds a derived tick count to [0, max] (code-review
+// hardening): defense-in-depth at every cast site that narrows a cached
+// *Ticks int into a smaller unsigned type (StaminaLock/ChargeTicks are
+// uint16, Buffer is uint8, the StruckAt/graceTicks comparison is uint32).
+// Config.Sanitize already keeps the durations these are derived from small
+// and non-negative, but a cast site should never trust that alone --
+// casting a negative int straight to an unsigned type wraps to a huge
+// value instead of panicking or saturating.
+func clampTickCount(n, max int) int {
+	if n < 0 {
+		return 0
+	}
+	if n > max {
+		return max
+	}
+	return n
+}
+
 // PartSpec describes one contact body part's reach, power and precision
 // (docs/design/contact-v2.md §6). Values are tunable in vivo via Config.
 type PartSpec struct {
@@ -236,6 +254,14 @@ type RallyState struct {
 	ServeTossBounced bool // true once the pre-strike drop has bounced legally, once, behind the service line on the server's own side
 	ServeBoxPending  bool // true from the server's opening strike (EvKick/EvBodyHit) until that serve's own bounce on the receiving side is judged (box/let/fault)
 	ServeNetTouch    bool // true if the serve's post-strike return flight has clipped the net; distinguishes a Let (still lands in the box) from a normal legal bounce
+
+	// ServeWaitTicks (code-review hardening: the padel-like serve clock,
+	// Config.ServeTimeLimit) counts how many consecutive ticks the server
+	// has spent in PhaseServe without releasing the ball (!Ball.Tossed).
+	// Zero value is correct at the start of every fresh serve attempt
+	// (resetForServe/replayServe rebuild RallyState from scratch); reset to
+	// 0 the moment the ball is tossed. See enforceServeClock in rules.go.
+	ServeWaitTicks int
 }
 
 // serveBoxForScore returns which diagonal service box the server must serve
