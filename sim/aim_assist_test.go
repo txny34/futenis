@@ -54,7 +54,7 @@ func TestStrike_AimAssistAlwaysClearsNet(t *testing.T) {
 						p.BufCharge = ch
 						p.BufTarget = Vec3{X: tx, Y: BallRadius, Z: 1}
 						strike(&s, 0, part, u, nil)
-						if cap := s.Cfg.Parts[part].SpeedMax + s.Cfg.MomentumMax; s.Ball.Vel.Len() > cap+1e-9 {
+						if cap := (s.Cfg.Parts[part].SpeedMax + s.Cfg.MomentumMax) * perfectBoost(&s, qualityOf(&s.Cfg, u)); s.Ball.Vel.Len() > cap+1e-9 {
 							t.Fatalf("part=%d u=%.1f from x=%.1f target x=%.1f charge=%.1f: speed %.2f over cap %.2f", part, u, px, tx, ch, s.Ball.Vel.Len(), cap)
 						}
 						if !clearsRealNet(s.Cfg, from, s.Ball.Vel) {
@@ -116,5 +116,34 @@ func TestDeviation_StaysShortOfBackGlass(t *testing.T) {
 		if got.X > maxX {
 			t.Fatalf("h=%d: deviated X=%.3f, want <= %.2f", h, got.X, maxX)
 		}
+	}
+}
+
+// TestStrike_PerfectIsTheWinner: a PERFECT contact is how points are won
+// (the aim assist removes net/out errors): it leaves clearly faster than a
+// GOOD contact with the same charge and target, and still lands in court.
+// (A low foot contact is limited by the arc needed to clear the net, not by
+// power, so the test uses a chest-height contact.)
+func TestStrike_PerfectIsTheWinner(t *testing.T) {
+	launch := func(u float64) (Vec3, Vec3, Config) {
+		s := newStrikeTestState()
+		s.Tick = 500
+		from := Vec3{X: -6, Y: s.Cfg.Parts[PartChest].HIdeal}
+		s.Ball.Pos = from
+		s.Players[0].Pos = Vec3{X: -6}
+		s.Players[0].BufCharge = 0.6
+		s.Players[0].BufTarget = Vec3{X: 7, Y: BallRadius, Z: 2}
+		strike(&s, 0, PartChest, u, nil)
+		return from, s.Ball.Vel, s.Cfg
+	}
+	from, perfect, cfg := launch(0)
+	_, good, _ := launch(cfg.QualPerfectMax + 0.05)
+	hp := math.Hypot(perfect.X, perfect.Z)
+	hg := math.Hypot(good.X, good.Z)
+	if hp < hg*1.2 {
+		t.Fatalf("perfect horizontal speed %.2f, want >= 1.2x good (%.2f)", hp, hg)
+	}
+	if !landsInRivalCourt(&cfg, from, perfect) {
+		t.Fatal("a perfect shot must still land in the rival court")
 	}
 }
