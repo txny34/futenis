@@ -29,9 +29,9 @@ const tiebreakTarget = 7
 
 // hasWonGamePadel reports whether pointsW (the team that just scored) has
 // won the current game against pointsL: either the classic "first to
-// target (4, or tiebreakTarget in a tiebreak), win by 2" rule, or -- with Config.GoldenPoint -- sudden death
-// the instant either team leads at 40-40 (3-3) or later, no 2-point margin
-// required ("punto de oro").
+// target (4, or tiebreakTarget in a tiebreak), win by 2" rule, or, with
+// Config.GoldenPoint, sudden death the instant either team leads at 40-40
+// (3-3) or later, no 2-point margin required ("punto de oro").
 func hasWonGamePadel(pointsW, pointsL, target int, golden bool) bool {
 	if golden && pointsL >= target-1 && pointsW > pointsL {
 		return true
