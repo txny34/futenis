@@ -3,7 +3,8 @@ import { button, el } from "./dom";
 import { mainMenu, matchSetup, panel, pauseMenu, titleScreen } from "./screens";
 import { loadSettings, saveSettings, Settings } from "./settings";
 import { settingsView } from "./settings-view";
-import { GameMode, MatchOptions } from "./types";
+import { trainingView } from "./training-view";
+import { DEFAULT_POINTS, GameMode, MatchOptions } from "./types";
 
 export type { Difficulty, GameMode, MatchOptions } from "./types";
 export type { Settings } from "./settings";
@@ -91,6 +92,11 @@ export class MenuUI {
   }
 
   private setup(mode: GameMode): void {
+    if (mode === "playground") {
+      const go = (training: MatchOptions["training"]): void => this.start({ mode, difficulty: "normal", pointsToWin: DEFAULT_POINTS, training });
+      this.mount("setup", trainingView(go, () => this.render("main")));
+      return;
+    }
     this.mount("setup", matchSetup(mode, (o) => this.start(o), () => this.render("main")));
   }
 

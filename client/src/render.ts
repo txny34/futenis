@@ -7,6 +7,7 @@ import { BallView } from "./view/ball";
 import { CameraRig } from "./view/camera";
 import { ImpactFx } from "./view/impact-fx";
 import { LandingMarker } from "./view/landing-marker";
+import { MachineView } from "./view/machine";
 import { TimingRing } from "./view/timing-ring";
 import { Overlays } from "./view/overlays";
 import { PostFx } from "./view/post";
@@ -37,6 +38,7 @@ export class CourtView {
   readonly players: PlayersView;
   readonly rig = new CameraRig();
   readonly fx: ImpactFx;
+  readonly machine: MachineView;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly sun: THREE.DirectionalLight;
@@ -65,6 +67,7 @@ export class CourtView {
     this.timing = new TimingRing(this.scene);
     this.landing = new LandingMarker(this.scene);
     this.fx = new ImpactFx(this.scene);
+    this.machine = new MachineView(this.scene);
     this.post = new PostFx(this.renderer, this.scene, this.rig.camera);
     window.addEventListener("resize", () => this.resize());
     this.applyVideo("high", true);
@@ -101,6 +104,7 @@ export class CourtView {
     this.updateOverlays(curr, human, hasHuman);
     this.updatePrediction(prev, curr, alpha, human, hasHuman);
     this.fx.update(dt);
+    this.machine.update(curr, dt);
     const serving = human.showOverlays && hasHuman && curr[Snap.Phase] === Phase.Serve && curr[Snap.Server] === HUMAN_TEAM;
     this.serveBox.update(serving, curr[PLAYER_POS[human.slot] + 2], dt);
     this.rig.update(hasHuman ? this.humanFeet : null, this.ball.position, dt);
