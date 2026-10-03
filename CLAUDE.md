@@ -1,53 +1,83 @@
 # futenis — Rules del proyecto
 
-Futtenis (fútbol-tenis) en cancha de pádel con paredes. 1v1. **Máximo 1 toque por lado.**
-Juego de navegador, meta comercial (online, skins, pase de batalla) — pero **ingeniería primero, arte después**.
+Futtenis (fútbol-tenis) en cancha de pádel con paredes. **1v1 y 2v2** (+ Playground). **Un toque por equipo por cruce.**
+Reglas = **reglamento de pádel** adaptado al pie (saque, cuadros, let, doble falta, 15/30/40, juegos, sets).
+Juego de navegador, meta comercial (online, skins, pase de batalla) — **ingeniería primero, arte después**.
+
+**Pilar de diseño:** fácil de aprender, dificilísimo de dominar. **Referencia: Rocket League** — pocos inputs,
+física continua, mecánicas emergentes, recursos visibles (stamina = turbo), transferencia de momento.
 
 ## Arquitectura (NO NEGOCIABLE)
 
 ```
-sim/      Go puro. Reglas + física. Fuente de verdad. CERO dependencias de JS/DOM/red.
-wasm/     package main (GOOS=js). Único puente sim <-> navegador.
-cmd/dev/  Servidor de desarrollo en Go (estáticos + build). Sin Node.
-cmd/server/ (futuro) Servidor autoritativo: corre el MISMO sim nativo.
-client/   TypeScript + three.js. SOLO dibuja, lee input y maneja cámara. NUNCA decide reglas.
+sim/      Go puro. Reglas + física + puntuación + predicción. Fuente de verdad. CERO dependencias de JS/DOM/red.
+ai/       Go puro. Bot determinista (4 dificultades, 2v2). Produce sim.PlayerInput, como un humano. Sin trampas.
+wasm/     package main (GOOS=js). Único puente sim/ai <-> navegador. Corre el bot en los slots no humanos.
+cmd/dev/  Servidor de desarrollo en Go (estáticos + build con esbuild Go API). Sin Node. Default :8090 (WSL2).
+cmd/server/ (futuro) Servidor autoritativo: corre el MISMO sim + ai nativos.
+client/   TypeScript + three.js. SOLO dibuja, lee input, cámara, HUD, menú, feedback. NUNCA decide reglas.
+docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), character.md (pipeline de personaje).
 ```
 
-- **Sin Node.** TS se compila con el binario `esbuild` (escrito en Go). three.js vía import map.
-- La dependencia va en una sola dirección: `client -> wasm -> sim`. `sim` no conoce a nadie.
+- **Sin Node.** TS se compila con la API Go de `esbuild`. three.js (+ `three/addons/`) vía import map.
+- Dependencias en una sola dirección: `client -> wasm -> (ai, sim)`, `ai -> sim`. `sim` no conoce a nadie.
 
 ## Estándares de juego en browser
 
-1. **Fixed timestep**: `sim` avanza en ticks de `1/60 s` (`TickRate`). El cliente acumula tiempo real
-   con `requestAnimationFrame` y llama `step` N veces; renderiza **interpolando** entre el estado previo y el actual.
+1. **Fixed timestep**: `sim` a **120 Hz** (`TickRate`, como la física de RL). Red a 60 Hz (futuro). Render sin tope,
+   interpolando entre snapshot previo y actual. Duraciones en `Config` en **segundos**; el sim deriva ticks.
 2. **Determinismo**: mismo estado + mismos inputs = mismo resultado, nativo y WASM.
-   - Prohibido: `time.Now`, `math/rand` sin semilla del estado, iterar maps, goroutines en `sim`.
-   - Expresiones float de más de una operación sobre la misma línea: forzar redondeo con `float64(...)`
-     donde el compilador pueda fusionar en FMA (arm64). Usar los helpers de `vec.go`.
-3. **Input como acciones**, no teclas: `sim.PlayerInput`. El mapeo teclado/joystick/táctil vive en `client`.
-4. **Red (futuro)**: gracias a la regla de 1 toque, la trayectoria de la pelota entre toques es determinista.
-   Se sincronizan **eventos de toque** + movimiento de jugadores, no la pelota frame a frame.
-   Servidor autoritativo, predicción en cliente, interpolación de rivales.
+   - Prohibido: `time.Now`, `math/rand` (usar `sim.Hash64`/splitmix sobre el estado), iterar maps, goroutines en `sim`/`ai`.
+   - Expresiones float de más de una operación: forzar redondeo con `float64(...)` (FMA en arm64). Helpers de `vec.go`.
+3. **Input como acciones** (`sim.PlayerInput` v2): `MoveX/Z`, `TargetX/Z` (punto en cancha rival), `Buttons`
+   (Strike=1, Lob=2, Jump=4, Sprint=8, Dash=16) como **niveles mantenidos** — el sim detecta flancos. `Spin` −1/0/+1.
+   Mapeo teclado/mouse en `client/src/input.ts` (WASD, mouse apunta, click izq/der, rueda, Espacio, Shift, Q).
+4. **Golpe**: parte del cuerpo por altura (pie, rodilla, pecho, hombro, cabeza, chilena), buffer de timing con calidad
+   (perfect/good/forced), desvío determinista, velocidad **analítica** resuelta contra el integrador real.
+   Efecto solo en piques/paredes (sin Magnus) → trayectoria entre toques exacta.
+5. **Red (futuro)**: se sincronizan **eventos de toque** + movimiento de jugadores, no la pelota frame a frame.
+
+## Contrato y layout (CRÍTICO)
+
+- Snapshot, eventos, input y config tienen layout congelado en `docs/design/contact-v2.md §20`. **Solo se agrega al final.**
+- El cliente verifica el layout del wasm al cargar (`futenis.layout()` + `assertLayout`). Si cambiás un layout en Go,
+  actualizá `client/src/snapshot.ts` / `engine.ts` / `dev/panel.ts` **en el mismo commit**.
+- Toda config que entra por wasm pasa por `Config.Sanitize()` (rangos min/max en cada campo).
 
 ## Reglas WASM (performance)
 
-- **Un solo cruce JS<->Go por frame** para el estado: snapshot en buffer fijo (`[]float64` → bytes LE),
-  layout definido en `sim/snapshot.go`. Prohibidas llamadas granulares por entidad.
-- **Cero allocations por tick en `sim`**: buffers pre-allocados, `events` se reutiliza (`[:0]`).
-- Medir tamaño del `.wasm`; si molesta, evaluar TinyGo.
+- **Un solo cruce JS<->Go por frame** (snapshot en buffer fijo, bytes LE). Prohibidas llamadas granulares por entidad.
+- **Cero allocations por tick** en `sim` y `ai` (`testing.AllocsPerRun` en los tests). Cero allocations por frame en el cliente.
 
 ## Mundo
 
-- Unidades: metros, segundos. **Y arriba**. X = largo (-10..10), Z = ancho (-5..5). Red en X=0.
-- Lado 0 = X negativo, lado 1 = X positivo.
+- Metros, segundos. **Y arriba**. X = largo (-10..10), Z = ancho (-5..5). Red en X=0. Línea de saque ±6.95.
+- Equipo 0 = X negativo (humano, cámara detrás), equipo 1 = X positivo. `MaxPlayers = 4` (array fijo).
+
+## Arte y cliente
+
+- Dirección: **"arena nocturna neón"** indie con identidad propia. Colores **solo** en `client/src/env/theme.ts` (tokens).
+- Personaje **procedural** "toy athlete" (`client/src/character/`), hitbox del sim idéntico para todas las skins;
+  lo visual nunca afecta la física. Rig compartido → skins = parámetros.
+- Feedback tipo juego competitivo: anillo de timing, marcador de pique, flash dorado, callouts, VS / Victoria.
 
 ## Calidad
 
-- TDD en `sim`: test primero. `go test ./sim/...` debe pasar siempre. Coverage ≥ 80% en `sim`.
-- `go vet ./...` limpio. Funciones < 50 líneas, archivos < 400.
-- Inmutabilidad donde no cueste performance; en el hot path de `sim` se muta in-place a propósito (documentado).
-- Commits convencionales (`feat:`, `fix:`, ...). Sin atribución de IA.
+- TDD en `sim` y `ai`. `go test ./...` siempre verde. Coverage: `sim` ≥ 95%. Soak tests (`go test -run Soak ./sim/`).
+- `gofmt` + `go vet ./...` + `GOOS=js GOARCH=wasm go vet ./wasm/` limpios. `-race` en CI local.
+- Funciones < 50 líneas, archivos Go < 400, archivos TS < 200. TS strict, sin `any`.
+- Review independiente (go-reviewer) por etapa: cero CRITICAL/HIGH antes de mergear.
+- Commits convencionales (`feat:`, `fix:`, ...). Sin atribución de IA. Nunca push directo a `main`.
+
+## Correr
+
+```
+go run ./cmd/dev          # http://localhost:8090  (?dev=1 = panel de tuning)
+                          # http://localhost:8090/character.html = visor del personaje
+go test -short ./...      # rápido;  sin -short incluye soak y harness del bot (lento)
+```
 
 ## Fuera de alcance por ahora (YAGNI)
 
-Modelos 3D, skins, menús, React, ECS, base de datos, pagos, servidor online. Llegan por etapas.
+Online / servidor autoritativo, matchmaking, base de datos, pagos, skins comerciales, monedas, habilidades especiales,
+flip en el aire y "por cuatro" (salir y volver por encima del vidrio) → v3. React, ECS.

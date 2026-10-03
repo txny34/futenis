@@ -1,0 +1,160 @@
+import { Engine, MAX_STEPS, StepResult } from "./engine";
+import { ShotFeed } from "./feel/shots";
+import { Hud } from "./hud";
+import { Controls } from "./input";
+import { CourtView, HumanView, ScreenPoint } from "./render";
+import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
+
+const TICK_S = 1 / 120; // must match sim.TickRate
+const MAX_FRAME_DT_S = MAX_STEPS * TICK_S; // one wasm call per frame (125 ms): beyond that the sim slows down
+const MS_PER_S = 1000;
+const FPS_SMOOTHING = 0.1;
+const FPS_CAP_SLACK_MS = 0.5; // rAF jitter tolerance so a 60 cap on a 60 Hz screen never drops frames
+const HIT_STOP_MS = 50; // perfect-hit freeze frame
+const POPUP_LIFT_M = 0.8; // popup starts this far above the contact point
+const POPUP_DIR_SPEED = 4; // m/s of lateral (Z) shot speed mapped to full drift
+export const HUMAN_SLOT = 0;
+
+/** Mutable state the menu/settings drive. Read every frame, never reallocated. */
+export interface LoopState {
+  running: boolean;
+  paused: boolean;
+  fpsCap: number; // 0 = uncapped
+  cameraShake: boolean;
+  /** performance.now() ms until which the sim is held (VS intro). */
+  holdUntil: number;
+  /** Landing marker allowed for the current match (settings x difficulty). */
+  showLanding: boolean;
+}
+
+/** Final tally of a scored match (reused object). Games are the last set's,
+ * counted from EvGameWon: the sim zeroes State.Games when a set closes. */
+export interface MatchResult { winner: number; games0: number; games1: number }
+
+/** Fixed-timestep loop: accumulate real time, step the sim at 1/120 s, render interpolated. */
+export class GameLoop {
+  /** Fires once when a scored match reaches Phase.GameOver; call rearm() on a new match. */
+  onMatchOver: ((r: Readonly<MatchResult>, snap: Float64Array) => void) | null = null;
+  private frame: StepResult;
+  private acc = 0;
+  private last = 0;
+  private lastRender = 0;
+  private fps = 0;
+  private hitStopUntil = 0;
+  private overFired = false;
+  private stepped = false;
+  private readonly games = new Int32Array(2);
+  private readonly result: MatchResult = { winner: -1, games0: 0, games1: 0 };
+  private readonly shots = new ShotFeed();
+  private readonly point: ScreenPoint = { x: 0, y: 0 };
+  private readonly human: HumanView = { slot: HUMAN_SLOT, targetX: 0, targetZ: 0, showOverlays: false, showLanding: false };
+
+  constructor(
+    private readonly engine: Engine,
+    private readonly view: CourtView,
+    private readonly hud: Hud,
+    private readonly controls: Controls,
+    readonly state: LoopState,
+  ) {
+    this.frame = engine.peek();
+  }
+
+  start(): void {
+    this.last = performance.now();
+    this.lastRender = this.last;
+    requestAnimationFrame(this.tick);
+  }
+
+  rearm(): void {
+    this.overFired = false;
+    this.stepped = false; // the engine's snapshot still shows the previous match until the next step
+    this.shots.reset();
+    this.games.fill(0);
+    this.result.winner = -1;
+  }
+
+  private readonly tick = (now: number): void => {
+    requestAnimationFrame(this.tick);
+    const cap = this.state.fpsCap;
+    if (cap > 0 && now - this.lastRender < MS_PER_S / cap - FPS_CAP_SLACK_MS) return; // frame skip
+    const dt = Math.min((now - this.last) / MS_PER_S, MAX_FRAME_DT_S);
+    this.last = now;
+    this.lastRender = now;
+    if (dt > 0) this.fps += (1 / dt - this.fps) * FPS_SMOOTHING;
+    const frozen = now < this.hitStopUntil;
+    try {
+      if (!frozen) this.simulate(dt, now);
+    } catch (err) {
+      this.state.running = false;
+      this.hud.error(`Error de simulación: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    const live = this.state.running && !this.state.paused;
+    this.human.showOverlays = live;
+    this.human.showLanding = this.state.showLanding;
+    this.view.render(this.frame.prev, this.frame.curr, this.acc / TICK_S, live && !frozen ? dt : 0, this.human);
+    this.hud.update(this.frame.curr, now);
+    this.hud.setFps(this.fps);
+    this.hud.setSpin(this.controls.spinLevel);
+    this.checkMatchOver();
+  };
+
+  private simulate(dt: number, now: number): void {
+    const live = this.state.running && !this.state.paused && this.engine.loaded && now >= this.state.holdUntil;
+    if (!live) {
+      this.acc = 0;
+      return;
+    }
+    const input = this.controls.sample(this.view.camera);
+    this.human.targetX = input.targetX;
+    this.human.targetZ = input.targetZ;
+    this.engine.setInput(HUMAN_SLOT, input);
+    this.acc += dt;
+    const n = Math.min(Math.floor(this.acc / TICK_S), MAX_STEPS);
+    if (n > 0) {
+      this.acc -= n * TICK_S;
+      this.frame = this.engine.step(n);
+      this.stepped = true;
+      for (let i = 0; i < this.frame.eventCount; i++) this.onEvent(this.frame.events[i], now);
+    }
+    this.acc = Math.min(this.acc, TICK_S);
+  }
+
+  private onEvent(e: SimEvent, now: number): void {
+    if (e.kind === EventKind.BounceFloor && this.shots.rematePending) this.view.fx.splat(e.x, e.z);
+    const shot = this.shots.onEvent(e);
+    this.view.players.onEvent(e);
+    this.hud.onEvent(e, shot, now);
+    if (e.kind === EventKind.Kick) this.onKick(e, now);
+    else this.tally(e);
+  }
+
+  private tally(e: SimEvent): void {
+    const side = e.side === 1 ? 1 : 0;
+    if (e.kind === EventKind.GameWon) this.games[side]++;
+    if (e.kind === EventKind.SetWon || e.kind === EventKind.MatchWon || e.kind === EventKind.GameOver) {
+      this.result.games0 = this.games[0];
+      this.result.games1 = this.games[1];
+      if (e.kind !== EventKind.SetWon) this.result.winner = side;
+      else this.games.fill(0);
+    }
+  }
+
+  private onKick(e: SimEvent, now: number): void {
+    const perfect = e.quality === Quality.Perfect;
+    this.view.fx.impact(e.x, e.y, e.z, e.quality);
+    if (perfect) this.view.players.flash(e.player);
+    if (e.player !== HUMAN_SLOT) return;
+    const p = this.view.screenOf(e.x, e.y + POPUP_LIFT_M, e.z, this.point);
+    this.hud.hitPopup(e.quality, p.x, p.y, e.vz / POPUP_DIR_SPEED, now);
+    if (!perfect) return;
+    this.hitStopUntil = now + HIT_STOP_MS;
+    if (this.state.cameraShake) this.view.rig.shake();
+  }
+
+  private checkMatchOver(): void {
+    const c = this.frame.curr;
+    if (this.overFired || !this.stepped || !this.state.running || c[Snap.Phase] !== Phase.GameOver || c[Snap.Mode] === Mode.Playground) return;
+    this.overFired = true;
+    this.onMatchOver?.(this.result, c);
+  }
+}
