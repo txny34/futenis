@@ -181,3 +181,48 @@ func TestApplyRules_NonPlaygroundIgnoresFeed(t *testing.T) {
 		t.Fatal("1v1 must never judge feeds")
 	}
 }
+
+func evAt(kind EventKind, side, player int8, tick uint32) Event {
+	return Event{Kind: kind, Side: side, Player: player, Tick: tick}
+}
+
+// A body graze followed by the same player's strike inside bodyMergeTicks is
+// ONE touch (rules.go mergesWithBodyGraze): the kick re-launches the return.
+func TestJudgeFeed_GrazeThenOwnStrikeIsOneTouch(t *testing.T) {
+	s := liveFeedState(t, nil)
+	out := judgeSeq(&s,
+		ev(EvBounceFloor, 0, -1),
+		evAt(EvBodyHit, 0, 0, 100),
+		evAt(EvKick, 0, 0, 100+bodyMergeTicks),
+		evAt(EvBounceFloor, 1, -1, 200),
+	)
+	if countKind(out, EvReturnOK) != 1 || countKind(out, EvReturnFail) != 0 {
+		t.Fatalf("out=%+v, want one OK (graze+strike = one touch)", out)
+	}
+}
+
+func TestJudgeFeed_KickAfterStrikeStillFails(t *testing.T) {
+	cases := []struct {
+		name  string
+		first EventKind
+		gap   uint32
+	}{
+		{"kick then kick", EvKick, 1},
+		{"graze then late kick", EvBodyHit, bodyMergeTicks + 1},
+	}
+	for _, c := range cases {
+		s := liveFeedState(t, nil)
+		out := judgeSeq(&s, evAt(c.first, 0, 0, 100), evAt(EvKick, 0, 0, 100+c.gap))
+		if countKind(out, EvReturnFail) != 1 {
+			t.Errorf("%s: out=%+v, want a fail", c.name, out)
+		}
+	}
+}
+
+func TestJudgeFeed_GrazeKickThenSecondKickFails(t *testing.T) {
+	s := liveFeedState(t, nil)
+	out := judgeSeq(&s, evAt(EvBodyHit, 0, 0, 100), evAt(EvKick, 0, 0, 101), evAt(EvKick, 0, 0, 102))
+	if countKind(out, EvReturnFail) != 1 {
+		t.Fatalf("out=%+v, want fail on the third touch", out)
+	}
+}

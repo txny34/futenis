@@ -14,8 +14,6 @@ const (
 	beliefTolerance = 0.15
 	// netClearance keeps the intercept search away from the net plane.
 	netClearance = 0.4
-	// floorBounceMinSpeed mirrors sim's resting threshold (m/s).
-	floorBounceMinSpeed = 0.5
 	// lateral is the side-on stand-off (m) between the player's axis and
 	// the ball at contact: inside every low part's Reach, outside the body
 	// capsule (PlayerRadius+BallRadius = 0.46), so the ball meets the foot
@@ -77,103 +75,17 @@ func bestErr(cfg *sim.Config, hRel, dH float64, serveOnly bool) (sim.BodyPart, f
 	return best, bestU
 }
 
-// Mirrors of sim/physics.go's unexported bounce constants (keep in sync).
-const (
-	floorSpinFrictionMin = 0.4
-	floorSpinFrictionMax = 1.05
-	floorSpinRestMax     = 0.95
-	wallSpinRestMax      = 1.0
-	netBounceDamping     = 0.3
-)
-
-// stepBall advances b one tick with sim.PredictBall, then re-runs a local
-// mirror of stepBall's net/floor/wall resolution to report bounced (a floor
-// bounce on this tick).
-//
-// NOTE: sim.PredictBall is already bounce-aware (it resolves net/floor/wall
-// itself), so the local predictFloor never sees the ball below BallRadius
-// and bounced is always false today. Left as-is in the cleanup pass because
-// fixing it changes bot behavior (bounce windows in findIntercept/contactSoon).
+// stepBall advances b one tick with sim.PredictBall (which resolves
+// net/floor/wall exactly like the sim) and reports whether that tick was a
+// floor bounce, read off the returned state: the ball sits on the floor and
+// either rebounded (falling before, rising after) or just came to rest
+// (edge-triggered, like the sim's EvBounceFloor).
 func stepBall(b sim.Ball, cfg *sim.Config) (sim.Ball, bool) {
-	prev := b.Pos
-	b = sim.PredictBall(b, cfg, 1)
-	b = predictNet(b, prev)
-	b, bounced := predictFloor(b, cfg)
-	inside := math.Abs(prev.X) <= sim.CourtHalfLength && math.Abs(prev.Z) <= sim.CourtHalfWidth
-	if b.Pos.Y <= sim.WallHeight && inside {
-		b = predictWalls(b, cfg)
-	}
-	return b, bounced
-}
-
-func predictNet(b sim.Ball, prev sim.Vec3) sim.Ball {
-	if (prev.X < 0) == (b.Pos.X < 0) {
-		return b
-	}
-	t := (0 - prev.X) / (b.Pos.X - prev.X)
-	if prev.Y+float64((b.Pos.Y-prev.Y)*t) >= sim.NetHeight+sim.BallRadius {
-		return b
-	}
-	sign := 1.0
-	if prev.X < 0 {
-		sign = -1
-	}
-	b.Pos.X = sign * sim.BallRadius
-	b.Vel.X = float64(-b.Vel.X * netBounceDamping)
-	return b
-}
-
-func predictFloor(b sim.Ball, cfg *sim.Config) (sim.Ball, bool) {
-	if b.Pos.Y >= sim.BallRadius {
-		b.Resting = false
-		return b, false
-	}
-	b.Pos.Y = sim.BallRadius
-	if b.Vel.Y >= 0 {
-		return b, false
-	}
-	incoming := -b.Vel.Y
-	if incoming < floorBounceMinSpeed {
-		b.Vel.Y = 0
-		was := b.Resting
-		b.Resting = true
-		return b, !was
-	}
-	b.Resting = false
-	fric := clampF(float64(cfg.FloorFriction+cfg.SpinFloorFriction*b.Spin), floorSpinFrictionMin, floorSpinFrictionMax)
-	rest := clampF(float64(cfg.FloorRestitution*(1-cfg.SpinFloorRest*b.Spin)), 0, floorSpinRestMax)
-	b.Vel.Y = incoming * rest
-	b.Vel.X *= fric
-	b.Vel.Z *= fric
-	b.Spin *= cfg.SpinDecay
-	return b, true
-}
-
-func predictWalls(b sim.Ball, cfg *sim.Config) sim.Ball {
-	restW := clampF(float64(cfg.WallRestitution*(1+cfg.SpinWallRest*math.Min(b.Spin, 0))), 0, wallSpinRestMax)
-	var hx, hz bool
-	b.Pos.X, b.Vel.X, hx = reflectAxis(b.Pos.X, b.Vel.X, sim.CourtHalfLength-sim.BallRadius, restW)
-	b.Pos.Z, b.Vel.Z, hz = reflectAxis(b.Pos.Z, b.Vel.Z, sim.CourtHalfWidth-sim.BallRadius, restW)
-	if hx || hz {
-		if b.Spin < 0 {
-			b.Vel.Y -= float64(cfg.SpinWallDrop * (-b.Spin))
-		}
-		b.Spin *= cfg.SpinDecay
-	}
-	return b
-}
-
-func clampF(v, lo, hi float64) float64 { return math.Max(lo, math.Min(hi, v)) }
-
-// reflectAxis bounces one coordinate off the +/-limit wall pair.
-func reflectAxis(p, v, limit, rest float64) (float64, float64, bool) {
-	if p > limit {
-		return limit, float64(-v * rest), true
-	}
-	if p < -limit {
-		return -limit, float64(-v * rest), true
-	}
-	return p, v, false
+	next := sim.PredictBall(b, cfg, 1)
+	onFloor := next.Pos.Y <= sim.BallRadius
+	rebound := b.Vel.Y <= 0 && next.Vel.Y > 0
+	settled := next.Resting && !b.Resting
+	return next, onFloor && (rebound || settled)
 }
 
 // onTeamSide reports whether x lies in team's half, away from the net.

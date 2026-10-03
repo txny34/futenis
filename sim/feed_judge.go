@@ -40,6 +40,10 @@ func judgeFeedEvent(s *State, e Event) feedVerdict {
 		return feedFail
 	}
 	if s.Feed.Struck {
+		if mergesWithBodyGraze(&s.Rally, e) {
+			s.Rally.BodyGraze = false // the strike re-launches the same touch
+			return feedPending
+		}
 		return judgeReturnFlight(e)
 	}
 	return judgeIncoming(s, e)
@@ -52,6 +56,7 @@ func judgeIncoming(s *State, e Event) feedVerdict {
 	case EvKick, EvBodyHit:
 		// FeedVolleyOnly needs no check here: its first bounce already failed.
 		f.Struck = true
+		recordFeedTouch(&s.Rally, e)
 		return feedPending
 	case EvBounceFloor:
 		if e.Side != 0 {
@@ -69,6 +74,16 @@ func judgeIncoming(s *State, e Event) feedVerdict {
 	default:
 		return feedPending
 	}
+}
+
+// recordFeedTouch remembers the human's first touch so a body graze followed
+// by the same player's strike within bodyMergeTicks stays one touch, exactly
+// like a match (rules.go mergesWithBodyGraze). Playground has no padel rally,
+// so RallyState's touch fields are free for the judge.
+func recordFeedTouch(r *RallyState, e Event) {
+	r.LastPlayer = e.Player
+	r.BodyGraze = e.Kind == EvBodyHit
+	r.BodyGrazeTick = e.Tick
 }
 
 // feedOrVoid returns feedFail when the human is to blame, else feedVoid.
@@ -115,6 +130,7 @@ func resolveFeed(s *State, v feedVerdict, ev []Event) []Event {
 		ev = append(ev, Event{Kind: EvReturnFail, Tick: s.Tick, Pos: s.Ball.Pos, Side: 0, Player: -1})
 	}
 	f.Live, f.Struck, f.Bounces = false, false, 0
+	s.Rally.BodyGraze = false
 	f.NextTick = 0
 	if !s.Cfg.FeedOnDemand {
 		f.NextTick = s.Tick + uint32(s.Cfg.feedIntervalTicks)

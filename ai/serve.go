@@ -71,21 +71,18 @@ func (b *Bot) serveSetup(s *sim.State, slot int) sim.PlayerInput {
 }
 
 // serveSpot is behind the service line (so the toss, ServeTossOffset in
-// front, still bounces behind it), in the ServeBox's Z half.
+// front, still bounces behind it), on the half diagonally opposite the
+// target box: the serve goes crosscourt.
 func serveSpot(s *sim.State, team int8) (x, z float64) {
 	cfg := &s.Cfg
 	depth := cfg.ServiceLineDist + cfg.ServeTossOffset + serveStandMargin
 	depth = math.Min(depth, sim.CourtHalfLength-sim.PlayerRadius)
-	return -forward(team) * depth, boxSign(s.Rally.ServeBox) * serveStandZ
+	return -forward(team) * depth, -boxZ(s) * serveStandZ
 }
 
-// boxSign is the Z sign of ServeBox's half (box 0 = +Z, box 1 = -Z).
-func boxSign(box int8) float64 {
-	if box == 0 {
-		return 1
-	}
-	return -1
-}
+// boxZ is the Z sign of the target box (sim's side convention: box 0 = the
+// receiver's right, box 1 = the receiver's left).
+func boxZ(s *sim.State) float64 { return sim.ServeBoxZSign(s.Server, s.Rally.ServeBox) }
 
 // aimServe targets the middle of the diagonal box, with capped noise.
 func (b *Bot) aimServe(s *sim.State, slot int) {
@@ -93,17 +90,21 @@ func (b *Bot) aimServe(s *sim.State, slot int) {
 	noise := math.Min(b.Level.AimNoise, serveMaxNoise)
 	h := sim.Hash64(b.Seed ^ uint64(s.Score[0]+s.Score[1])<<4 ^ uint64(s.Rally.ServeAttempt))
 	b.aimX = forward(team) * (s.Cfg.ServiceLineDist*serveAimDepth + signed(h)*noise)
-	b.aimZ = boxSign(s.Rally.ServeBox) * (sim.CourtHalfWidth/2 + signed(sim.Hash64(h))*noise)
+	b.aimZ = boxZ(s) * (sim.CourtHalfWidth/2 + signed(sim.Hash64(h))*noise)
 	b.spin = 0
 }
 
-// serveWait positions non-servers: the receiver deep in the box half,
-// partners on their own half.
+// serveWait positions non-servers: the 1v1 receiver in the target box, the
+// server's 2v2 partner on the half the server left free, receivers on their
+// own slot's half.
 func (b *Bot) serveWait(s *sim.State, slot int) sim.PlayerInput {
 	me := &s.Players[slot]
 	x, z := home(s, slot)
-	if s.NumPlayers < 4 && me.Team != s.Server {
-		z = boxSign(s.Rally.ServeBox) * serveStandZ
+	switch {
+	case s.NumPlayers < 4 && me.Team != s.Server:
+		z = boxZ(s) * serveStandZ
+	case s.NumPlayers >= 4 && me.Team == s.Server:
+		z = boxZ(s) * sim.CourtHalfWidth / 2
 	}
 	return b.withAim(b.moveTo(me, x, z, false))
 }
