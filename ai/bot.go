@@ -8,21 +8,19 @@ import (
 
 const (
 	// replanEvery is how often (ticks) a still-valid intercept is recomputed.
-	replanEvery = 4
+	replanEvery = 3
 	// maxHoldTicks force-releases a charge that lost its intercept (2 s).
 	maxHoldTicks = 2 * sim.TickRate
 	// arriveRadius is the distance (m) under which the bot stops moving.
-	arriveRadius = 0.08
+	arriveRadius = 0.05
 	// slowRadius is the distance (m) under which the bot eases its speed.
-	slowRadius = 0.6
+	slowRadius = 0.5
 	// sprintDistance is the minimum distance (m) worth sprinting for.
-	sprintDistance = 2.5
-	// standBehind is how far (m) behind the ball the bot wants to stand.
-	standBehind = 0.35
+	sprintDistance = 2.0
 	// homeDepth is the recovery distance (m) from the net.
-	homeDepth = 6.5
+	homeDepth = 7.0
 	// jumpLeadTicks is when, before contact, the bot presses jump.
-	jumpLeadTicks = 30
+	jumpLeadTicks = 20
 )
 
 // Bot is a deterministic, allocation-free AI controller for one slot.
@@ -37,13 +35,18 @@ type Bot struct {
 	hasBelief  bool
 	countdown  int // reaction ticks left before the belief resyncs
 
-	plan      intercept
-	planAge   int
-	holdTicks int   // ticks the current charge has been held
-	shot      uint8 // BtnStrike or BtnLob while charging, else 0
-	aimX      float64
-	aimZ      float64
-	spin      int8
+	plan        intercept
+	win         bounceWindow
+	planAge     int
+	holdTicks   int     // ticks the current charge has been held
+	shot        uint8   // BtnStrike or BtnLob while charging, else 0
+	aimed       bool    // target/shot latched for the coming contact
+	pendingShot uint8   // shot to press once the charge window opens
+	chargeWant  int     // desired charge ticks for the latched shot
+	cooldown    int     // ticks left of a released strike buffer (no re-press)
+	aimX        float64 // latched target
+	aimZ        float64
+	spin        int8
 }
 
 // New returns a bot with the preset Level for difficulty, seeded by slot.
@@ -59,6 +62,9 @@ func (b *Bot) Think(s *sim.State, slot int) sim.PlayerInput {
 		return sim.PlayerInput{}
 	}
 	b.updateBelief(s)
+	if b.cooldown > 0 {
+		b.cooldown--
+	}
 	switch s.Phase {
 	case sim.PhaseServe:
 		return b.thinkServe(s, slot)
@@ -112,7 +118,14 @@ func unit(h uint64) float64 { return float64(h>>11) * 0x1p-53 }
 // signed maps hash bits to [-1, 1).
 func signed(h uint64) float64 { return unit(h)*2 - 1 }
 
-func (b *Bot) resetCharge() { b.shot, b.holdTicks = 0, 0 }
+func (b *Bot) resetCharge() { b.shot, b.holdTicks, b.aimed = 0, 0, false }
+
+// release lets go of the charge and blocks re-pressing while the sim's
+// strike buffer is live (a re-press would cancel it).
+func (b *Bot) release(cfg *sim.Config) {
+	b.resetCharge()
+	b.cooldown = ticksOfSec(cfg.StrikeBufferTime) + 1
+}
 
 // forward is +1 when team attacks toward +X.
 func forward(team int8) float64 {
@@ -137,7 +150,7 @@ func (b *Bot) speedFor(p *sim.Player, cfg *sim.Config) float64 {
 func (b *Bot) moveTo(p *sim.Player, x, z float64, urgent bool) sim.PlayerInput {
 	dx, dz := x-p.Pos.X, z-p.Pos.Z
 	d := math.Sqrt(float64(dx*dx) + float64(dz*dz))
-	in := sim.PlayerInput{TargetX: b.aimX, TargetZ: b.aimZ, Spin: b.spin, Buttons: b.shot}
+	in := sim.PlayerInput{TargetX: b.aimX, TargetZ: b.aimZ, Spin: b.spin}
 	if d < arriveRadius {
 		return in
 	}
@@ -166,6 +179,8 @@ func home(s *sim.State, slot int) (x, z float64) {
 // recover walks back to the home spot, drifting toward the ball's lane.
 func (b *Bot) recover(s *sim.State, slot int) sim.PlayerInput {
 	x, z := home(s, slot)
-	z = float64(z*0.7) + float64(b.belief.Pos.Z*0.3)
+	if s.NumPlayers < 4 {
+		z = float64(b.belief.Pos.Z * 0.4)
+	}
 	return b.moveTo(&s.Players[slot], x, z, false)
 }

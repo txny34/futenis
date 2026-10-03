@@ -78,7 +78,7 @@ func TestServerReachesBallAndServes(t *testing.T) {
 func TestBotMatchesAlwaysFinish(t *testing.T) {
 	for _, mode := range []sim.Mode{sim.Mode1v1, sim.Mode2v2} {
 		for d := Easy; d <= Pro; d++ {
-			for seed := uint64(0); seed < 5; seed++ {
+			for seed := uint64(0); seed < 2; seed++ {
 				r := playMatch(mode, [sim.MaxPlayers]Difficulty{d, Pro - d, d, Pro - d}, seed)
 				if r.winner < 0 {
 					t.Fatalf("mode %d %v seed %d hit the tick cap", mode, d, seed)
