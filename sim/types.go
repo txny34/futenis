@@ -31,6 +31,7 @@ type Config struct {
 	PointsToWin      int
 }
 
+// DefaultConfig returns the baseline tuned Config used by a fresh Match.
 func DefaultConfig() Config {
 	return Config{
 		Gravity:          9.81,
@@ -55,33 +56,54 @@ type PlayerInput struct {
 	Power        float64 // 0..1
 }
 
+// Ball is the ball's kinematic state: position and velocity in meters/(m/s).
 type Ball struct {
 	Pos, Vel Vec3
+	// Resting is true once the ball has settled on the floor (a downward
+	// contact slow enough that Vel.Y was clamped to 0 instead of bounced).
+	// Edge-triggered: resolveFloor emits EvBounceFloor exactly once when
+	// this flips false->true, not on every tick while the ball keeps
+	// resting/rolling. Cleared once the ball is airborne again.
+	Resting bool
+	// Out is true once the ball has left the court bounds. Edge-triggered:
+	// resolveWalls emits EvOut exactly once when this flips false->true, not
+	// on every tick while the ball stays outside. Cleared once the ball is
+	// back inside the court bounds.
+	Out bool
 }
 
+// Player is one player's kinematic state and which half of the court they
+// are confined to.
 type Player struct {
 	Pos, Vel Vec3
 	Side     int8 // 0 = X negative, 1 = X positive
 }
 
+// Phase is which stage of a point the match is in.
 type Phase uint8
 
+// Phase values, in the order a point normally progresses through them.
 const (
-	PhaseServe Phase = iota // ball waiting for the server's kick
-	PhaseRally              // ball in play
-	PhasePoint              // point just scored, short pause before next serve
-	PhaseGameOver
+	PhaseServe    Phase = iota // ball waiting for the server's kick
+	PhaseRally                 // ball in play
+	PhasePoint                 // point just scored, short pause before next serve
+	PhaseGameOver              // match decided, Step is a no-op
 )
 
+// EventKind identifies what kind of Event was emitted by Step.
 type EventKind uint8
 
+// EventKind values. BounceFloor/HitWall/HitNet/Out describe something that
+// happened to the ball; Kick/Point/GameOver describe a player or score
+// action. Order matters for wire compatibility: EvOut was added last.
 const (
-	EvBounceFloor EventKind = iota + 1
-	EvHitWall
-	EvHitNet
-	EvKick
-	EvPoint
-	EvGameOver
+	EvBounceFloor EventKind = iota + 1 // ball bounced on the floor
+	EvHitWall                          // ball hit a side/back wall
+	EvHitNet                           // ball clipped the net below NetHeight
+	EvKick                             // a player kicked the ball
+	EvPoint                            // a point was awarded
+	EvGameOver                         // the match ended
+	EvOut                              // ball left the court bounds
 )
 
 // Event is emitted by Step. Side meaning depends on Kind:
@@ -95,10 +117,9 @@ type Event struct {
 
 // RallyState is the bookkeeping the rules need inside a rally.
 type RallyState struct {
-	LastKicker       int8   // -1 if none yet
-	BouncesOnSide    [2]int // floor bounces on each side since the last kick
-	WallBeforeBounce bool   // ball hit a wall on the receiving side before bouncing there
-	PauseTicks       int    // remaining ticks in PhasePoint
+	LastKicker    int8   // -1 if none yet
+	BouncesOnSide [2]int // floor bounces on each side since the last kick
+	PauseTicks    int    // remaining ticks in PhasePoint
 }
 
 // State is the full deterministic game state. Copyable by value (snapshots, rollback).

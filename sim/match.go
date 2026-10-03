@@ -7,6 +7,8 @@ type Match struct {
 	events []Event
 }
 
+// NewMatch creates a Match with the given Config, starting with side 0
+// serving.
 func NewMatch(cfg Config) *Match {
 	m := &Match{events: make([]Event, 0, 32)}
 	m.state.Cfg = cfg
@@ -29,9 +31,14 @@ func (m *Match) Step(inputs [2]PlayerInput) []Event {
 	if s.Phase == PhaseGameOver {
 		return m.events
 	}
-	movePlayers(s, inputs)
-	m.events = applyKicks(s, inputs, m.events)
-	if s.Phase == PhaseRally {
+
+	sanitized := [2]PlayerInput{sanitizeInput(inputs[0]), sanitizeInput(inputs[1])}
+
+	movePlayers(s, sanitized)
+	m.events = applyKicks(s, sanitized, m.events)
+	// The ball keeps flying visually during the point pause; rules.go only
+	// judges events while Phase == PhaseRally.
+	if s.Phase == PhaseRally || s.Phase == PhasePoint {
 		m.events = stepBall(s, m.events)
 	}
 	m.events = applyRules(s, m.events)
