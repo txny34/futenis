@@ -59,10 +59,10 @@ func TestSanitizeInput(t *testing.T) {
 			want: PlayerInput{TargetX: -(CourtHalfLength - cfg.TargetWallMargin), TargetZ: -(CourtHalfWidth - cfg.TargetWallMargin)},
 		},
 		{
-			name: "a target requested on the player's own half is pushed to the rival half",
+			name: "a target on the player's own half is kept (the low-aim shot into the net)",
 			in:   PlayerInput{TargetX: -3},
 			side: 0,
-			want: PlayerInput{TargetX: 3},
+			want: PlayerInput{TargetX: -3},
 		},
 	}
 

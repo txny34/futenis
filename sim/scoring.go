@@ -115,7 +115,8 @@ func awardPointPadel(s *State, winner int8, ev []Event) []Event {
 	if hasWonGamePadel(s.Score[winner], s.Score[1-winner], golden) {
 		return awardGamePadel(s, winner, ev)
 	}
-	return appendGamePointWarnings(s, target, golden, ev)
+	ev = appendGamePointWarnings(s, target, golden, ev)
+	return startNextPoint(s, winner, ev)
 }
 
 // appendGamePointWarnings emits EvGamePoint (server) / EvBreakPoint

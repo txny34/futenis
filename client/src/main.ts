@@ -70,6 +70,7 @@ function startMatch(app: App, o: MatchOptions): void {
   if (app.menu) app.state.showLanding = landingAllowed(app.menu.settings, o);
   app.controls.releaseAll();
   app.controls.enabled = true;
+  app.controls.lock();
   app.loop?.rearm();
   app.hud.resetMatch();
   app.hud.setDashCooldown(app.engine.getConfig()[CFG_DASH_COOLDOWN]);
@@ -105,6 +106,7 @@ function applySettings(app: App, s: Settings): void {
   app.state.cameraShake = s.game.cameraShake;
   app.state.showLanding = landingAllowed(s, app.last);
   app.view.rig.dynamic = s.game.dynamicCamera;
+  app.view.rig.sensitivity = s.controls.mouseSensitivity;
   app.hud.setFpsVisible(s.video.showFps);
   app.hud.setScale(s.game.hudScale);
 }
@@ -125,6 +127,10 @@ function wire(app: App, menu: MenuUI): void {
     app.mode = null;
     app.screens.hide();
   });
+  app.controls.onLook = (dx, dy) => app.view.rig.look(dx, dy);
+  app.controls.onZoom = (d) => app.view.rig.zoom(d);
+  app.controls.onLockChange = (locked) => app.hud.setCrosshair(locked);
+  app.controls.onLockLost = () => { if (app.state.running && !menu.isOpen) menu.showPause(); }; // native Esc
   menu.onSettingsChange((s) => applySettings(app, s));
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {

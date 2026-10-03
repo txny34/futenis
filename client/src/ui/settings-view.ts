@@ -16,13 +16,13 @@ const TABS: readonly Choice<TabId>[] = [
 
 const BINDINGS: readonly (readonly [string, string])[] = [
   ["Mover", "W A S D"],
-  ["Apuntar", "Mouse"],
-  ["Cargar / patear", "Click izq."],
+  ["Cámara / apuntar", "Mouse (mira al centro)"],
+  ["Zoom", "Rueda"],
+  ["Golpe", "Click izq."],
   ["Globo", "Click der."],
-  ["Efecto", "Rueda"],
   ["Salto", "Espacio"],
-  ["Sprint", "Shift"],
   ["Dash", "Q"],
+  ["Mouse libre", "Ctrl"],
 ];
 
 const QUALITY_CHOICES: readonly Choice<Quality>[] = [

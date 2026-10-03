@@ -5,6 +5,14 @@
 
 export type StrikePart = "foot" | "knee" | "chest" | "shoulder" | "head" | "bicycle";
 
+/** Visual strike tiers: the sim keeps 6 parts, the puppet animates 3. */
+export type StrikeTier = "low" | "mid" | "high";
+
+/** Single sim part -> animation tier mapping (chilena reads as a header for now). */
+export const PART_TIER: Readonly<Record<StrikePart, StrikeTier>> = {
+  foot: "low", knee: "low", chest: "mid", shoulder: "mid", head: "high", bicycle: "high",
+};
+
 export interface ZoneBand {
   readonly min: number;
   readonly ideal: number;

@@ -1,17 +1,16 @@
 import * as THREE from "three";
 import { THEME } from "../env/theme";
-import { Character, CharacterPose, DEFAULT_LOOK, StrikePart, createCharacter } from "../character/character";
+import { Character, CharacterPose, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter } from "../character/character";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import {
-  EventKind, Extra, MAX_PLAYERS, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, SimEvent, Snap, teamOf,
+  EventKind, Extra, MAX_PLAYERS, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
 } from "../snapshot";
 
 const TEAM_SHIRTS = THEME.team;
 const PARTNER_SHORTS = [0xf2f2f2, 0x2b2f36] as const; // slot 0 / slot 1 of a team
 const TICK_RATE = 120; // mirrors sim.TickRate
-const SPEED_REF = 7.5; // m/s mapped to pose.speed = 1 (~sprint speed)
-const SPRINT_NORM = 0.8;
+const SPEED_REF = 7.5; // m/s mapped to pose.speed = 1 (top run speed)
 const FACING_MIN_SPEED = 0.5; // below this, players face the net
 const FACE_POS_X = Math.PI / 2; // facing +X (team 0 looks at the net)
 const STRIKE_DURATION_S = 0.45;
@@ -25,7 +24,8 @@ interface Slot {
   readonly contact: THREE.Vector3;
   readonly flash: HitFlash;
   strikeT: number;
-  strikePart: StrikePart;
+  strikeTier: StrikeTier;
+  strikePerfect: boolean;
   hasContact: boolean;
 }
 
@@ -33,11 +33,11 @@ function makeSlot(scene: THREE.Scene): Slot {
   const character = createCharacter(DEFAULT_LOOK);
   character.root.traverse((o) => { o.castShadow = true; });
   scene.add(character.root);
-  const strike = { part: "foot" as StrikePart, t: 0, contact: null };
+  const strike = { tier: "low" as StrikeTier, perfect: false, t: 0, contact: null };
   const pose: CharacterPose = {
-    speed: 0, sprinting: false, airborne: false, verticalVel: 0, charge: 0, strike, facing: FACE_POS_X,
+    speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: FACE_POS_X,
   };
-  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), strikeT: 0, strikePart: "foot", hasContact: false };
+  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), strikeT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
 }
 
 /** Up to 4 procedural characters posed from the interpolated snapshot. Allocation-free per frame. */
@@ -56,7 +56,8 @@ export class PlayersView {
     if (e.player < 0 || e.player >= MAX_PLAYERS) return;
     const s = this.slots[e.player];
     const name = PART_NAMES[e.part] ?? "none";
-    s.strikePart = name === "none" ? "foot" : name;
+    s.strikeTier = name === "none" ? "low" : PART_TIER[name];
+    s.strikePerfect = e.kind === EventKind.Kick && e.quality === Quality.Perfect;
     s.strikeT = STRIKE_START_T;
     s.hasContact = e.kind !== EventKind.Whiff;
     s.contact.set(e.x, e.y, e.z);
@@ -92,7 +93,6 @@ export class PlayersView {
     const speed = Math.hypot(vx, vz);
     const p = s.pose;
     p.speed = Math.min(1, speed / SPEED_REF);
-    p.sprinting = p.speed > SPRINT_NORM;
     p.airborne = curr[e + Extra.OnGround] === 0;
     p.verticalVel = (curr[PLAYER_POS[i] + 1] - prev[PLAYER_POS[i] + 1]) * TICK_RATE;
     p.charge = curr[e + Extra.Charge];
@@ -107,7 +107,8 @@ export class PlayersView {
     if (s.strikeT > 0) s.strikeT += dt / STRIKE_DURATION_S;
     if (s.strikeT >= 1) s.strikeT = 0;
     st.t = s.strikeT;
-    st.part = s.strikePart;
+    st.tier = s.strikeTier;
+    st.perfect = s.strikePerfect;
     st.contact = s.strikeT > 0 && s.hasContact ? s.contact : null;
   }
 

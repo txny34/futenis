@@ -52,15 +52,15 @@ export const THEME: Theme = {
   skyTop: 0x02040d,
   skyHorizon: 0x10224a,
   fog: 0x070d22,
-  courtFloor: 0x0c5560, // darker teal: the neon ball and white lines pop
+  courtFloor: 0x2c3354, // slate blue-grey like the reference: the neon ball and white lines pop
   courtLines: 0xf4fbff,
-  apron: 0x0a1630,
+  apron: 0x1a1f38,
   glass: 0x9fe8ff,
-  glassEdge: 0xd8f6ff,
-  mesh: 0x1a2130,
+  glassEdge: 0x2a3142, // dark metal panel frames
+  mesh: 0x07090f,
   metal: 0x161b26,
   netMesh: 0x05080d,
-  netBand: 0xffffff,
+  netBand: 0x3b7bff,
   neonA: 0xff5a4e,
   neonB: 0x19e3ff,
   ball: 0xe6ff1f,

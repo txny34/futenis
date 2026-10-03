@@ -9,11 +9,11 @@ import "math"
 // math.Pow (docs/design/contact-v2.md §9: "N <= 600 a 120 Hz").
 const maxSolveTicks = 600
 
-// netClearanceIterations is how many times driveTicks is allowed to grow N
-// and re-solve looking for a trajectory that clears the net with the
-// configured margin (docs/design/contact-v2.md §9: "máx 12 iteraciones,
-// acotado").
-const netClearanceIterations = 12
+// liftStep / liftMaxSteps bound liftOverNet's search (at most 48 net checks).
+const (
+	liftStep     = 0.25
+	liftMaxSteps = 48
+)
 
 // clampLen scales v down to maxLen if it is longer, leaving it untouched
 // (including the zero vector) otherwise.
@@ -102,7 +102,7 @@ func netClearanceOK(cfg *Config, from, v Vec3) bool {
 // start from the no-drag estimate d/(vh*Dt), refine it against the actual
 // k-weighted average speed with two fixed-point iterations, then grow N
 // (re-solving each time) until the resulting trajectory clears the net by
-// DriveNetClearance, or netClearanceIterations is exhausted.
+// DriveNetClearance (ensureNetClearance).
 func driveTicks(cfg *Config, from, target Vec3, d, vh float64) int {
 	if vh <= 0 {
 		vh = 1e-6
@@ -126,22 +126,63 @@ func driveTicks(cfg *Config, from, target Vec3, d, vh float64) int {
 	return ensureNetClearance(cfg, from, target, n)
 }
 
-// ensureNetClearance grows n until launchVelocity(n) clears the net with
-// the configured margin, or gives up after netClearanceIterations (a
-// deliberately short/over-powered shot is allowed to clip the net — that is
-// the "red = castigo legítimo" mechanic, not a bug).
+// ensureNetClearance returns the smallest n >= the requested one whose
+// launchVelocity clears the net with the configured margin (the aim
+// assist: a shot aimed at the rival half always passes the net). A longer
+// flight means a higher arc, so clearance is monotonic in n: double n until
+// it clears, then bisect back down. A target on the striker's own side is
+// left alone (aiming there is the deliberate "into the net" shot).
 func ensureNetClearance(cfg *Config, from, target Vec3, n int) int {
 	if sideOf(from.X) == sideOf(target.X) {
 		return n
 	}
-	for iter := 0; iter < netClearanceIterations; iter++ {
-		v := launchVelocity(cfg, from, target, n)
-		if netClearanceOK(cfg, from, v) {
-			return n
-		}
-		n++
+	clears := func(n int) bool { return netClearanceOK(cfg, from, launchVelocity(cfg, from, target, n)) }
+	if clears(n) {
+		return n
 	}
-	return n
+	lo, hi := n, n
+	for !clears(hi) {
+		if hi >= maxSolveTicks {
+			return maxSolveTicks
+		}
+		lo, hi = hi, min(hi*2, maxSolveTicks)
+	}
+	for hi-lo > 1 {
+		mid := (lo + hi) / 2
+		if clears(mid) {
+			hi = mid
+		} else {
+			lo = mid
+		}
+	}
+	return hi
+}
+
+// liftOverNet is the last line of the aim assist, after the part's speed cap
+// shortened the shot: it raises the vertical launch speed in liftStep
+// increments (bounded) until the ball clears the net, trading horizontal
+// speed for lift so |v| never exceeds maxSpeed (a higher, shorter ball, not
+// a faster one). Own-side targets are never lifted.
+func liftOverNet(cfg *Config, from, target, v Vec3, maxSpeed float64) Vec3 {
+	if sideOf(from.X) == sideOf(target.X) {
+		return v
+	}
+	for i := 0; i < liftMaxSteps && v.Y < maxSpeed && !netClearanceOK(cfg, from, v); i++ {
+		v.Y = math.Min(v.Y+liftStep, maxSpeed)
+		v = capHorizontal(v, maxSpeed)
+	}
+	return v
+}
+
+// capHorizontal scales v's XZ part down so |v| <= maxSpeed, keeping v.Y.
+func capHorizontal(v Vec3, maxSpeed float64) Vec3 {
+	h := math.Hypot(v.X, v.Z)
+	room := math.Sqrt(math.Max(float64(maxSpeed*maxSpeed-v.Y*v.Y), 0))
+	if h <= room || h == 0 {
+		return v
+	}
+	k := room / h
+	return Vec3{X: float64(v.X * k), Y: v.Y, Z: float64(v.Z * k)}
 }
 
 // lobTicks picks N for a Lob shot from the desired apex height (linearly

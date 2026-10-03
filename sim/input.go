@@ -40,11 +40,11 @@ func sanitizeSpin(v int8) int8 {
 	return v
 }
 
-// sanitizeTargetX clamps TargetX to the rival half of the court for the
-// given side: NaN/Inf collapses to the center of the rival half, otherwise
-// its magnitude is clamped to [TargetMinFromNet, CourtHalfLength-
-// TargetWallMargin] and given the sign that points at the rival half
-// (forwardSign(side)).
+// sanitizeTargetX clamps TargetX's magnitude to [TargetMinFromNet,
+// CourtHalfLength-TargetWallMargin] keeping its side: NaN/Inf (and 0)
+// collapse to / point at the rival half. A target on the player's own half
+// is kept on purpose: it is the "aimed very low" shot, which gets no net
+// assist from the solver (ensureNetClearance) and ends in the net.
 func sanitizeTargetX(x float64, side int8, cfg *Config) float64 {
 	fwd := forwardSign(side)
 	if math.IsNaN(x) || math.IsInf(x, 0) {
@@ -52,6 +52,9 @@ func sanitizeTargetX(x float64, side int8, cfg *Config) float64 {
 	}
 	maxAbs := CourtHalfLength - cfg.TargetWallMargin
 	absX := clamp(math.Abs(x), cfg.TargetMinFromNet, maxAbs)
+	if x*fwd < 0 {
+		return -fwd * absX
+	}
 	return fwd * absX
 }
 

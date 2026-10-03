@@ -40,5 +40,5 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
 }
 
 export type { CharacterPose, StrikePose } from "./animator";
-export type { CharacterLook, StrikePart } from "./config";
-export { BODY, DEFAULT_LOOK, SIM_ZONES } from "./config";
+export type { CharacterLook, StrikePart, StrikeTier } from "./config";
+export { BODY, DEFAULT_LOOK, PART_TIER, SIM_ZONES } from "./config";

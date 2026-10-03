@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { buildCourt } from "./court";
 import { Arena } from "./env/arena";
-import { Contact, Extra, FLAG_STAMINA_LOCK, PLAYER_CONTACT, PLAYER_EXTRA, PLAYER_POS, Phase, Snap, teamOf } from "./snapshot";
+import { Contact, Extra, PLAYER_CONTACT, PLAYER_EXTRA, PLAYER_POS, Phase, Snap, teamOf } from "./snapshot";
 import type { Quality } from "./ui/settings";
 import { BallView } from "./view/ball";
 import { CameraRig } from "./view/camera";
@@ -142,8 +142,7 @@ export class CourtView {
     this.overlays.setVisible(visible);
     if (!visible) return;
     const e = PLAYER_EXTRA[h.slot];
-    const locked = ((curr[e + Extra.Flags] | 0) & FLAG_STAMINA_LOCK) !== 0;
-    this.overlays.update(this.humanFeet, h.targetX, h.targetZ, curr[e + Extra.Stamina], locked, curr[e + Extra.Charge], this.rig.camera);
+    this.overlays.update(this.humanFeet, h.targetX, h.targetZ, curr[e + Extra.Charge]);
   }
 
   private resize(): void {

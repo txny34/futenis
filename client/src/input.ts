@@ -2,45 +2,69 @@ import * as THREE from "three";
 import type { HumanInput } from "./engine";
 import { Btn } from "./snapshot";
 
-// Single human on slot 0. Camera sits behind team 0 looking along +X, so
-// screen up = +X and screen right = +Z: W=+X, S=-X, D=+Z, A=-Z.
-// Everything is a held LEVEL (PlayerInput v2); the sim detects edges itself.
+// Single human on slot 0, Roblox-style: the mouse (pointer lock) turns the
+// camera, WASD moves relative to the camera yaw, and the aim is wherever the
+// crosshair (above the screen center, AIM_NDC_Y) hits the floor. Everything is a held LEVEL
+// (PlayerInput v2); the sim detects edges itself. Spin is always 0.
 const KEY_UP = "KeyW";
 const KEY_DOWN = "KeyS";
 const KEY_LEFT = "KeyA";
 const KEY_RIGHT = "KeyD";
 const KEY_JUMP = "Space";
 const KEY_DASH = "KeyQ";
-const SPRINT_KEYS = ["ShiftLeft", "ShiftRight"] as const;
+const KEY_FREE_MOUSE = "ControlLeft";
 const PREVENT_DEFAULT = new Set(["Space", "ArrowUp", "ArrowDown"]);
 const MOUSE_LEFT = 1; // PointerEvent.buttons bit
 const MOUSE_RIGHT = 2;
-const SPIN_MIN = -1;
-const SPIN_MAX = 1;
-const DEFAULT_TARGET_X = 5; // middle of the rival half until the mouse moves
+const AIM_NDC_Y = 0.25; // crosshair height in NDC = 37.5% from the top (hud.css #crosshair)
+const DEFAULT_TARGET_X = 5; // middle of the rival half
+const RIVAL_MIN_X = 0.5; // team 0 aims at X > 0
+const COURT_HALF_Z = 5;
+const MIN_FORWARD_X = 0.05; // camera facing away from the rival: aim straight ahead
+const SHORT_TARGET_X = 1.5; // crosshair on our own half (looking down): a short drop past the net
+const DEEP_TARGET_X = 9.5; // crosshair above the horizon: deepest shot
+const LOW_AIM_X = -2.5; // crosshair this deep into our own half (aiming really low): the shot goes into the net
 
 /** Keyboard + mouse -> HumanInput. Knows nothing about rules. Allocation-free per frame. */
 export class Controls {
-  /** False while a menu is open: pointer/keys are ignored and levels drop to zero. */
-  enabled = false;
+  /** Mouse delta while locked (pixels). */
+  onLook: ((dx: number, dy: number) => void) | null = null;
+  /** Wheel deltaY (positive = zoom out). */
+  onZoom: ((deltaY: number) => void) | null = null;
+  /** Pointer lock lost without the player asking (native Esc): the app pauses. */
+  onLockLost: (() => void) | null = null;
+  onLockChange: ((locked: boolean) => void) | null = null;
+  private on = false;
+  private locked = false;
+  private freeRequested = false;
+  private canvas: HTMLElement | null = null;
   private readonly down = new Set<string>();
   private mouseButtons = 0;
-  private spin = 0;
-  private hasPointer = false;
-  private readonly ndc = new THREE.Vector2();
+  private latched = 0; // buttons pressed since the last sample: a click shorter than a frame still counts
+  private readonly center = new THREE.Vector2(0, AIM_NDC_Y);
   private readonly raycaster = new THREE.Raycaster();
   private readonly floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly hit = new THREE.Vector3();
+  private readonly fwd = new THREE.Vector3();
   private readonly action: HumanInput = { moveX: 0, moveZ: 0, targetX: DEFAULT_TARGET_X, targetZ: 0, buttons: 0, spin: 0 };
   private pressHandler: ((code: string) => void) | null = null;
 
+  /** False while a menu is open: input is ignored, levels drop to zero and the pointer is released. */
+  get enabled(): boolean { return this.on; }
+  set enabled(v: boolean) {
+    this.on = v;
+    if (!v && this.locked) document.exitPointerLock();
+  }
+
   attach(canvas: HTMLElement): void {
+    this.canvas = canvas;
     window.addEventListener("keydown", (e) => this.onKeyDown(e));
     window.addEventListener("keyup", (e) => this.down.delete(e.code));
     window.addEventListener("blur", () => this.releaseAll());
-    canvas.addEventListener("pointermove", (e) => this.onPointer(e, canvas));
-    canvas.addEventListener("pointerdown", (e) => this.onPointer(e, canvas));
-    window.addEventListener("pointerup", (e) => { this.mouseButtons = e.buttons; });
+    canvas.addEventListener("pointerdown", (e) => this.onPointerDown(e));
+    window.addEventListener("pointerup", (e) => { this.mouseButtons = this.on ? e.buttons : 0; });
+    document.addEventListener("mousemove", (e) => { if (this.locked && this.on) this.onLook?.(e.movementX, e.movementY); });
+    document.addEventListener("pointerlockchange", () => this.onLockState());
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
   }
@@ -48,42 +72,73 @@ export class Controls {
   /** Non-repeating key press callback (B respawn, R reset...). */
   onKeyPress(fn: (code: string) => void): void { this.pressHandler = fn; }
 
-  /** Current wheel spin level -1/0/+1, for the HUD. */
-  get spinLevel(): number { return this.spin; }
+  get isLocked(): boolean { return this.locked; }
 
-  /** Fills and returns the reused input, projecting the cursor onto the court plane. */
+  /** Fills and returns the reused input: camera-relative move + crosshair aim. */
   sample(camera: THREE.Camera): HumanInput {
     const a = this.action;
-    if (!this.enabled) {
+    a.spin = 0;
+    if (!this.on) {
       a.moveX = 0; a.moveZ = 0; a.buttons = 0;
       return a;
     }
-    a.moveX = this.axis(KEY_DOWN, KEY_UP);
-    a.moveZ = this.axis(KEY_LEFT, KEY_RIGHT);
+    camera.getWorldDirection(this.fwd);
+    this.move(a);
     a.buttons = this.buttons();
-    a.spin = this.spin;
-    if (this.hasPointer) this.project(camera, a);
+    this.latched = 0;
+    this.aim(camera, a);
     return a;
   }
 
   releaseAll(): void {
     this.down.clear();
     this.mouseButtons = 0;
+    this.latched = 0;
   }
 
-  private project(camera: THREE.Camera, a: HumanInput): void {
-    this.raycaster.setFromCamera(this.ndc, camera);
-    if (this.raycaster.ray.intersectPlane(this.floor, this.hit) === null) return;
-    a.targetX = this.hit.x; // clamp to the rival half is the sim's job
-    a.targetZ = this.hit.z;
+  private move(a: HumanInput): void {
+    let fx = this.fwd.x;
+    let fz = this.fwd.z;
+    const len = Math.hypot(fx, fz);
+    if (len < 1e-6) { fx = 1; fz = 0; } else { fx /= len; fz /= len; }
+    const f = this.axis(KEY_DOWN, KEY_UP);
+    const r = this.axis(KEY_LEFT, KEY_RIGHT);
+    let mx = fx * f - fz * r; // right = (-fz, fx): yaw 0 -> D = +Z
+    let mz = fz * f + fx * r;
+    const m = Math.hypot(mx, mz);
+    if (m > 1) { mx /= m; mz /= m; }
+    a.moveX = mx;
+    a.moveZ = mz;
+  }
+
+  private aim(camera: THREE.Camera, a: HumanInput): void {
+    this.raycaster.setFromCamera(this.center, camera);
+    const hit = this.raycaster.ray.intersectPlane(this.floor, this.hit);
+    if (hit !== null && hit.x > RIVAL_MIN_X) {
+      a.targetX = hit.x; // exact clamp to the rival half is the sim's job
+      a.targetZ = hit.z;
+      return;
+    }
+    if (hit !== null && hit.x < LOW_AIM_X) { a.targetX = hit.x; a.targetZ = hit.z; return; } // own half: no net assist
+    const p = camera.position;
+    const fx = this.fwd.x;
+    const depth = hit === null ? DEEP_TARGET_X : SHORT_TARGET_X;
+    if (fx < MIN_FORWARD_X) {
+      a.targetX = depth;
+      a.targetZ = Math.max(-COURT_HALF_Z, Math.min(COURT_HALF_Z, p.z));
+      return;
+    }
+    const t = (depth - p.x) / fx; // forward ray projected onto the court
+    a.targetX = depth;
+    a.targetZ = Math.max(-COURT_HALF_Z, Math.min(COURT_HALF_Z, p.z + this.fwd.z * Math.max(0, t)));
   }
 
   private buttons(): number {
     let b = 0;
-    if (this.mouseButtons & MOUSE_LEFT) b |= Btn.Strike;
-    if (this.mouseButtons & MOUSE_RIGHT) b |= Btn.Lob;
+    const mouse = this.mouseButtons | this.latched;
+    if (mouse & MOUSE_LEFT) b |= Btn.Strike;
+    if (mouse & MOUSE_RIGHT) b |= Btn.Lob;
     if (this.down.has(KEY_JUMP)) b |= Btn.Jump;
-    if (this.down.has(SPRINT_KEYS[0]) || this.down.has(SPRINT_KEYS[1])) b |= Btn.Sprint;
     if (this.down.has(KEY_DASH)) b |= Btn.Dash; // held level; the sim detects the press edge itself
     return b;
   }
@@ -93,26 +148,51 @@ export class Controls {
   }
 
   private onKeyDown(e: KeyboardEvent): void {
-    if (!this.enabled) return;
+    if (!this.on) return;
     if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
     if (e.repeat) return;
+    if (e.code === KEY_FREE_MOUSE) { this.toggleLock(); return; }
     this.down.add(e.code);
     this.pressHandler?.(e.code);
   }
 
-  private onPointer(e: PointerEvent, canvas: HTMLElement): void {
-    // offsetX/Y are relative to the canvas (the event target): no DOMRect allocation.
-    const w = canvas.clientWidth || 1;
-    const h = canvas.clientHeight || 1;
-    this.ndc.set((e.offsetX / w) * 2 - 1, -(e.offsetY / h) * 2 + 1);
-    this.hasPointer = true;
-    this.mouseButtons = this.enabled ? e.buttons : 0;
+  private toggleLock(): void {
+    if (this.locked) {
+      this.freeRequested = true;
+      document.exitPointerLock();
+    } else {
+      this.lock();
+    }
+  }
+
+  /** Requests pointer lock (needs a user gesture; failures are retried on the next click). */
+  lock(): void {
+    const c = this.canvas;
+    if (!c || this.locked) return;
+    const p: unknown = c.requestPointerLock();
+    if (p instanceof Promise) p.catch(() => undefined); // denied (no gesture / cooldown): next click retries
+  }
+
+  private onPointerDown(e: PointerEvent): void {
+    if (!this.on) { this.mouseButtons = 0; return; }
+    if (!this.locked) this.lock(); // clicks still play while unlocked
+    this.mouseButtons = e.buttons;
+    this.latched |= e.buttons;
+  }
+
+  private onLockState(): void {
+    this.locked = document.pointerLockElement === this.canvas;
+    this.onLockChange?.(this.locked);
+    if (this.locked) { this.freeRequested = false; return; }
+    this.mouseButtons = 0;
+    const asked = this.freeRequested;
+    this.freeRequested = false;
+    if (this.on && !asked) this.onLockLost?.();
   }
 
   private onWheel(e: WheelEvent): void {
-    if (!this.enabled) return;
+    if (!this.on) return;
     e.preventDefault();
-    const dir = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0; // wheel up = topspin
-    this.spin = Math.max(SPIN_MIN, Math.min(SPIN_MAX, this.spin + dir));
+    this.onZoom?.(e.deltaY);
   }
 }

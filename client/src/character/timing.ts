@@ -31,7 +31,7 @@ export function impactBell(t: number, halfWidth = IK_HALF_WIDTH): number {
 const LIFT_START = 0.05;
 const LIFT_SPAN = 0.5;
 
-/** Jump/rise curve for head and bicycle: 0 -> 1 at impact -> 0. */
+/** Jump/rise curve for headers: 0 -> 1 at impact -> 0. */
 export function liftCurve(t: number): number {
   const u = (t - LIFT_START) / LIFT_SPAN;
   return u <= 0 || u >= 1 ? 0 : Math.sin(u * Math.PI);
