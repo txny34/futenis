@@ -11,8 +11,7 @@ type candidate struct {
 }
 
 // applyStrikes is Step's single entry point for contact resolution
-// (docs/design/contact-v2.md §7.2), replacing the wave-0 applyKicks/
-// performKick compat shim: it advances every active player's charge/buffer
+// (docs/design/contact-v2.md §7.2): it advances every active player's charge/buffer
 // state, resolves at most one body-part contact for the whole tick (even in
 // 2v2, where up to 4 players may have a live buffer at once), and appends
 // EvWhiff/EvToss/EvKick as appropriate.

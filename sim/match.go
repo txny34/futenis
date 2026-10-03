@@ -29,16 +29,6 @@ func (m *Match) State() State { return m.state }
 // Restore replaces the state (used for rollback / server correction).
 func (m *Match) Restore(s State) { m.state = s }
 
-// RespawnBall resets the ball to a neutral position above center court.
-// ModePlayground only: without scoring, the ball can be respawned on
-// demand (e.g. a dev-panel button) instead of via the serve rules.
-//
-// TODO(wave1): wire an actual client/dev-panel trigger; Wave 0 only
-// provides the primitive (docs/design/contact-v2.md "Modos y 2v2").
-func (m *Match) RespawnBall() {
-	m.state.Ball = Ball{Pos: Vec3{Y: serveBallHeight}}
-}
-
 // Step advances exactly one fixed tick. The returned slice is only valid
 // until the next Step. inputs has MaxPlayers slots; only the first
 // s.NumPlayers are read (see State.NumPlayers, numPlayersForMode).

@@ -36,7 +36,7 @@ type Mode uint8
 const (
 	Mode1v1        Mode = iota // 2 players, 1 per team (today's default)
 	Mode2v2                    // 4 players, 2 per team (real padel)
-	ModePlayground             // free-form sandbox: no scoring, ball can be respawned on demand
+	ModePlayground             // Entrenamiento: 1 human vs the ball machine (feed.go), no scoring
 )
 
 // numPlayersForMode returns how many of State.Players are active for mode.
@@ -139,26 +139,22 @@ type Ball struct {
 	Out bool
 	// Spin is -1..1 (- back, + top), constant in flight (no Magnus, §1
 	// non-objetivos), decayed by Config.SpinDecay on every bounce (§10).
-	//
-	// TODO(wave1): wired into resolveFloor/reflectWalls (spin.go).
 	Spin float64
 	// Tossed is true once the ball has been released/dropped for the
 	// current serve attempt (docs/design/contact-v2.md §7.5 — real padel
 	// serve adapted to feet; this replaces the original self-toss design).
-	// Before Tossed, the ball is held at rest in front of the server.
-	//
-	// TODO(wave1): set on BtnStrike press during PhaseServe; drives the
-	// serve bounce/box judging state machine in rules.go.
+	// Before Tossed, the ball is held at rest in front of the server; the
+	// server's BtnStrike press in PhaseServe tosses it (tossServe, serve.go).
 	Tossed bool
 }
 
 // Player is one player's kinematic state and which half of the court (and
 // which side of that half, in 2v2) they belong to.
 type Player struct {
-	Pos, Vel Vec3 // Vel.Y becomes meaningful once wave1 wires jump/gravity
+	Pos, Vel Vec3 // Vel.Y is the jump/gravity vertical speed (movement.go)
 	Team     int8 // 0 = X negative half, 1 = X positive half (was "Side" pre-2v2)
-	Slot     int8 // 0 = right partner, 1 = left partner (2v2 only; always 0 in 1v1). Starting-position/serve-box reference only; wave0 does not confine movement by Slot.
-	OnGround bool // TODO(wave1): jump (player.go); Wave 0 never sets this false
+	Slot     int8 // 0 = right partner, 1 = left partner (2v2 only; always 0 in 1v1). Starting-position/serve-box reference only; movement is not confined by Slot.
+	OnGround bool // false while airborne after a jump (movement.go)
 
 	// Held is in.Buttons from the previous tick, used to detect press/
 	// release edges without the sim ever receiving edge-triggered input.
@@ -275,14 +271,12 @@ type RallyState struct {
 	ServerPlayer int8
 
 	// Serve state machine (docs/design/contact-v2.md §7.5 — real padel
-	// serve adapted to feet, overriding the original self-toss design).
-	//
-	// TODO(wave1): resetForServe/rules.go wire these; Wave 0 only reserves
-	// the fields so the contract is frozen.
+	// serve adapted to feet, overriding the original self-toss design),
+	// set by resetForServe (rules.go) and the serve judge (serve.go).
 	ServeAttempt uint8 // 1 = first serve, 2 = second serve (after a fault)
 	ServeBox     int8  // 0 = right diagonal box, 1 = left diagonal box; alternates every point (serveBoxForScore)
 
-	// wave1-C: real-padel serve judge state (docs/design/contact-v2.md
+	// Real-padel serve judge state (docs/design/contact-v2.md
 	// §7.5, serve.go). Zero value for all three is correct at the start of
 	// every fresh serve attempt (resetForServe/replayServe rebuild
 	// RallyState from scratch).
@@ -317,10 +311,8 @@ type RallyState struct {
 
 // serveBoxForScore returns which diagonal service box the server must serve
 // from/into, per real padel's right/left alternation: the box flips every
-// point played, independent of who is serving.
-//
-// TODO(wave1): resetForServe calls this to set RallyState.ServeBox, and the
-// serve judge in rules.go uses it to validate where the serve landed.
+// point played, independent of who is serving. resetForServe stores it in
+// RallyState.ServeBox for the serve judge (serve.go).
 func serveBoxForScore(score [2]int) int8 {
 	total := score[0] + score[1]
 	return int8(total % 2)
@@ -328,8 +320,7 @@ func serveBoxForScore(score [2]int) int8 {
 
 // serverPlayerIndex returns which of State.Players is allowed to serve for
 // team, alternating between partners each time that team serves again
-// (docs/design/contact-v2.md "Modos y 2v2": chosen serve-order rule for
-// wave 0 — NOT real padel's full round-robin across all 4 players turn by
+// (docs/design/contact-v2.md "Modos y 2v2": chosen serve-order rule — NOT real padel's full round-robin across all 4 players turn by
 // turn across games, which needs a game/set model this codebase doesn't
 // have yet; this is the simplest rule that still gives both partners the
 // serve). In 1v1 there is exactly one player per team, so it is always

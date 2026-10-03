@@ -292,22 +292,6 @@ func TestNewMatch_2v2StartsAllFourPlayers(t *testing.T) {
 	}
 }
 
-func TestRespawnBall(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Mode = ModePlayground
-	m := NewMatch(cfg)
-	s := m.State()
-	s.Ball.Pos = Vec3{X: 50, Y: 50, Z: 50}
-	m.Restore(s)
-
-	m.RespawnBall()
-
-	got := m.State().Ball
-	assertFloat(t, "ball.Pos.X", got.Pos.X, 0)
-	assertFloat(t, "ball.Pos.Y", got.Pos.Y, serveBallHeight)
-	assertFloat(t, "ball.Pos.Z", got.Pos.Z, 0)
-}
-
 func TestTeamPlayers(t *testing.T) {
 	a, b := teamPlayers(0)
 	if a != 0 || b != 1 {

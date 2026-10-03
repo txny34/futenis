@@ -2,10 +2,9 @@ package sim
 
 import "math"
 
-// movement.go: wave1 player movement/body ownership (docs/design/
+// movement.go: player movement/body ownership (docs/design/
 // contact-v2.md §4 "Salto", §5 "Movimiento, sprint y stamina", §19.4
-// "Separación de cápsulas entre compañeros"). movePlayers replaces the
-// wave-0 instant-velocity stub that used to live in physics.go.
+// "Separación de cápsulas entre compañeros").
 
 // movePlayers advances every active player (s.NumPlayers) by one tick:
 // vertical (jump/gravity/landing), horizontal (acceleration toward a
@@ -203,8 +202,7 @@ func stepPlayerStamina(p *Player, in PlayerInput, cfg *Config) {
 }
 
 // clampPlayerToCourt confines p to their own team's half of the court and
-// within the side walls (unchanged from the wave-0 behavior, just moved
-// here alongside the rest of player movement).
+// within the side walls.
 func clampPlayerToCourt(p *Player) {
 	minX, maxX := sideXRange(p.Team)
 	p.Pos.X = clamp(p.Pos.X, minX, maxX)

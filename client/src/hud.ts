@@ -12,7 +12,7 @@ const NAMES = ["Local", "Visita"] as const; // team colors come from the theme, 
 const HELP_TEXT =
   "WASD mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · Espacio salto · " +
   "Q dash · Ctrl mouse libre · Esc pausa";
-const LAUNCH_KEY = "B"; // mirrors main.ts RESPAWN_KEY (KeyB): Match.Feed() in Entrenamiento
+const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
 const PLAYGROUND_HELP = ` · ${LAUNCH_KEY} lanzar bola`;
 const CALL_MS = 1800;
 const SERVE_HINT = "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado";

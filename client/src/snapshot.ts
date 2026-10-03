@@ -73,7 +73,6 @@ export const EventKind = {
 
 // Mirrors sim.BodyPart. Index 0 = PartNone.
 export const PART_NAMES = ["none", "foot", "knee", "chest", "shoulder", "head", "bicycle"] as const;
-export type PartName = (typeof PART_NAMES)[number];
 
 // Mirrors sim.Quality.
 export const Quality = { Perfect: 0, Good: 1, Forced: 2 } as const;

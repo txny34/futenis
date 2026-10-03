@@ -2,15 +2,14 @@ package sim
 
 import "math"
 
-// This file is wave1-C's real-padel serve judge (docs/design/contact-v2.md
+// This file is the real-padel serve judge (docs/design/contact-v2.md
 // §7.5, overriding the original self-toss design): the drop, the required
 // toss bounce behind the service line, the diagonal service box, lets,
 // faults and double faults. It only judges events and mutates State/Rally;
-// it never reads PlayerInput -- the strike pipeline (wave1 strike.go) is
-// expected to call tossServe on the server's BtnStrike press edge while
-// Phase == PhaseServe && !Ball.Tossed (per the doc's updateCharge comment),
-// and to keep emitting the usual EvKick/EvBodyHit/EvWhiff the judge below
-// reacts to.
+// it never reads PlayerInput -- the strike pipeline (strike.go) calls
+// tossServe on the server's BtnStrike press edge while
+// Phase == PhaseServe && !Ball.Tossed, and emits the EvKick/EvBodyHit/
+// EvWhiff the judge below reacts to.
 
 // --- service box / toss-bounce geometry -------------------------------
 

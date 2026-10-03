@@ -53,8 +53,7 @@ type FeedState struct {
 	Shot           uint8   // feedDrive/feedLob/feedSmash of the last feed
 }
 
-// Feed launches a ball now if none is live (ModePlayground only; replaces
-// RespawnBall there). The launch itself happens inside the next Step so its
+// Feed launches a ball now if none is live (ModePlayground only). The launch itself happens inside the next Step so its
 // EvFeed reaches the caller through Step's event slice like every other
 // event, and the trigger is a plain State change (replayable).
 func (m *Match) Feed() {

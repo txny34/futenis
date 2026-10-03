@@ -11,7 +11,7 @@ import { Difficulty, GameMode, MatchOptions, MenuUI, Settings } from "./ui/menu"
 import { DEFAULT_TRAINING } from "./ui/training-settings";
 
 const RESET_KEY = "KeyR";
-const RESPAWN_KEY = "KeyB";
+const FEED_KEY = "KeyB";
 const LOADING_TEXT = "Cargando…";
 const MODE_ID: Readonly<Record<GameMode, MatchSetup["mode"]>> = { "1v1": 0, "2v2": 1, playground: 2 };
 const DIFFICULTY_ID: Readonly<Record<Difficulty, number>> = { easy: 0, normal: 1, hard: 2, pro: 3 };
@@ -140,7 +140,7 @@ function wire(app: App, menu: MenuUI): void {
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {
     if (!app.state.running || app.state.paused) return;
-    if (code === RESPAWN_KEY && app.mode === "playground") app.engine.respawnBall();
+    if (code === FEED_KEY && app.mode === "playground") app.engine.respawnBall();
     if (code === RESET_KEY) {
       app.engine.reset();
       app.loop?.rearm();

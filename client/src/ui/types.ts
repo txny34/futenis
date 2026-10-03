@@ -11,5 +11,4 @@ export interface MatchOptions {
   readonly training?: TrainingSettings;
 }
 
-export const POINTS_CHOICES: readonly number[] = [5, 7, 11, 21];
 export const DEFAULT_POINTS = 11;

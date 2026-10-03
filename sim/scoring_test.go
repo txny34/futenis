@@ -169,7 +169,7 @@ func TestAwardPointPadel_DeuceRequiresAdvantage(t *testing.T) {
 		t.Fatalf("Games[0]: got %d, want 0 (only advantage, not a 2-point margin)", s.Games[0])
 	}
 
-	ev = awardPoint(&s, 0, ev) // now wins by 2
+	awardPoint(&s, 0, ev) // now wins by 2
 	if s.Games[0] != 1 {
 		t.Fatalf("Games[0]: got %d, want 1 (won on the second straight point past deuce)", s.Games[0])
 	}

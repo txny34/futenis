@@ -34,7 +34,6 @@ type intercept struct {
 	k      int
 	ball   sim.Ball
 	stand  sim.Vec3
-	serve  bool
 	errMax float64
 }
 
@@ -87,10 +86,14 @@ const (
 	netBounceDamping     = 0.3
 )
 
-// stepBall advances b one tick: sim.PredictBall (gravity+drag; still
-// bounce-less, see the TODO in sim/trajectory.go) plus a mirror of
-// stepBall's net/floor/wall resolution with the §10 spin model. bounced
-// reports a floor bounce on this tick.
+// stepBall advances b one tick with sim.PredictBall, then re-runs a local
+// mirror of stepBall's net/floor/wall resolution to report bounced (a floor
+// bounce on this tick).
+//
+// NOTE: sim.PredictBall is already bounce-aware (it resolves net/floor/wall
+// itself), so the local predictFloor never sees the ball below BallRadius
+// and bounced is always false today. Left as-is in the cleanup pass because
+// fixing it changes bot behavior (bounce windows in findIntercept/contactSoon).
 func stepBall(b sim.Ball, cfg *sim.Config) (sim.Ball, bool) {
 	prev := b.Pos
 	b = sim.PredictBall(b, cfg, 1)
