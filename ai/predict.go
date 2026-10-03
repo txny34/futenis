@@ -21,6 +21,10 @@ const (
 	lateral = 0.55
 	// maxContactErr is the worst part error the bot plans/releases for.
 	maxContactErr = 0.95
+	// idealOffset converts a Level.IdealErr into the planned side-on
+	// stand-off (m): standing at IdealErr*idealOffset keeps the reach term
+	// of the contact error (dH/Reach) well inside the target error.
+	idealOffset = 0.5
 	// arriveSlackTicks is the safety margin when judging reachability.
 	arriveSlackTicks = 3
 )
@@ -33,6 +37,7 @@ type intercept struct {
 	ball   sim.Ball
 	stand  sim.Vec3
 	errMax float64
+	off    float64 // planned side-on stand-off (m)
 }
 
 // ticksOfSec mirrors sim's unexported ticksOf (seconds -> ticks, >= 1).
@@ -96,20 +101,20 @@ func onTeamSide(x float64, team int8) bool {
 	return x > netClearance
 }
 
-// standSpot is where to stand for a side-on contact with ball: lateral
+// standSpot is where to stand for a side-on contact with ball: off
 // metres off the ball's horizontal path, on the side closer to the player
 // (falls back to "behind the ball" for a near-vertical ball).
-func standSpot(p *sim.Player, ball sim.Ball) sim.Vec3 {
+func standSpot(p *sim.Player, ball sim.Ball, off float64) sim.Vec3 {
 	vx, vz := ball.Vel.X, ball.Vel.Z
 	l := math.Sqrt(float64(vx*vx) + float64(vz*vz))
 	if l < 0.5 {
-		return sim.Vec3{X: ball.Pos.X - forward(p.Team)*lateral, Z: ball.Pos.Z}
+		return sim.Vec3{X: ball.Pos.X - forward(p.Team)*off, Z: ball.Pos.Z}
 	}
 	nx, nz := -vz/l, vx/l
 	if float64((p.Pos.X-ball.Pos.X)*nx)+float64((p.Pos.Z-ball.Pos.Z)*nz) < 0 {
 		nx, nz = -nx, -nz
 	}
-	s := sim.Vec3{X: ball.Pos.X + nx*lateral, Z: ball.Pos.Z + nz*lateral}
+	s := sim.Vec3{X: ball.Pos.X + nx*off, Z: ball.Pos.Z + nz*off}
 	minX, maxX := teamXRange(p.Team)
 	s.X = math.Max(minX, math.Min(maxX, s.X))
 	zl := sim.CourtHalfWidth - sim.PlayerRadius
@@ -147,15 +152,17 @@ type bounceWindow struct{ min, max int }
 
 // findIntercept walks the predicted trajectory and returns the first
 // reachable contact inside win whose best part error at the side-on
-// stand-off is <= errMax, preferring Foot/Knee contacts (more power and
+// stand-off off is <= errMax, preferring Foot/Knee contacts (more power and
 // accuracy than chest/shoulder).
-func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax float64, win bounceWindow) intercept {
+func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax, off float64, win bounceWindow) intercept {
 	ball := start
 	var fallback intercept
+	var path [horizonTicks + 1]sim.Vec3
 	bounces := 0
 	for k := 1; k <= horizonTicks; k++ {
 		var b bool
 		ball, b = stepBall(ball, cfg)
+		path[k] = ball.Pos
 		mine := onTeamSide(ball.Pos.X, p.Team)
 		if b && mine {
 			bounces++
@@ -166,15 +173,18 @@ func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax
 		if bounces < win.min || !mine {
 			continue
 		}
-		part, u := bestErr(cfg, ball.Pos.Y, lateral, false)
+		part, u := bestErr(cfg, ball.Pos.Y, off, false)
 		if u > errMax {
 			continue
 		}
-		stand := standSpot(p, ball)
+		stand := standSpot(p, ball, off)
 		if ticksToReach(p, stand, speed, cfg.PlayerAccel)+arriveSlackTicks > k {
 			continue
 		}
-		hit := intercept{ok: true, k: k, ball: ball, stand: stand, errMax: errMax}
+		if off < lateral && !clearPath(&path, k-ticksOfSec(cfg.StrikeBufferTime)+2, stand) {
+			continue
+		}
+		hit := intercept{ok: true, k: k, ball: ball, stand: stand, errMax: errMax, off: off}
 		if part <= sim.PartKnee {
 			return hit
 		}
@@ -214,3 +224,21 @@ func contactSoon(ball sim.Ball, p *sim.Player, cfg *sim.Config, window int, maxE
 	}
 	return false
 }
+
+// clearPath reports whether the ball stays off a body capsule standing at
+// stand on every path tick before upTo: an ideal (close) stand-off is only
+// worth planning if the ball does not hit the body before the strike
+// buffer can be live (the buffer makes the body immune, §7.4).
+func clearPath(path *[horizonTicks + 1]sim.Vec3, upTo int, stand sim.Vec3) bool {
+	const r = sim.PlayerRadius + sim.BallRadius + bodyMargin
+	for j := 1; j < upTo; j++ {
+		q := path[j]
+		if q.Y < sim.PlayerHeight+sim.BallRadius && math.Hypot(q.X-stand.X, q.Z-stand.Z) < r {
+			return false
+		}
+	}
+	return true
+}
+
+// bodyMargin pads the body capsule radius in clearPath (m).
+const bodyMargin = 0.05

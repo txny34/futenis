@@ -15,6 +15,13 @@ func (b *Bot) thinkRally(s *sim.State, slot int) sim.PlayerInput {
 		b.resetCharge()
 		return b.recover(s, slot)
 	}
+	if b.missed && s.Rally.ShotCount == b.missedShot {
+		// This bot whiffed this ball (a mistimed shot): it does not get a
+		// second try at the same crossing.
+		b.resetCharge()
+		return b.recover(s, slot)
+	}
+	b.missed = false
 	used := s.Rally.BouncesOnSide[me.Team]
 	win := bounceWindow{min: 0, max: 1 - used}
 	if s.Rally.ServeBoxPending {
@@ -28,7 +35,7 @@ func (b *Bot) chase(s *sim.State, slot int, win bounceWindow) sim.PlayerInput {
 	me := &s.Players[slot]
 	if b.cooldown > 0 {
 		// Strike buffer live: hold position, never re-press.
-		return b.withAim(b.moveTo(me, b.plan.stand.X, b.plan.stand.Z, false))
+		return b.withAim(b.moveTo(me, b.tgt.X, b.tgt.Z, false))
 	}
 	b.win = win
 	b.refreshPlan(s, me, win)
@@ -40,6 +47,7 @@ func (b *Bot) chase(s *sim.State, slot int, win bounceWindow) sim.PlayerInput {
 	contact := uint64(s.Tick) + uint64(b.plan.k)
 	tx := b.plan.stand.X + signed(sim.Hash64(b.Seed^contact))*b.Level.PosError
 	tz := b.plan.stand.Z + signed(sim.Hash64(b.Seed^contact^0xA5A5))*b.Level.PosError
+	b.tgt = sim.Vec3{X: tx, Z: tz}
 	in := b.moveTo(me, tx, tz, true)
 	return b.strike(s, slot, in)
 }
@@ -52,7 +60,16 @@ func (b *Bot) refreshPlan(s *sim.State, me *sim.Player, win bounceWindow) {
 		return
 	}
 	b.planAge = 0
-	b.plan = findIntercept(b.belief, &s.Cfg, me, b.speedFor(me, &s.Cfg), maxContactErr, win)
+	speed := b.speedFor(me, &s.Cfg)
+	// A serve return (win.min > 0) keeps the side-on stand-off: standing on
+	// the ball's path would take the pre-bounce ball on the body.
+	if e := b.Level.IdealErr; e > 0 && win.min == 0 {
+		b.plan = findIntercept(b.belief, &s.Cfg, me, speed, e, e*idealOffset, win)
+		if b.plan.ok {
+			return
+		}
+	}
+	b.plan = findIntercept(b.belief, &s.Cfg, me, speed, maxContactErr, lateral, win)
 }
 
 // isChaser decides 2v2 coordination: the teammate who reaches the planned
@@ -64,14 +81,24 @@ func (b *Bot) isChaser(s *sim.State, slot int) bool {
 	mate := slot ^ 1
 	me, m := &s.Players[slot], &s.Players[mate]
 	cfg := &s.Cfg
-	mine := ticksToReach(me, standSpot(me, b.plan.ball), b.speedFor(me, cfg), cfg.PlayerAccel)
-	theirs := ticksToReach(m, standSpot(m, b.plan.ball), b.speedFor(m, cfg), cfg.PlayerAccel)
+	mine := ticksToReach(me, standSpot(me, b.plan.ball, b.plan.off), b.speedFor(me, cfg), cfg.PlayerAccel)
+	theirs := ticksToReach(m, standSpot(m, b.plan.ball, b.plan.off), b.speedFor(m, cfg), cfg.PlayerAccel)
 	return mine < theirs || mine == theirs && slot < mate
 }
 
 // mistimeTicks is how much earlier than its buffer window a mistimed shot
 // is released: far enough that the strike buffer expires before contact.
 const mistimeTicks = 30
+
+const (
+	// pressureSpeed is the incoming horizontal ball speed (m/s) above which
+	// the bot starts to feel pressure (see missChance).
+	pressureSpeed = 16.0
+	// pressureSpan is the extra speed (m/s) to reach full pressure.
+	pressureSpan = 8.0
+	// pressureMissGain is the extra MissChance multiple at full pressure.
+	pressureMissGain = 4.0
+)
 
 // strike presses (latching aim) once contact is within the charge window,
 // and releases as soon as a contact falls inside the strike buffer window
@@ -93,14 +120,12 @@ func (b *Bot) strike(s *sim.State, slot int, in sim.PlayerInput) sim.PlayerInput
 		b.shot, b.holdTicks = b.pendingShot, 0
 	}
 	b.holdTicks++
-	window := buf - 1
+	early := 0
 	if b.Level.TimingError > 0 {
-		window += int(unit(b.hash(s, slot, 3)) * float64(b.Level.TimingError+1))
+		early = int(unit(b.hash(s, slot, 3)) * float64(b.Level.TimingError+1))
 	}
-	if b.mistimed {
-		window += mistimeTicks
-	}
-	if b.holdTicks > 1 && (contactSoon(b.belief, me, cfg, window, maxContactErr, b.win.min) || b.holdTicks > maxHoldTicks) {
+	if b.holdTicks > 1 && (b.releaseNow(me, cfg, early, buf) || b.holdTicks > maxHoldTicks) {
+		b.missed, b.missedShot = b.mistimed, s.Rally.ShotCount
 		b.release(cfg)
 		in.Buttons &^= sim.BtnStrike | sim.BtnLob
 		return b.withAim(in)
@@ -129,7 +154,7 @@ func (b *Bot) chooseShot(s *sim.State, slot int) {
 	wide := sim.CourtHalfWidth - b.Level.LineMargin
 	shot := sim.BtnStrike
 	b.spin = 0
-	b.mistimed = unit(b.hash(s, slot, 9)) < b.Level.MissChance
+	b.mistimed = unit(b.hash(s, slot, 9)) < b.missChance()
 	if unit(b.hash(s, slot, 4)) < b.Level.Decision {
 		b.aimZ = -math.Copysign(wide, oz)
 		b.aimX = fwd * (sim.CourtHalfLength - b.Level.LineMargin - 0.5)
@@ -152,6 +177,16 @@ func (b *Bot) chooseShot(s *sim.State, slot int) {
 	b.chargeWant = b.chargeFor(s, slot, shot)
 }
 
+// missChance is Level.MissChance raised under pressure: a fast incoming
+// ball (typically an opponent's PERFECT contact, sim's perfectSpeedBonus)
+// is harder to meet cleanly, up to pressureMissGain times more misses. This
+// is what turns a PERFECT contact into a point between strong bots.
+func (b *Bot) missChance() float64 {
+	v := math.Hypot(b.belief.Vel.X, b.belief.Vel.Z)
+	p := math.Max(0, math.Min(1, (v-pressureSpeed)/pressureSpan))
+	return math.Min(1, b.Level.MissChance*(1+pressureMissGain*p))
+}
+
 // chargeFor picks how long to charge: a lob barely needs any; a drive
 // gets the fastest speed whose (drag-free) arc still clears the net by
 // netMargin from the planned contact to the latched target -- the sim's
@@ -163,7 +198,7 @@ func (b *Bot) chargeFor(s *sim.State, slot int, shot uint8) int {
 		return maxT / 4
 	}
 	from := b.plan.ball.Pos
-	part, _ := bestErr(cfg, from.Y, lateral, false)
+	part, _ := bestErr(cfg, from.Y, b.plan.off, false)
 	if part == sim.PartNone {
 		part = sim.PartFoot
 	}

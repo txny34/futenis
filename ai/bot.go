@@ -36,12 +36,16 @@ type Bot struct {
 	countdown  int // reaction ticks left before the belief resyncs
 
 	plan        intercept
+	tgt         sim.Vec3       // where the bot is heading for the planned contact
+	prof        contactProfile // release lookahead scratch (no allocs)
 	win         bounceWindow
 	planAge     int
 	holdTicks   int     // ticks the current charge has been held
 	shot        uint8   // BtnStrike or BtnLob while charging, else 0
 	aimed       bool    // target/shot latched for the coming contact
 	mistimed    bool    // this shot will be released far too early (Level.MissChance)
+	missed      bool    // a mistimed shot was released: no retry this crossing
+	missedShot  int     // sim.RallyState.ShotCount when it was missed
 	pendingShot uint8   // shot to press once the charge window opens
 	chargeWant  int     // desired charge ticks for the latched shot
 	cooldown    int     // ticks left of a released strike buffer (no re-press)
@@ -68,10 +72,12 @@ func (b *Bot) Think(s *sim.State, slot int) sim.PlayerInput {
 	}
 	switch s.Phase {
 	case sim.PhaseServe:
+		b.missed = false
 		return b.thinkServe(s, slot)
 	case sim.PhaseRally:
 		return b.thinkRally(s, slot)
 	default:
+		b.missed = false
 		b.resetCharge()
 		return b.recover(s, slot)
 	}
