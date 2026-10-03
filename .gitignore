@@ -1,0 +1,4 @@
+client/dist/
+*.wasm
+wasm_exec.js
+node_modules/
