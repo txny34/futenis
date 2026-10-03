@@ -1,5 +1,12 @@
 package sim
 
+import "math"
+
+// rivalMinTargetX is the closest to the net (|X|) a deviated target may land
+// when the requested target was on the rival half: deviation can make a
+// shot short, never send it back to the striker's own side.
+const rivalMinTargetX = 0.5
+
 // deviateTarget applies the §8 deterministic target deviation: a radius R
 // that grows with u² (so a forced contact is punished much harder than a
 // merely-good one), split into a longitudinal component (along the
@@ -22,6 +29,7 @@ func deviateTarget(cfg *Config, target, ballXZ Vec3, ps *PartSpec, u float64, h 
 
 	limit := CourtHalfWidth - cfg.TargetWallMargin
 	deviated.Z = clamp(deviated.Z, -limit, limit)
+	deviated.X = keepOnRivalSide(target.X, ballXZ.X, deviated.X)
 	return deviated
 }
 
@@ -34,4 +42,17 @@ func shotSpeed(ps *PartSpec, charge, u float64, h uint64, cfg *Config) float64 {
 	a, _ := unitPair(h)
 	c := a * u
 	return float64(base * (1 + c*cfg.DevPowerMax))
+}
+
+// keepOnRivalSide holds a deviated X on the rival half (at least
+// rivalMinTargetX past the net) when the requested target crossed the net.
+// A target on the striker's own side is returned untouched.
+func keepOnRivalSide(targetX, fromX, x float64) float64 {
+	if sideOf(targetX) == sideOf(fromX) {
+		return x
+	}
+	if targetX > 0 {
+		return math.Max(x, rivalMinTargetX)
+	}
+	return math.Min(x, -rivalMinTargetX)
 }

@@ -194,7 +194,8 @@ func strike(s *State, i int8, part BodyPart, u float64, ev []Event) []Event {
 	speed += momentumBonus(p.Vel, s.Ball.Pos, tgt, cfg)
 
 	v := solveLaunch(cfg, s.Ball.Pos, tgt, shot, speed, p.BufCharge)
-	s.Ball.Vel = clampLen(v, ps.SpeedMax+cfg.MomentumMax)
+	maxSpeed := ps.SpeedMax + cfg.MomentumMax
+	s.Ball.Vel = liftOverNet(cfg, s.Ball.Pos, tgt, clampLen(v, maxSpeed), maxSpeed)
 	s.Ball.Spin = clamp(float64(p.BufSpin), ps.SpinMin, ps.SpinMax)
 	s.Ball.Resting = false
 	s.Ball.Out = false
