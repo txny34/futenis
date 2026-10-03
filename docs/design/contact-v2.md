@@ -361,16 +361,58 @@ lado ya tocó (`LastKicker == side`, ej. la pelota rebota en el propio cuerpo tr
 gracia) → falta, punto para el rival. Un body hit tras el toque rival es un "toque" legal pero sin control
 (no hay solver): la pelota rebota donde caiga. `rules.go` cambia sólo en tratar `EvBodyHit` como `EvKick`.
 
-### 7.5 Saque con autopase
+### 7.5 Saque (reglas reales de pádel, adaptadas a pie)
 
-- En `PhaseServe` el sacador queda en su posición de saque; la pelota está quieta en
-  `Pos + forward·ServeTossOffset`, `Y = ServeTossHeight`, sin gravedad, `Tossed = false`.
-- **Press** de Strike/Lob: `Ball.Vel.Y = ServeTossSpeed`, `Tossed = true`, gravedad activa, emite `EvToss`.
-  El mismo press empieza la carga; desde ahí el sacador se puede mover (a 0.8× mientras carga).
-- `canKick` en saque exige `Tossed && Ball.Vel.Y <= 0` (se golpea **bajando**). Las partes salen solas de
-  la altura (típicamente Foot/Knee si la deja caer, Head/Bicycle si salta).
-- Si la pelota toca el piso sin golpe → se repite el saque (`resetForServe`, sin penalidad, emite
-  `EvBounceFloor` pero no es falta).
+> **Anula el autopase de la versión original de este documento.** Decisión del coordinador
+> (prevalece sobre el texto anterior de esta sección y sobre la fila 3 de la tabla de §17):
+> el saque de pádel real, adaptado a que se golpea con el cuerpo en vez de con la mano/paleta.
+
+- **Dos saques** por punto; doble falta = punto para el receptor (igual que pádel/tenis real).
+- **Press** de Strike (en `PhaseServe`): la pelota se **suelta** a la altura de la cintura
+  (`ServeTossHeight` ≈ 1.0 m) delante del sacador (`ServeTossOffset`), **sin** impulso hacia arriba
+  (`ServeTossSpeed` = 0 por defecto — ya no es un autopase, es un drop). Gravedad activa desde la
+  suelta, emite `EvToss`. El mismo press empieza la carga; el sacador se puede mover (a 0.8× mientras
+  carga), igual que antes.
+- La pelota debe **picar una sola vez** en el piso, **detrás de la línea de saque** del lado del
+  sacador (`|X| > ServiceLineDist` = 6.95 m desde la red) y **antes** de que el sacador la golpee.
+  Golpearla sin que haya picado, o después de un segundo pique, es falta.
+- El sacador debe golpear con **pie o rodilla** (altura de contacto baja: `hRel` restringe la parte a
+  `{Foot, Knee}` por la tabla de §6 — un saque no se puede cabecear ni pechar).
+- El saque va **en diagonal**: debe caer primero en el **cajón de saque diagonal** del receptor (entre
+  la red y la línea de saque, del lado contrario de la línea central en Z respecto de la posición del
+  sacador). El sacador alterna cajón derecho/izquierdo **cada punto** (regla real de pádel/tenis):
+  `serveBoxForScore(Score) = (Score[0]+Score[1]) % 2` (0 = derecha, 1 = izquierda, visto desde el
+  fondo de ese sacador). Pura, en `sim`; wave1 la llama desde `resetForServe` y desde el juez de saque.
+- **Falta** (`EvServeFault`): la pelota cae fuera del cajón diagonal correcto, toca la red y no cruza,
+  toca una pared antes de picar, o el sacador no llega a golpearla (whiff, o la pelota pica dos veces
+  antes del golpe).
+  - 1ª falta de un punto → se repite el saque (`Rally.ServeAttempt` 1 → 2), sin penalidad más que eso.
+  - 2ª falta consecutiva (doble falta) → punto para el receptor.
+- **Let** (`EvLet`): la pelota toca la red pero **aun así** cae dentro del cajón correcto → se repite
+  el mismo saque sin que cuente como falta (`Rally.ServeAttempt` no cambia).
+- Una vez que el pique es válido y el sacador golpea, la pelota puede tocar vidrio de fondo/lateral
+  como en el juego normal: a partir de ahí el punto se juega igual que cualquier intercambio.
+
+**Estado nuevo (contrato wave 0; el juez de saque completo es wave 1):**
+
+```go
+type RallyState struct {
+    // ... LastTeam, LastPlayer, BouncesOnSide, PauseTicks (sin cambios) ...
+    ServerPlayer int8  // qué jugador (no equipo) saca este punto (serverPlayerIndex)
+    ServeAttempt uint8 // 1 = primer saque, 2 = segundo saque (tras una falta)
+    ServeBox     int8  // 0 = cajón derecho, 1 = cajón izquierdo (alterna por punto)
+}
+```
+
+```go
+// Nuevos EventKinds (append, no reordenar): EvWhiff, EvJump, EvBodyHit, EvToss,
+// EvServeFault, EvLet
+```
+
+Nuevo campo de `Config`: `ServiceLineDist` (m, default 6.95) — distancia red → línea de saque, donde
+el saque debe picar antes de ser golpeado. `ServeTossHeight`/`ServeTossOffset` se mantienen (altura/
+adelanto de la suelta); `ServeTossSpeed` default pasa a 0 (ya no hay autopase hacia arriba, pero se
+deja el campo por si se quiere tunear una asistencia pequeña).
 
 ---
 
@@ -703,7 +745,7 @@ escala.
 |---|---|---|
 | 1 | Frecuencias | Sim 120 Hz; render sin tope con interpolación; snapshots de red 60 Hz (§1.1). |
 | 2 | Spin | Rueda del mouse, 3 niveles: back / plano / top (§10). |
-| 3 | Saque | Autopase: press lanza la pelota, se golpea bajando (§7.5). |
+| 3 | Saque | **Override (coordinador, post-aprobación):** reglas reales de pádel adaptadas a pie — drop (sin impulso), pique obligatorio tras la línea de saque, cajón diagonal, 2 saques, let/falta (§7.5). Reemplaza el autopase original de esta fila. |
 | 4 | Salto | Cuesta `JumpStaminaCost = 0.05` (§4). |
 | 5 | Carga | Ralentiza a 0.8× (§7.1). |
 | 6 | Círculo de desviación | Sólo tutorial / dev; asunto del cliente (§11.4). |
@@ -720,3 +762,162 @@ escala.
 Indie con identidad propia, no realista. **Un único rig humanoide compartido** por todos los personajes y
 skins (las animaciones se hacen una vez). La **hitbox vive en `sim`** (cápsula de §7.4 + tabla de partes
 §6) y es idéntica para todas las skins: lo visual **nunca** afecta la física ni las reglas.
+
+---
+
+## 19. Modos y 2v2
+
+> Decisión del coordinador (contrato, wave 0): el pádel real es 2v2. El juego soporta **1v1**, **2v2**
+> y un modo **Playground** (sandbox sin puntaje). Esta sección es el contrato; la implementación real
+> (separación de cápsulas entre compañeros, IA llenando los slots que el cliente no controla) es
+> wave 1.
+
+### 19.1 `Mode` y cuántos jugadores
+
+```go
+type Mode uint8
+const (
+    Mode1v1      Mode = iota // 2 jugadores, 1 por equipo (hoy, default)
+    Mode2v2                  // 4 jugadores, 2 por equipo (pádel real)
+    ModePlayground           // sandbox libre: sin puntaje, pelota respawneable a demanda
+)
+const MaxPlayers = 4 // tamaño fijo de State.Players para TODOS los modos
+```
+
+`State.NumPlayers` (2 o 4) dice cuántos de los `MaxPlayers` slots están activos; `Match.Step` siempre
+recibe `[MaxPlayers]PlayerInput` (los slots no usados se ignoran). `State` sigue siendo un array fijo
+(`[MaxPlayers]Player`, no slice) para seguir siendo comparable con `==` y copiable sin allocs.
+
+### 19.2 Convención de índices equipo/jugador
+
+- `Player.Team` (reemplaza el viejo `Player.Side`): 0 = mitad X negativa, 1 = mitad X positiva.
+- `Player.Slot`: 0 = compañero derecho, 1 = compañero izquierdo (sólo relevante en 2v2; posición de
+  arranque/referencia de cajón de saque, **no** confina el movimiento en wave 0).
+- Convención fija de `teamPlayers(team)`: equipo 0 = índices `{0,1}`, equipo 1 = índices `{2,3}`.
+
+### 19.3 Reglas por EQUIPO (no por jugador)
+
+- **Un toque por equipo por cruce**: cualquiera de los dos compañeros puede golpear, pero sólo cuenta
+  **un** toque total — si el compañero que no golpeó también toca la pelota en el mismo cruce, es doble
+  toque (falta), igual que si el mismo jugador la tocara dos veces.
+- `RallyState.LastKicker` → **`RallyState.LastTeam`** (mismo rol, ahora nombrado por equipo) +
+  **`RallyState.LastPlayer`** (qué jugador específico, dentro de ese equipo, tocó — informativo /
+  para wave1, no participa hoy en la decisión de punto, que sigue siendo 100% a nivel equipo).
+- `Score` sigue siendo `[2]int`, indexado por equipo — sin cambios.
+- `Event.Side` sigue significando **equipo** (0/1), nunca un índice de `State.Players`. Se agrega
+  **`Event.Player`** (índice en `State.Players`, o `-1` si el evento no involucra a un jugador
+  específico) para que wave1 pueda saber *quién* exactamente tocó, sin romper la semántica de `Side`.
+
+### 19.4 Separación de cápsulas entre compañeros
+
+**Stub en wave 0, implementación en wave 1.** `movePlayers` hoy no evita que dos compañeros del mismo
+equipo se superpongan (sólo los confina a su mitad de cancha en X/Z). La resolución de colisión
+cápsula-cápsula entre compañeros es responsabilidad de `player.go` (wave1, junto con salto/stamina).
+
+### 19.5 Orden de saque en 2v2
+
+**Decisión del coordinador: documentar la elección.** Pádel/tenis "real" rota el saque entre los 4
+jugadores juego a juego (A1, B1, A2, B2, ...), lo cual requiere un modelo de *games* que este código
+no tiene (hoy se juega a puntos directos, `PointsToWin`). La regla elegida para wave 0, más simple y
+sin ese modelo:
+
+```go
+// serverPlayerIndex: alterna compañero cada vez que el EQUIPO vuelve a sacar.
+func serverPlayerIndex(s *State, team int8) int8 {
+    if s.NumPlayers < 4 { return team } // 1v1: un jugador por equipo
+    a, b := teamPlayers(team)
+    if s.LastServerPlayer[team] == a { return b }
+    return a
+}
+```
+
+`State.LastServerPlayer [2]int8` recuerda, por equipo, qué jugador sacó la última vez que ese equipo
+sacó. **Nota para wave1/2**: si se quiere la rotación real de dobles (round-robin de los 4 jugadores
+a través de *games*), hace falta modelar *games*/*sets* explícitamente; hasta entonces esta alternancia
+simple es la que corre.
+
+### 19.6 Playground
+
+- No se puntúa nunca: `applyRules` devuelve temprano (no-op) si `Cfg.Mode == ModePlayground`.
+- `NewMatch` arranca directo en `PhaseRally` (sin fase de saque: no hay reglas de saque que cumplir).
+- `(*Match).RespawnBall()` repone la pelota al centro de la cancha a demanda (botón del panel dev,
+  wave1) — primitiva únicamente; wave 0 no cablea ningún trigger de UI.
+
+### 19.7 Snapshot y wasm
+
+- El snapshot agrega (al final, §11.2/más abajo) bloques de posición+extras para los jugadores 2 y 3,
+  más `SnapNumPlayers` y `SnapMode`.
+- El buffer de input de wasm pasa a `MaxPlayers × inputPerPlayer` (4×6=24 floats): el cliente llena los
+  slots humanos; los slots de IA (si los hay) se llenan dentro de wasm en wave1 — hoy quedan en cero.
+
+---
+
+## 20. Contrato congelado (wave 0)
+
+Layout final tal como lo implementa el código de `sim`/`wasm` al cierre de la wave 0. Referencia para
+el agente de `client/` al portar `snapshot.ts`/`input.ts`/`engine.ts`.
+
+### 20.1 `PlayerInput` (wasm input buffer)
+
+`inputPerPlayer = 6`: `[moveX, moveZ, targetX, targetZ, buttons, spin]`.
+`inputLen = MaxPlayers * inputPerPlayer = 24` floats, un bloque de 6 por cada uno de los 4 slots fijos
+(1v1 y Playground sólo llenan los slots 0 y 1; 2v2 llena los 4).
+
+### 20.2 `Event` (wasm event stride)
+
+`eventStride = 14`: `[kind, tick, posX, posY, posZ, side, player, part, quality, velX, velY, velZ,
+spin, _pad]`. `side` es el EQUIPO (0/1); `player` es el índice en `State.Players` o `-1`.
+
+`EventKind` (valores viejos nunca cambian; nuevos sólo se agregan al final):
+
+```
+1 EvBounceFloor  2 EvHitWall  3 EvHitNet  4 EvKick  5 EvPoint  6 EvGameOver  7 EvOut
+8 EvWhiff  9 EvJump  10 EvBodyHit  11 EvToss  12 EvServeFault  13 EvLet
+```
+
+### 20.3 Snapshot (`sim.Snap*`, wasm `outPrev`/`outCurr` blocks)
+
+Índices viejos (0..14, hasta `SnapLastTeam` inclusive, antes `SnapLastKicker`) **sin cambios de
+posición**. A partir de ahí, todo apendeado:
+
+```
+0 SnapTick  1 SnapPhase  2 SnapServer  3 SnapScore0  4 SnapScore1
+5 SnapBallX 6 SnapBallY 7 SnapBallZ
+8 SnapP0X 9 SnapP0Y 10 SnapP0Z  11 SnapP1X 12 SnapP1Y 13 SnapP1Z
+14 SnapLastTeam                                    -- (antes: SnapLastKicker, mismo índice)
+
+-- apendeado, contrato v2 + 2v2 --
+15 SnapBallSpin  16 SnapBallTossed  17 SnapNumPlayers  18 SnapMode
+19..25 SnapP0{VelX,VelZ,Stamina,Charge,OnGround,Buffer,Flags}
+26..32 SnapP1{VelX,VelZ,Stamina,Charge,OnGround,Buffer,Flags}
+33..35 SnapP2{X,Y,Z}  36..42 SnapP2{VelX,VelZ,Stamina,Charge,OnGround,Buffer,Flags}
+43..45 SnapP3{X,Y,Z}  46..52 SnapP3{VelX,VelZ,Stamina,Charge,OnGround,Buffer,Flags}
+53 SnapLen
+```
+
+`Charge` = `ChargeTicks / chargeMaxTicks` (0 si `Config` nunca se `Sanitize()`ó). `Flags` =
+`ShotType | (StaminaLock>0)<<1`.
+
+### 20.4 Config live-tuning (`sim/config_layout.go`)
+
+`CfgScalarLen` = 45 escalares (orden de declaración de `Config`, incluye `Mode` al final) +
+`PartCount(7) × cfgPartFieldCount(11)` = 77 floats de la tabla de partes (`HMin, HIdeal, HMax, Reach,
+SpeedMin, SpeedMax, DevBase, DevMax, SpinMin, SpinMax, AllowLob∈{0,1}`, por cada una de las 7
+`BodyPart`, incluyendo el índice 0 `PartNone` sin usar). `CfgLen = CfgScalarLen + 77 = 122`.
+
+### 20.5 Lo que el doc original tenía y este wave 0 decidió distinto (para que el agente de wave 1 no se sorprenda)
+
+1. **Saque**: autopase → drop + pique obligatorio + cajón diagonal + 2 saques (§7.5, override del
+   coordinador). `ServeTossSpeed` default pasó de 4.5 a 0.
+2. **Modos/2v2**: no estaba en el doc original; se agregó completo (§19) por decisión del coordinador,
+   incluyendo el rename `Player.Side` → `Player.Team`, `RallyState.LastKicker` → `LastTeam` (+
+   `LastPlayer`), y `Event.Player`.
+3. **`sanitizeInput`**: el doc original describe la firma como `(in, side)`; wave 0 la implementó como
+   `(in, side, cfg)` porque el clamp de `TargetX/TargetZ` depende de `Config.TargetMinFromNet` /
+   `TargetWallMargin`, que son tuneables en vivo — una firma pura de 2 argumentos no puede leerlos.
+4. **`eventStride`**: el doc dejaba "13 (o 12; fijar)" sin decidir cuál. Wave 0 fijó **14** (13 campos
+   + `Event.Player`, que no estaba contemplado antes de la decisión 2v2).
+5. **Compat v1**: mientras `strike.go` no exista (wave 1), `applyKicks`/`performKick` en `physics.go`
+   mapean el *release* de `BtnStrike`/`BtnLob` al viejo pipeline de patada (apuntando a `TargetX/Z` en
+   vez de `AimX/AimZ`, potencia fija en vez de carga real). Esto es un shim documentado con
+   `TODO(wave1)`, no el solver final de §7-§9.

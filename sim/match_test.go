@@ -6,54 +6,91 @@ import (
 )
 
 func TestSanitizeInput(t *testing.T) {
+	cfg := DefaultConfig()
 	cases := []struct {
 		name string
 		in   PlayerInput
+		side int8
 		want PlayerInput
 	}{
 		{
-			name: "NaN collapses to zero on every float field",
+			name: "NaN collapses MoveX/MoveZ to zero and Target to the rival half's center",
 			in: PlayerInput{
 				MoveX: math.NaN(), MoveZ: math.NaN(),
-				AimX: math.NaN(), AimZ: math.NaN(),
-				Loft: math.NaN(), Power: math.NaN(),
+				TargetX: math.NaN(), TargetZ: math.NaN(),
 			},
-			want: PlayerInput{},
+			side: 0,
+			want: PlayerInput{TargetX: CourtHalfLength / 2},
 		},
 		{
 			name: "axes are clamped to -1..1",
-			in:   PlayerInput{MoveX: 5, MoveZ: -5, AimX: 10, AimZ: -10},
-			want: PlayerInput{MoveX: 1, MoveZ: -1, AimX: 1, AimZ: -1},
-		},
-		{
-			name: "loft/power are clamped to 0..1",
-			in:   PlayerInput{Loft: -5, Power: 5},
-			want: PlayerInput{Loft: 0, Power: 1},
+			in:   PlayerInput{MoveX: 5, MoveZ: -5},
+			side: 0,
+			want: PlayerInput{MoveX: 1, MoveZ: -1, TargetX: cfg.TargetMinFromNet},
 		},
 		{
 			name: "infinities are clamped, not propagated",
 			in:   PlayerInput{MoveX: math.Inf(1), MoveZ: math.Inf(-1)},
-			want: PlayerInput{MoveX: 1, MoveZ: -1},
+			side: 0,
+			want: PlayerInput{MoveX: 1, MoveZ: -1, TargetX: cfg.TargetMinFromNet},
 		},
 		{
-			name: "kick flag passes through untouched",
-			in:   PlayerInput{Kick: true},
-			want: PlayerInput{Kick: true},
+			name: "unknown button bits are dropped",
+			in:   PlayerInput{Buttons: 0xFF},
+			side: 0,
+			want: PlayerInput{Buttons: btnMask, TargetX: cfg.TargetMinFromNet},
 		},
 		{
-			name: "already-valid input is unchanged",
-			in:   PlayerInput{MoveX: 0.3, MoveZ: -0.4, AimX: 0.1, AimZ: -0.1, Loft: 0.5, Power: 0.7},
-			want: PlayerInput{MoveX: 0.3, MoveZ: -0.4, AimX: 0.1, AimZ: -0.1, Loft: 0.5, Power: 0.7},
+			name: "spin is clamped to {-1,0,1}",
+			in:   PlayerInput{Spin: 5},
+			side: 0,
+			want: PlayerInput{Spin: 1, TargetX: cfg.TargetMinFromNet},
+		},
+		{
+			name: "target is clamped to the rival half for side 0 (positive X)",
+			in:   PlayerInput{TargetX: 100, TargetZ: 100},
+			side: 0,
+			want: PlayerInput{TargetX: CourtHalfLength - cfg.TargetWallMargin, TargetZ: CourtHalfWidth - cfg.TargetWallMargin},
+		},
+		{
+			name: "target is clamped to the rival half for side 1 (negative X)",
+			in:   PlayerInput{TargetX: -100, TargetZ: -100},
+			side: 1,
+			want: PlayerInput{TargetX: -(CourtHalfLength - cfg.TargetWallMargin), TargetZ: -(CourtHalfWidth - cfg.TargetWallMargin)},
+		},
+		{
+			name: "a target requested on the player's own half is pushed to the rival half",
+			in:   PlayerInput{TargetX: -3},
+			side: 0,
+			want: PlayerInput{TargetX: 3},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := sanitizeInput(c.in)
+			got := sanitizeInput(c.in, c.side, &cfg)
 			if got != c.want {
 				t.Errorf("got %+v, want %+v", got, c.want)
 			}
 		})
+	}
+}
+
+// TestEdges_HeldStrikeAcrossMultiStepIsSinglePress checks the v2 contract's
+// core promise (docs/design/contact-v2.md §2): a held button produces one
+// press edge, no matter how many ticks it stays held.
+func TestEdges_HeldStrikeAcrossMultiStepIsSinglePress(t *testing.T) {
+	p := &Player{}
+	in := PlayerInput{Buttons: BtnStrike}
+
+	if !pressed(p, in, BtnStrike) {
+		t.Fatalf("first tick with the button held should be a press edge")
+	}
+	p.Held = in.Buttons
+	for i := 0; i < 10; i++ {
+		if pressed(p, in, BtnStrike) {
+			t.Fatalf("tick %d: got a press edge again while the button stayed held", i)
+		}
 	}
 }
 
@@ -64,7 +101,7 @@ func TestStepIsNoOpAfterGameOver(t *testing.T) {
 	s.Score = [2]int{11, 3}
 	m.Restore(s)
 
-	ev := m.Step([2]PlayerInput{{Kick: true, AimX: 1, Power: 1}, {}})
+	ev := m.Step([MaxPlayers]PlayerInput{{Buttons: BtnStrike, TargetX: 5}, {}})
 
 	if len(ev) != 0 {
 		t.Fatalf("got %d events, want 0 after game over", len(ev))
@@ -83,7 +120,7 @@ func TestStepBallFliesDuringPointPause(t *testing.T) {
 	s.Ball = Ball{Pos: Vec3{Y: 1}, Vel: Vec3{Y: 2}}
 	m.Restore(s)
 
-	m.Step([2]PlayerInput{{}, {}})
+	m.Step([MaxPlayers]PlayerInput{})
 
 	after := m.State()
 	if after.Ball.Pos.Y == 1 {
@@ -95,7 +132,24 @@ func TestStepBallFliesDuringPointPause(t *testing.T) {
 // CLAUDE.md using testing.AllocsPerRun.
 func TestStepAllocatesZero(t *testing.T) {
 	m := NewMatch(DefaultConfig())
-	inputs := [2]PlayerInput{{MoveX: 0.3}, {MoveX: -0.3}}
+	inputs := [MaxPlayers]PlayerInput{{MoveX: 0.3}, {MoveX: -0.3}}
+
+	allocs := testing.AllocsPerRun(100, func() {
+		m.Step(inputs)
+	})
+
+	if allocs != 0 {
+		t.Errorf("Step allocated %v times per call, want 0", allocs)
+	}
+}
+
+// TestStepAllocatesZero_2v2 covers the 2v2 path (4 active players) for the
+// same zero-alloc contract.
+func TestStepAllocatesZero_2v2(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Mode = Mode2v2
+	m := NewMatch(cfg)
+	inputs := [MaxPlayers]PlayerInput{{MoveX: 0.3}, {MoveX: -0.3}, {MoveZ: 0.2}, {MoveZ: -0.2}}
 
 	allocs := testing.AllocsPerRun(100, func() {
 		m.Step(inputs)
@@ -116,7 +170,7 @@ func TestDeterminism(t *testing.T) {
 		m := NewMatch(DefaultConfig())
 		g := newLCG(seed)
 		for i := 0; i < ticks; i++ {
-			inputs := [2]PlayerInput{scriptedInput(g), scriptedInput(g)}
+			inputs := [MaxPlayers]PlayerInput{scriptedInput(g), scriptedInput(g)}
 			m.Step(inputs)
 		}
 		return m.State()
@@ -130,20 +184,22 @@ func TestDeterminism(t *testing.T) {
 	}
 }
 
-// TestIntegrationServeToPoint drives a full serve with a strong, straight,
-// well-lofted kick and asserts that an EvPoint eventually gets emitted
-// before the ball returns to a serve.
+// TestIntegrationServeToPoint drives a full serve with a strong, straight
+// kick aimed deep into the rival half and asserts that an EvPoint
+// eventually gets emitted before the ball returns to a serve.
 func TestIntegrationServeToPoint(t *testing.T) {
 	m := NewMatch(DefaultConfig())
 
-	serverInput := PlayerInput{Kick: true, AimX: 1, Loft: 0.3, Power: 1}
 	const maxTicks = 10 * TickRate
 
 	sawPoint := false
 	for i := 0; i < maxTicks; i++ {
-		var in [2]PlayerInput
+		var in [MaxPlayers]PlayerInput
 		if i == 0 {
-			in[0] = serverInput
+			in[0] = PlayerInput{Buttons: BtnStrike, TargetX: CourtHalfLength - 1}
+		}
+		if i == 1 {
+			in[0] = PlayerInput{TargetX: CourtHalfLength - 1}
 		}
 		ev := m.Step(in)
 		for _, e := range ev {
@@ -170,14 +226,14 @@ func TestRestingBallResolvesPoint(t *testing.T) {
 	m := NewMatch(DefaultConfig())
 	s := m.State()
 	s.Phase = PhaseRally
-	s.Rally = RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 1}}
+	s.Rally = RallyState{LastTeam: 0, LastPlayer: 0, BouncesOnSide: [2]int{0, 1}}
 	s.Ball = Ball{Pos: Vec3{X: 3, Y: BallRadius + 0.009}, Vel: Vec3{Y: -0.4375}}
 	m.Restore(s)
 
 	const maxTicks = 5 * TickRate
 	sawPoint := false
 	for i := 0; i < maxTicks && !sawPoint; i++ {
-		ev := m.Step([2]PlayerInput{{}, {}})
+		ev := m.Step([MaxPlayers]PlayerInput{})
 		for _, e := range ev {
 			if e.Kind == EvPoint && e.Side == 0 {
 				sawPoint = true
@@ -196,7 +252,7 @@ func TestRestingBallResolvesPoint(t *testing.T) {
 // the point for the kicker (the receiver failed to return it in time).
 func TestRestingBallOnReceiverSideAfterOneBounceAwardsKicker(t *testing.T) {
 	s := newRulesTestState()
-	s.Rally = RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 1}}
+	s.Rally = RallyState{LastTeam: 0, LastPlayer: 0, BouncesOnSide: [2]int{0, 1}}
 	s.Ball = Ball{Pos: Vec3{X: 0.5, Y: BallRadius + 0.0001}, Vel: Vec3{Y: -0.05}}
 
 	ev := stepBall(&s, nil)
@@ -221,7 +277,7 @@ func TestRestingBallOnReceiverSideAfterOneBounceAwardsKicker(t *testing.T) {
 // that is a fault, so the receiver wins the point.
 func TestRestingBallOnKickerSideIsAFault(t *testing.T) {
 	s := newRulesTestState()
-	s.Rally = RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}}
+	s.Rally = RallyState{LastTeam: 0, LastPlayer: 0, BouncesOnSide: [2]int{0, 0}}
 	s.Ball = Ball{Pos: Vec3{X: -0.5, Y: BallRadius + 0.0001}, Vel: Vec3{Y: -0.05}}
 
 	ev := stepBall(&s, nil)
@@ -245,7 +301,7 @@ func TestRestingBallOnKickerSideIsAFault(t *testing.T) {
 // reports allocations; CLAUDE.md requires zero allocations per tick.
 func BenchmarkStep(b *testing.B) {
 	m := NewMatch(DefaultConfig())
-	inputs := [2]PlayerInput{{MoveX: 0.5, AimX: 1}, {MoveX: -0.5, AimX: -1}}
+	inputs := [MaxPlayers]PlayerInput{{MoveX: 0.5, TargetX: 9}, {MoveX: -0.5, TargetX: -9}}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		m.Step(inputs)
@@ -255,16 +311,16 @@ func BenchmarkStep(b *testing.B) {
 // FuzzStep feeds arbitrary (including NaN/Inf) input into Step and asserts
 // the simulation never panics and the resulting positions stay finite.
 func FuzzStep(f *testing.F) {
-	f.Add(0.0, 0.0, false, 0.0, 0.0, 0.0, 0.0)
-	f.Add(math.NaN(), math.Inf(1), true, math.Inf(-1), math.NaN(), 1e300, -1e300)
-	f.Add(1.0, 1.0, true, 1.0, 1.0, 1.0, 1.0)
+	f.Add(0.0, 0.0, uint8(0), 0.0, 0.0, int8(0))
+	f.Add(math.NaN(), math.Inf(1), uint8(0xFF), math.Inf(-1), math.NaN(), int8(5))
+	f.Add(1.0, 1.0, uint8(BtnStrike|BtnLob), 1.0, 1.0, int8(-5))
 
-	f.Fuzz(func(t *testing.T, moveX, moveZ float64, kick bool, aimX, aimZ, loft, power float64) {
+	f.Fuzz(func(t *testing.T, moveX, moveZ float64, buttons uint8, targetX, targetZ float64, spin int8) {
 		m := NewMatch(DefaultConfig())
-		in := PlayerInput{MoveX: moveX, MoveZ: moveZ, Kick: kick, AimX: aimX, AimZ: aimZ, Loft: loft, Power: power}
+		in := PlayerInput{MoveX: moveX, MoveZ: moveZ, Buttons: buttons, TargetX: targetX, TargetZ: targetZ, Spin: spin}
 
 		for i := 0; i < 10; i++ {
-			m.Step([2]PlayerInput{in, in})
+			m.Step([MaxPlayers]PlayerInput{in, in})
 		}
 
 		s := m.State()

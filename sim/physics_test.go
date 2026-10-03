@@ -6,11 +6,16 @@ import (
 )
 
 func newPhysicsTestState() State {
-	s := State{Cfg: DefaultConfig()}
-	s.Players[0] = Player{Side: 0}
-	s.Players[1] = Player{Side: 1}
-	s.Rally.LastKicker = -1
+	s := State{Cfg: DefaultConfig(), NumPlayers: 2}
+	s.Players[0] = Player{Team: 0}
+	s.Players[1] = Player{Team: 1}
+	s.Rally.LastTeam = -1
+	s.Rally.LastPlayer = -1
 	return s
+}
+
+func fullInputs(in0, in1 PlayerInput) [MaxPlayers]PlayerInput {
+	return [MaxPlayers]PlayerInput{in0, in1}
 }
 
 func TestMovePlayers(t *testing.T) {
@@ -19,7 +24,7 @@ func TestMovePlayers(t *testing.T) {
 	t.Run("moves at configured speed along a single axis", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Players[0].Pos = Vec3{X: -5}
-		movePlayers(&s, [2]PlayerInput{{MoveX: 1}, {}})
+		movePlayers(&s, fullInputs(PlayerInput{MoveX: 1}, PlayerInput{}))
 
 		wantVel := cfg.PlayerSpeed
 		assertFloat(t, "player0.Vel.X", s.Players[0].Vel.X, wantVel)
@@ -30,7 +35,7 @@ func TestMovePlayers(t *testing.T) {
 	t.Run("diagonal input is normalized before scaling by speed", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Players[0].Pos = Vec3{X: -5}
-		movePlayers(&s, [2]PlayerInput{{MoveX: 1, MoveZ: 1}, {}})
+		movePlayers(&s, fullInputs(PlayerInput{MoveX: 1, MoveZ: 1}, PlayerInput{}))
 
 		diag := 1 / math.Sqrt2
 		wantVelX := diag * cfg.PlayerSpeed
@@ -42,7 +47,7 @@ func TestMovePlayers(t *testing.T) {
 	t.Run("side0 is clamped before crossing the net", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Players[0].Pos = Vec3{X: -0.4}
-		movePlayers(&s, [2]PlayerInput{{MoveX: 1}, {}})
+		movePlayers(&s, fullInputs(PlayerInput{MoveX: 1}, PlayerInput{}))
 
 		assertFloat(t, "player0.Pos.X", s.Players[0].Pos.X, -PlayerRadius)
 	})
@@ -50,7 +55,7 @@ func TestMovePlayers(t *testing.T) {
 	t.Run("side1 is clamped before crossing the net", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Players[1].Pos = Vec3{X: 0.4}
-		movePlayers(&s, [2]PlayerInput{{}, {MoveX: -1}})
+		movePlayers(&s, fullInputs(PlayerInput{}, PlayerInput{MoveX: -1}))
 
 		assertFloat(t, "player1.Pos.X", s.Players[1].Pos.X, PlayerRadius)
 	})
@@ -58,7 +63,7 @@ func TestMovePlayers(t *testing.T) {
 	t.Run("side0 is clamped at the back wall", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Players[0].Pos = Vec3{X: -9.6}
-		movePlayers(&s, [2]PlayerInput{{MoveX: -1}, {}})
+		movePlayers(&s, fullInputs(PlayerInput{MoveX: -1}, PlayerInput{}))
 
 		assertFloat(t, "player0.Pos.X", s.Players[0].Pos.X, -(CourtHalfLength - PlayerRadius))
 	})
@@ -66,91 +71,18 @@ func TestMovePlayers(t *testing.T) {
 	t.Run("player is clamped at the side wall on Z", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Players[0].Pos = Vec3{X: -5, Z: 4.9}
-		movePlayers(&s, [2]PlayerInput{{MoveZ: 1}, {}})
+		movePlayers(&s, fullInputs(PlayerInput{MoveZ: 1}, PlayerInput{}))
 
 		assertFloat(t, "player0.Pos.Z", s.Players[0].Pos.Z, CourtHalfWidth-PlayerRadius)
 	})
-}
 
-func TestApplyKicks(t *testing.T) {
-	t.Run("non-server cannot kick during serve", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Phase = PhaseServe
-		s.Server = 0
-		s.Players[1].Pos = Vec3{X: 0.5}
-		s.Ball.Pos = Vec3{X: 0.5}
+	t.Run("only the first NumPlayers slots move", func(t *testing.T) {
+		s := newPhysicsTestState() // NumPlayers: 2
+		s.Players[2].Pos = Vec3{X: -5}
+		movePlayers(&s, [MaxPlayers]PlayerInput{{}, {}, {MoveX: 1}, {MoveX: 1}})
 
-		ev := applyKicks(&s, [2]PlayerInput{{}, {Kick: true, AimX: 1}}, nil)
-
-		if len(ev) != 0 {
-			t.Fatalf("got %d events, want 0", len(ev))
-		}
-		if s.Phase != PhaseServe {
-			t.Errorf("Phase: got %v, want PhaseServe", s.Phase)
-		}
-	})
-
-	t.Run("server kick during serve switches to rally and emits EvKick", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Phase = PhaseServe
-		s.Server = 0
-		s.Players[0].Pos = Vec3{X: -0.5}
-		s.Ball.Pos = Vec3{X: -0.5}
-
-		ev := applyKicks(&s, [2]PlayerInput{{Kick: true, AimX: 1, Power: 1}, {}}, nil)
-
-		if s.Phase != PhaseRally {
-			t.Fatalf("Phase: got %v, want PhaseRally", s.Phase)
-		}
-		if len(ev) != 1 || ev[0].Kind != EvKick || ev[0].Side != 0 {
-			t.Fatalf("got %+v, want one EvKick with Side 0", ev)
-		}
-		if s.Ball.Vel.Len() == 0 {
-			t.Error("ball velocity was not set by the kick")
-		}
-	})
-
-	t.Run("out of reach does not kick", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Phase = PhaseRally
-		s.Rally.LastKicker = 1
-		s.Players[0].Pos = Vec3{X: -5}
-		s.Ball.Pos = Vec3{X: 0}
-
-		ev := applyKicks(&s, [2]PlayerInput{{Kick: true, AimX: 1}, {}}, nil)
-
-		if len(ev) != 0 {
-			t.Fatalf("got %d events, want 0", len(ev))
-		}
-	})
-
-	t.Run("either side may kick during rally", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Phase = PhaseRally
-		s.Players[1].Pos = Vec3{X: 0.5}
-		s.Ball.Pos = Vec3{X: 0.5}
-
-		ev := applyKicks(&s, [2]PlayerInput{{}, {Kick: true, AimX: -1, Power: 0.5}}, nil)
-
-		if len(ev) != 1 || ev[0].Kind != EvKick || ev[0].Side != 1 {
-			t.Fatalf("got %+v, want one EvKick with Side 1", ev)
-		}
-	})
-
-	t.Run("simultaneous kicks: side 0 wins the tie-break", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Phase = PhaseRally
-		s.Players[0].Pos = Vec3{X: -0.35}
-		s.Players[1].Pos = Vec3{X: 0.35}
-		s.Ball.Pos = Vec3{X: 0}
-
-		ev := applyKicks(&s, [2]PlayerInput{{Kick: true, AimX: 1}, {Kick: true, AimX: -1}}, nil)
-
-		if len(ev) != 1 {
-			t.Fatalf("got %d events, want exactly 1 (only one kick per tick)", len(ev))
-		}
-		if ev[0].Side != 0 {
-			t.Errorf("Side: got %d, want 0", ev[0].Side)
+		if s.Players[2].Pos.X != -5 {
+			t.Errorf("player2 (inactive slot) moved: got %+v", s.Players[2].Pos)
 		}
 	})
 }
@@ -264,7 +196,7 @@ func TestStepBallWalls(t *testing.T) {
 	t.Run("flying above wall height skips reflection and goes out", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Cfg = cfg
-		s.Ball = Ball{Pos: Vec3{X: 9.5, Y: WallHeight + 0.5}, Vel: Vec3{X: 50}}
+		s.Ball = Ball{Pos: Vec3{X: 9.5, Y: WallHeight + 0.5}, Vel: Vec3{X: 200}}
 
 		ev := stepBall(&s, nil)
 
@@ -281,7 +213,7 @@ func TestStepBallWalls(t *testing.T) {
 	t.Run("EvOut is edge-triggered: only the first tick out of bounds emits it", func(t *testing.T) {
 		s := newPhysicsTestState()
 		s.Cfg = cfg
-		s.Ball = Ball{Pos: Vec3{X: 9.5, Y: WallHeight + 0.5}, Vel: Vec3{X: 50}}
+		s.Ball = Ball{Pos: Vec3{X: 9.5, Y: WallHeight + 0.5}, Vel: Vec3{X: 200}}
 
 		first := stepBall(&s, nil)
 		second := stepBall(&s, nil)

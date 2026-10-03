@@ -41,7 +41,7 @@ func (b *builder) Build(ctx context.Context) error {
 		return fmt.Errorf("futenis.wasm: %w", err)
 	}
 	if err := b.bundleTS(); err != nil {
-		return fmt.Errorf("main.js: %w", err)
+		return fmt.Errorf("bundle main.js/preview.js: %w", err)
 	}
 	return nil
 }
@@ -116,15 +116,18 @@ func (b *builder) buildWasm(ctx context.Context) error {
 
 func (b *builder) bundleTS() error {
 	result := api.Build(api.BuildOptions{
-		EntryPoints: []string{filepath.Join(b.root, "client", "src", "main.ts")},
-		Outfile:     b.dist("main.js"),
-		Bundle:      true,
-		Write:       true,
-		Format:      api.FormatESModule,
-		Target:      api.ES2020,
-		Sourcemap:   api.SourceMapInline,
-		External:    []string{"three", "three/*"}, // provided by the import map
-		LogLevel:    api.LogLevelSilent,
+		EntryPointsAdvanced: []api.EntryPoint{
+			{InputPath: filepath.Join(b.root, "client", "src", "main.ts"), OutputPath: "main"},
+			{InputPath: filepath.Join(b.root, "client", "src", "character", "preview.ts"), OutputPath: "preview"},
+		},
+		Outdir:    b.dist(""),
+		Bundle:    true,
+		Write:     true,
+		Format:    api.FormatESModule,
+		Target:    api.ES2020,
+		Sourcemap: api.SourceMapInline,
+		External:  []string{"three", "three/*"}, // provided by the import map
+		LogLevel:  api.LogLevelSilent,
 	})
 	if len(result.Errors) == 0 {
 		return nil

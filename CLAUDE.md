@@ -18,7 +18,7 @@ client/   TypeScript + three.js. SOLO dibuja, lee input y maneja cámara. NUNCA 
 
 ## Estándares de juego en browser
 
-1. **Fixed timestep**: `sim` avanza en ticks de `1/60 s` (`TickRate`). El cliente acumula tiempo real
+1. **Fixed timestep**: `sim` avanza en ticks de `1/120 s` (`TickRate`, como la física de Rocket League; red a 60 Hz, render sin tope). El cliente acumula tiempo real
    con `requestAnimationFrame` y llama `step` N veces; renderiza **interpolando** entre el estado previo y el actual.
 2. **Determinismo**: mismo estado + mismos inputs = mismo resultado, nativo y WASM.
    - Prohibido: `time.Now`, `math/rand` sin semilla del estado, iterar maps, goroutines en `sim`.

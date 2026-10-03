@@ -56,13 +56,25 @@ func (g *lcg) bool(n uint64) bool {
 // scriptedInput builds a deterministic PlayerInput from the generator, used
 // to drive long determinism runs without any real randomness.
 func scriptedInput(g *lcg) PlayerInput {
+	var buttons uint8
+	if g.bool(5) {
+		buttons |= BtnStrike
+	}
+	if g.bool(7) {
+		buttons |= BtnLob
+	}
+	if g.bool(11) {
+		buttons |= BtnJump
+	}
+	if g.bool(3) {
+		buttons |= BtnSprint
+	}
 	return PlayerInput{
-		MoveX: g.floatRange(-1, 1),
-		MoveZ: g.floatRange(-1, 1),
-		Kick:  g.bool(5),
-		AimX:  g.floatRange(-1, 1),
-		AimZ:  g.floatRange(-1, 1),
-		Loft:  g.floatRange(0, 1),
-		Power: g.floatRange(0, 1),
+		MoveX:   g.floatRange(-1, 1),
+		MoveZ:   g.floatRange(-1, 1),
+		TargetX: g.floatRange(-CourtHalfLength, CourtHalfLength),
+		TargetZ: g.floatRange(-CourtHalfWidth, CourtHalfWidth),
+		Buttons: buttons,
+		Spin:    int8(g.next()%3) - 1,
 	}
 }

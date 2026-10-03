@@ -24,7 +24,7 @@ func newHandler(root string, build builderFunc, logger *log.Logger) http.Handler
 	files := http.FileServer(http.Dir(filepath.Join(root, "client")))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" || r.URL.Path == "/character.html" {
 			if err := build(r.Context()); err != nil {
 				logger.Printf("build failed:\n%v", err)
 				http.Error(w, "build failed:\n"+err.Error(), http.StatusInternalServerError)

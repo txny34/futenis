@@ -13,18 +13,18 @@ func TestDecodeInputsOrderAndSanitize(t *testing.T) {
 	for i := range src {
 		src[i] = float64(i) + 0.5
 	}
-	src[2] = 1                // p0 kick
-	src[inputPerPlayer+2] = 0 // p1 no kick
+	src[4] = 1                // p0 buttons
+	src[inputPerPlayer+4] = 0 // p1 buttons
 	src[inputPerPlayer] = math.NaN()
 	buf := make([]byte, inputLen*8)
 	encodeFloats(buf, src)
 
 	in := decodeInputs(buf)
 
-	if in[0].MoveX != 0.5 || in[0].MoveZ != 1.5 || !in[0].Kick || in[0].Power != 6.5 {
+	if in[0].MoveX != 0.5 || in[0].MoveZ != 1.5 || in[0].Buttons != 1 || in[0].TargetX != 2.5 {
 		t.Fatalf("p0 decoded wrong: %+v", in[0])
 	}
-	if in[1].MoveX != 0 || in[1].Kick || in[1].AimX != 10.5 || in[1].Power != 13.5 {
+	if in[1].MoveX != 0 || in[1].Buttons != 0 || in[1].TargetX != 8.5 {
 		t.Fatalf("p1 decoded wrong: %+v", in[1])
 	}
 }
@@ -39,8 +39,14 @@ func TestEncodeFloatsLittleEndian(t *testing.T) {
 
 func TestWriteEventSlot(t *testing.T) {
 	out := make([]float64, outLen)
-	writeEvent(out, 1, sim.Event{Kind: sim.EvKick, Tick: 7, Pos: sim.Vec3{X: 1, Y: 2, Z: 3}, Side: 1})
-	want := []float64{float64(sim.EvKick), 7, 1, 2, 3, 1}
+	writeEvent(out, 1, sim.Event{
+		Kind: sim.EvKick, Tick: 7, Pos: sim.Vec3{X: 1, Y: 2, Z: 3}, Side: 1, Player: 2,
+		Part: sim.PartFoot, Quality: sim.QualGood, Vel: sim.Vec3{X: 4, Y: 5, Z: 6}, Spin: 0.5,
+	})
+	want := []float64{
+		float64(sim.EvKick), 7, 1, 2, 3, 1, 2,
+		float64(sim.PartFoot), float64(sim.QualGood), 4, 5, 6, 0.5, 0,
+	}
 	o := outEvents + eventStride
 	for i, w := range want {
 		if out[o+i] != w {
@@ -59,8 +65,11 @@ func TestClamp(t *testing.T) {
 }
 
 func TestLayoutSize(t *testing.T) {
-	if outLen != 2*sim.SnapLen+1+192 {
+	if outLen != 2*sim.SnapLen+1+maxEvents*eventStride {
 		t.Fatalf("outLen=%d", outLen)
+	}
+	if inputLen != sim.MaxPlayers*inputPerPlayer {
+		t.Fatalf("inputLen=%d", inputLen)
 	}
 }
 
@@ -70,7 +79,7 @@ func TestRunFrameWritesCountAndCurr(t *testing.T) {
 	for i := range out {
 		out[i] = -999
 	}
-	runFrame(m, [2]sim.PlayerInput{}, 3, out)
+	runFrame(m, [sim.MaxPlayers]sim.PlayerInput{}, 3, out)
 	if c := out[outEventCount]; c < 0 || c > maxEvents {
 		t.Fatalf("event count %v out of range", c)
 	}
@@ -81,5 +90,23 @@ func TestRunFrameWritesCountAndCurr(t *testing.T) {
 		if out[outCurr+i] != w {
 			t.Fatalf("curr[%d]=%v want %v", i, out[outCurr+i], w)
 		}
+	}
+}
+
+// TestRunFrameHeldInputPersistsAcrossTicks is a regression test for the v2
+// contract change (docs/design/contact-v2.md §2): PlayerInput carries held
+// levels, not edges, so runFrame must NOT clear anything between the ticks
+// of a single step call -- a held BtnStrike across n>1 ticks must behave
+// like it was held for real, not re-fire or vanish.
+func TestRunFrameHeldInputPersistsAcrossTicks(t *testing.T) {
+	m := sim.NewMatch(sim.DefaultConfig())
+	in := [sim.MaxPlayers]sim.PlayerInput{{Buttons: sim.BtnStrike}}
+	out := make([]float64, outLen)
+
+	runFrame(m, in, 5, out)
+
+	st := m.State()
+	if st.Players[0].Held&sim.BtnStrike == 0 {
+		t.Fatalf("Player 0 Held: want BtnStrike still set after 5 ticks of a held input, got %+v", st.Players[0])
 	}
 }

@@ -10,14 +10,18 @@ import (
 // Buffer layout shared with the client (client/src mirrors it; keep EXACT).
 // All values are float64 little-endian.
 const (
-	// inputPerPlayer is the float count per player: moveX, moveZ, kick, aimX, aimZ, loft, power.
-	inputPerPlayer = 7
-	// inputLen is the total float count of the input buffer (player 0 then player 1).
-	inputLen = 2 * inputPerPlayer
+	// inputPerPlayer is the float count per player: moveX, moveZ, targetX,
+	// targetZ, buttons, spin (docs/design/contact-v2.md §11.3/§2 v2).
+	inputPerPlayer = 6
+	// inputLen is the total float count of the input buffer, one block per
+	// sim.MaxPlayers slot (client fills the human slots; unused/AI slots
+	// are zero until wave1 wires the AI into wasm -- "Modos y 2v2").
+	inputLen = sim.MaxPlayers * inputPerPlayer
 	// maxEvents caps the events reported per step call; extra events are dropped.
 	maxEvents = 32
-	// eventStride is the float count per event: kind, tick, posX, posY, posZ, side.
-	eventStride = 6
+	// eventStride is the float count per event: kind, tick, posX, posY,
+	// posZ, side, player, part, quality, velX, velY, velZ, spin, _pad.
+	eventStride = 14
 	// outPrev is the offset of the snapshot taken before the last tick of a call.
 	outPrev = 0
 	// outCurr is the offset of the snapshot taken after the last tick.
@@ -34,18 +38,20 @@ const (
 )
 
 // decodeInputs reads inputLen LE float64s from src. NaN/Inf become 0.
-func decodeInputs(src []byte) [2]sim.PlayerInput {
-	var in [2]sim.PlayerInput
+// PlayerInput v2 carries held levels (Buttons/Spin), not edges, so callers
+// no longer need to clear anything between the ticks of a single step call
+// (see runFrame).
+func decodeInputs(src []byte) [sim.MaxPlayers]sim.PlayerInput {
+	var in [sim.MaxPlayers]sim.PlayerInput
 	for p := range in {
 		b := p * inputPerPlayer
 		in[p] = sim.PlayerInput{
-			MoveX: readF64(src, b),
-			MoveZ: readF64(src, b+1),
-			Kick:  readF64(src, b+2) != 0,
-			AimX:  readF64(src, b+3),
-			AimZ:  readF64(src, b+4),
-			Loft:  readF64(src, b+5),
-			Power: readF64(src, b+6),
+			MoveX:   readF64(src, b),
+			MoveZ:   readF64(src, b+1),
+			TargetX: readF64(src, b+2),
+			TargetZ: readF64(src, b+3),
+			Buttons: uint8(readF64(src, b+4)),
+			Spin:    int8(readF64(src, b+5)),
 		}
 	}
 	return in
@@ -75,12 +81,22 @@ func writeEvent(out []float64, i int, e sim.Event) {
 	out[o+3] = e.Pos.Y
 	out[o+4] = e.Pos.Z
 	out[o+5] = float64(e.Side)
+	out[o+6] = float64(e.Player)
+	out[o+7] = float64(e.Part)
+	out[o+8] = float64(e.Quality)
+	out[o+9] = e.Vel.X
+	out[o+10] = e.Vel.Y
+	out[o+11] = e.Vel.Z
+	out[o+12] = e.Spin
+	out[o+13] = 0 // _pad, reserved
 }
 
 // runFrame advances m by n ticks (clamped) and fills out (len outLen) with
-// prev/curr snapshots and up to maxEvents events. Kick only applies to the
-// first tick (edge-triggered). Mutates out in place to avoid allocations.
-func runFrame(m *sim.Match, inputs [2]sim.PlayerInput, n int, out []float64) {
+// prev/curr snapshots and up to maxEvents events. inputs are held levels
+// (PlayerInput v2): unlike the old edge-triggered Kick, they are reused
+// as-is for every tick of this call, no per-tick clearing needed. Mutates
+// out in place to avoid allocations.
+func runFrame(m *sim.Match, inputs [sim.MaxPlayers]sim.PlayerInput, n int, out []float64) {
 	n = clamp(n, minSteps, maxSteps)
 	count := 0
 	for i := 0; i < n; i++ {
@@ -94,7 +110,6 @@ func runFrame(m *sim.Match, inputs [2]sim.PlayerInput, n int, out []float64) {
 				count++
 			}
 		}
-		inputs[0].Kick, inputs[1].Kick = false, false
 	}
 	st := m.State()
 	sim.WriteSnapshot(&st, out[outCurr:outEventCount])

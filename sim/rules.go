@@ -15,11 +15,22 @@ const serveBallHeight = 0.5
 // serve.
 const servePlayerOffset = 7.0
 
+// servePlayerZOffset is how far right/left of the center line the two
+// partners of a 2v2 team start for a new serve. Wave 0 placeholder: real
+// padel doubles starting positions / serve-box geometry is a wave1 concern
+// (docs/design/contact-v2.md §7.5, "Modos y 2v2").
+const servePlayerZOffset = CourtHalfWidth / 2
+
 // applyRules reads the events emitted this tick, updates RallyState and
 // Score, and appends EvPoint / EvGameOver when a point is decided. Events
 // are only judged while Phase == PhaseRally; during PhasePoint the ball may
-// still be flying but no event changes the score.
+// still be flying but no event changes the score. ModePlayground never
+// scores (docs/design/contact-v2.md "Modos y 2v2"): the ball just keeps
+// bouncing and RespawnBall is the only way to reset it.
 func applyRules(s *State, ev []Event) []Event {
+	if s.Cfg.Mode == ModePlayground {
+		return ev
+	}
 	switch s.Phase {
 	case PhaseRally:
 		return judgeRally(s, ev)
@@ -47,11 +58,12 @@ func judgeRally(s *State, ev []Event) []Event {
 }
 
 // judgeEvent inspects a single tick event against the current RallyState and
-// reports the winning side and whether the point is decided. It also
-// advances RallyState.LastKicker/BouncesOnSide for non-decisive kicks and
-// bounces, enforcing the "max 1 touch per side" padel rule.
+// reports the winning team and whether the point is decided. It also
+// advances RallyState.LastTeam/LastPlayer/BouncesOnSide for non-decisive
+// kicks and bounces, enforcing the "max 1 touch per TEAM" padel rule
+// (either partner may hit in 2v2, but only one touch total counts).
 func judgeEvent(r *RallyState, e Event) (winner int8, decided bool) {
-	k := r.LastKicker
+	k := r.LastTeam
 	if k < 0 {
 		return judgeFirstKick(r, e)
 	}
@@ -73,23 +85,25 @@ func judgeEvent(r *RallyState, e Event) (winner int8, decided bool) {
 }
 
 // judgeFirstKick handles the serve's opening kick, when RallyState has no
-// LastKicker yet.
+// LastTeam yet.
 func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
 	if e.Kind == EvKick {
-		r.LastKicker = e.Side
+		r.LastTeam = e.Side
+		r.LastPlayer = e.Player
 		r.BouncesOnSide = [2]int{}
 	}
 	return 0, false
 }
 
 // judgeKickEvent handles an EvKick once a rally is underway: a kick by the
-// current kicker's own side is a double touch (faultOnKickerSide); a kick by
-// the other side is a legal return that becomes the new LastKicker.
+// current kicker's own team is a double touch (faultOnKickerSide); a kick
+// by the other team is a legal return that becomes the new LastTeam.
 func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	if e.Side == k {
 		return faultOnKickerSide(r, k)
 	}
-	r.LastKicker = e.Side
+	r.LastTeam = e.Side
+	r.LastPlayer = e.Player
 	r.BouncesOnSide = [2]int{}
 	return 0, false
 }
@@ -125,10 +139,10 @@ func faultOnKickerSide(r *RallyState, k int8) (int8, bool) {
 // the match (EvGameOver) or starts the point pause before the next serve.
 func awardPoint(s *State, winner int8, ev []Event) []Event {
 	s.Score[winner]++
-	ev = append(ev, Event{Kind: EvPoint, Tick: s.Tick, Side: winner})
+	ev = append(ev, Event{Kind: EvPoint, Tick: s.Tick, Side: winner, Player: -1})
 	if s.Score[winner] >= s.Cfg.PointsToWin {
 		s.Phase = PhaseGameOver
-		return append(ev, Event{Kind: EvGameOver, Tick: s.Tick, Side: winner})
+		return append(ev, Event{Kind: EvGameOver, Tick: s.Tick, Side: winner, Player: -1})
 	}
 	s.Phase = PhasePoint
 	s.Server = winner
@@ -136,20 +150,59 @@ func awardPoint(s *State, winner int8, ev []Event) []Event {
 	return ev
 }
 
-// resetForServe places both players and the ball for a new serve by `server`,
-// resetting RallyState so the ball is in the server's reach and the previous
-// rally's bookkeeping cannot leak into the next point.
+// resetForServe places every active player and the ball for a new serve by
+// `server` (a team), resetting RallyState so the ball is in the server's
+// reach and the previous rally's bookkeeping cannot leak into the next
+// point. Also picks which individual player serves (serverPlayerIndex,
+// alternating partners in 2v2) and the diagonal serve box
+// (serveBoxForScore) -- docs/design/contact-v2.md §7.5 / "Modos y 2v2".
 func resetForServe(s *State, server int8) {
 	s.Server = server
 	s.Phase = PhaseServe
-	s.Rally = RallyState{LastKicker: -1}
 
-	s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset}, Side: 0}
-	s.Players[1] = Player{Pos: Vec3{X: servePlayerOffset}, Side: 1}
+	sp := serverPlayerIndex(s, server)
+	s.LastServerPlayer[server] = sp
+
+	s.Rally = RallyState{
+		LastTeam:     -1,
+		LastPlayer:   -1,
+		ServerPlayer: sp,
+		ServeAttempt: 1,
+		ServeBox:     serveBoxForScore(s.Score),
+	}
+
+	if s.NumPlayers >= 4 {
+		setupDoublesPositions(s)
+	} else {
+		s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset}, Team: 0, OnGround: true, Stamina: 1}
+		s.Players[1] = Player{Pos: Vec3{X: servePlayerOffset}, Team: 1, OnGround: true, Stamina: 1}
+	}
 
 	ballX := -serveBallOffset
 	if server == 1 {
 		ballX = serveBallOffset
 	}
 	s.Ball = Ball{Pos: Vec3{X: ballX, Y: serveBallHeight}}
+}
+
+// setupDoublesPositions places all 4 players for a 2v2 serve: each team's
+// two partners start on either side of the center line (Slot 0 = right, 1 =
+// left), per the teamPlayers index convention (team 0 = {0,1}, team 1 =
+// {2,3}).
+func setupDoublesPositions(s *State) {
+	s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset, Z: servePlayerZOffset}, Team: 0, Slot: 0, OnGround: true, Stamina: 1}
+	s.Players[1] = Player{Pos: Vec3{X: -servePlayerOffset, Z: -servePlayerZOffset}, Team: 0, Slot: 1, OnGround: true, Stamina: 1}
+	s.Players[2] = Player{Pos: Vec3{X: servePlayerOffset, Z: servePlayerZOffset}, Team: 1, Slot: 0, OnGround: true, Stamina: 1}
+	s.Players[3] = Player{Pos: Vec3{X: servePlayerOffset, Z: -servePlayerZOffset}, Team: 1, Slot: 1, OnGround: true, Stamina: 1}
+}
+
+// setupPlayground places a minimal 1v1-shaped pair straight into PhaseRally
+// with no serve/scoring state: ModePlayground is a free sandbox
+// (docs/design/contact-v2.md "Modos y 2v2").
+func setupPlayground(s *State) {
+	s.Phase = PhaseRally
+	s.Rally = RallyState{LastTeam: -1, LastPlayer: -1}
+	s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset}, Team: 0, OnGround: true, Stamina: 1}
+	s.Players[1] = Player{Pos: Vec3{X: servePlayerOffset}, Team: 1, OnGround: true, Stamina: 1}
+	s.Ball = Ball{Pos: Vec3{Y: serveBallHeight}}
 }

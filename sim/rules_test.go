@@ -3,11 +3,13 @@ package sim
 import "testing"
 
 func newRulesTestState() State {
-	s := State{Cfg: DefaultConfig()}
-	s.Players[0] = Player{Side: 0}
-	s.Players[1] = Player{Side: 1}
+	s := State{Cfg: DefaultConfig(), NumPlayers: 2}
+	s.Players[0] = Player{Team: 0}
+	s.Players[1] = Player{Team: 1}
 	s.Phase = PhaseRally
-	s.Rally.LastKicker = -1
+	s.Rally.LastTeam = -1
+	s.Rally.LastPlayer = -1
+	s.LastServerPlayer = [2]int8{-1, -1}
 	return s
 }
 
@@ -22,94 +24,101 @@ func TestJudgeEvent(t *testing.T) {
 		wantDecided bool
 	}{
 		{
-			name:        "first kick of the rally sets LastKicker, decides nothing",
-			rally:       RallyState{LastKicker: -1},
-			event:       Event{Kind: EvKick, Side: 0},
+			name:        "first kick of the rally sets LastTeam, decides nothing",
+			rally:       RallyState{LastTeam: -1},
+			event:       Event{Kind: EvKick, Side: 0, Player: 0},
 			wantDecided: false,
 		},
 		{
-			name:        "legal return by the other side decides nothing",
-			rally:       RallyState{LastKicker: 0},
-			event:       Event{Kind: EvKick, Side: 1},
+			name:        "legal return by the other team decides nothing",
+			rally:       RallyState{LastTeam: 0},
+			event:       Event{Kind: EvKick, Side: 1, Player: 1},
 			wantDecided: false,
 		},
 		{
 			name:        "double touch before any receiver bounce: receiver wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}},
-			event:       Event{Kind: EvKick, Side: 0},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 0}},
+			event:       Event{Kind: EvKick, Side: 0, Player: 0},
 			wantWinner:  1,
 			wantDecided: true,
 		},
 		{
-			name:        "ball returns to kicker's side after a legal receiver bounce: kicker wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 1}},
-			event:       Event{Kind: EvKick, Side: 0},
+			name:        "ball returns to kicker's team after a legal receiver bounce: kicker wins",
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 1}},
+			event:       Event{Kind: EvKick, Side: 0, Player: 0},
 			wantWinner:  0,
 			wantDecided: true,
 		},
 		{
+			name:        "a kick by the kicker's OWN partner is still a double touch (one touch per team)",
+			rally:       RallyState{LastTeam: 0, LastPlayer: 0, BouncesOnSide: [2]int{0, 0}},
+			event:       Event{Kind: EvKick, Side: 0, Player: 1},
+			wantWinner:  1,
+			wantDecided: true,
+		},
+		{
 			name:        "first bounce on receiver side decides nothing",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 0}},
 			event:       Event{Kind: EvBounceFloor, Side: 1},
 			wantDecided: false,
 		},
 		{
 			name:        "second bounce on receiver side: kicker wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 1}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 1}},
 			event:       Event{Kind: EvBounceFloor, Side: 1},
 			wantWinner:  0,
 			wantDecided: true,
 		},
 		{
 			name:        "bounce on kicker's own side before any receiver bounce: receiver wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 0}},
 			event:       Event{Kind: EvBounceFloor, Side: 0},
 			wantWinner:  1,
 			wantDecided: true,
 		},
 		{
 			name:        "bounce on kicker's own side after a legal receiver bounce: kicker wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 1}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 1}},
 			event:       Event{Kind: EvBounceFloor, Side: 0},
 			wantWinner:  0,
 			wantDecided: true,
 		},
 		{
 			name:        "wall before any bounce on the receiving side: receiver wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 0}},
 			event:       Event{Kind: EvHitWall, Side: 1},
 			wantWinner:  1,
 			wantDecided: true,
 		},
 		{
 			name:        "wall after a legal bounce on the receiving side: legal, decides nothing",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 1}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 1}},
 			event:       Event{Kind: EvHitWall, Side: 1},
 			wantDecided: false,
 		},
 		{
 			name:        "wall on the kicker's own side is always legal",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 0}},
 			event:       Event{Kind: EvHitWall, Side: 0},
 			wantDecided: false,
 		},
 		{
 			name:        "ball goes out before any receiver bounce: receiver wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 0}},
 			event:       Event{Kind: EvOut, Side: 1},
 			wantWinner:  1,
 			wantDecided: true,
 		},
 		{
 			name:        "ball goes out after a legal receiver bounce: kicker wins",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 1}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 1}},
 			event:       Event{Kind: EvOut, Side: 1},
 			wantWinner:  0,
 			wantDecided: true,
 		},
 		{
 			name:        "net hit never decides the point",
-			rally:       RallyState{LastKicker: 0, BouncesOnSide: [2]int{0, 0}},
+			rally:       RallyState{LastTeam: 0, BouncesOnSide: [2]int{0, 0}},
 			event:       Event{Kind: EvHitNet, Side: 0},
 			wantDecided: false,
 		},
@@ -131,7 +140,7 @@ func TestJudgeEvent(t *testing.T) {
 
 func TestApplyRulesAwardsPointAndPauses(t *testing.T) {
 	s := newRulesTestState()
-	s.Rally.LastKicker = 0
+	s.Rally.LastTeam = 0
 	s.Rally.BouncesOnSide = [2]int{0, 1}
 
 	ev := applyRules(&s, []Event{{Kind: EvBounceFloor, Side: 1}})
@@ -162,7 +171,7 @@ func TestApplyRulesAwardsPointAndPauses(t *testing.T) {
 
 func TestApplyRulesStopsAtFirstDecisiveEvent(t *testing.T) {
 	s := newRulesTestState()
-	s.Rally.LastKicker = 0
+	s.Rally.LastTeam = 0
 
 	// Two events in one tick: a net hit (never decisive) followed by an out
 	// on the kicker's own side before any receiver bounce (receiver wins).
@@ -183,7 +192,7 @@ func TestApplyRulesStopsAtFirstDecisiveEvent(t *testing.T) {
 
 func TestApplyRulesGameOver(t *testing.T) {
 	s := newRulesTestState()
-	s.Rally.LastKicker = 0
+	s.Rally.LastTeam = 0
 	s.Rally.BouncesOnSide = [2]int{0, 1}
 	s.Score[0] = s.Cfg.PointsToWin - 1
 
@@ -231,8 +240,28 @@ func TestApplyRulesPointPauseThenReserve(t *testing.T) {
 	if s.Server != 1 {
 		t.Errorf("Server: got %d, want 1 (winner serves)", s.Server)
 	}
-	if s.Rally.LastKicker != -1 {
-		t.Errorf("Rally.LastKicker: got %d, want -1 (fresh rally state)", s.Rally.LastKicker)
+	if s.Rally.LastTeam != -1 {
+		t.Errorf("Rally.LastTeam: got %d, want -1 (fresh rally state)", s.Rally.LastTeam)
+	}
+}
+
+// TestApplyRulesPlaygroundNeverScores covers ModePlayground's documented
+// contract: no scoring, ever, regardless of what the ball does.
+func TestApplyRulesPlaygroundNeverScores(t *testing.T) {
+	s := newRulesTestState()
+	s.Cfg.Mode = ModePlayground
+	s.Rally.LastTeam = 0
+	s.Rally.BouncesOnSide = [2]int{0, 1}
+
+	ev := applyRules(&s, []Event{{Kind: EvBounceFloor, Side: 1}})
+
+	if s.Score != [2]int{0, 0} {
+		t.Fatalf("Score: got %v, want unchanged in Playground", s.Score)
+	}
+	for _, e := range ev {
+		if e.Kind == EvPoint {
+			t.Fatalf("got an EvPoint in Playground mode, want none: %+v", ev)
+		}
 	}
 }
 
@@ -246,6 +275,9 @@ func TestResetForServe(t *testing.T) {
 		}
 		if s.Server != 0 {
 			t.Fatalf("Server: got %d, want 0", s.Server)
+		}
+		if s.Rally.ServerPlayer != 0 {
+			t.Fatalf("Rally.ServerPlayer: got %d, want 0 (1v1: team == player index)", s.Rally.ServerPlayer)
 		}
 		assertFloat(t, "ball.Pos.X", s.Ball.Pos.X, -serveBallOffset)
 		assertFloat(t, "player0.Pos.X", s.Players[0].Pos.X, -servePlayerOffset)
@@ -271,4 +303,42 @@ func TestResetForServe(t *testing.T) {
 			t.Errorf("ball is %v from the server, want <= KickReach (%v)", dist, s.Cfg.KickReach)
 		}
 	})
+
+	t.Run("2v2 places all 4 players and alternates the serving partner next time", func(t *testing.T) {
+		s := newRulesTestState()
+		s.NumPlayers = 4
+		s.LastServerPlayer = [2]int8{-1, -1}
+
+		resetForServe(&s, 0)
+		if s.Rally.ServerPlayer != 0 {
+			t.Fatalf("first serve: ServerPlayer got %d, want 0", s.Rally.ServerPlayer)
+		}
+		for i, p := range s.Players {
+			if p.Pos.X == 0 {
+				t.Errorf("player %d was not positioned: %+v", i, p)
+			}
+		}
+
+		resetForServe(&s, 0)
+		if s.Rally.ServerPlayer != 1 {
+			t.Fatalf("second serve by the same team: ServerPlayer got %d, want 1 (alternate partner)", s.Rally.ServerPlayer)
+		}
+	})
+}
+
+func TestServeBoxForScore(t *testing.T) {
+	cases := []struct {
+		score [2]int
+		want  int8
+	}{
+		{[2]int{0, 0}, 0},
+		{[2]int{1, 0}, 1},
+		{[2]int{1, 1}, 0},
+		{[2]int{2, 1}, 1},
+	}
+	for _, c := range cases {
+		if got := serveBoxForScore(c.score); got != c.want {
+			t.Errorf("serveBoxForScore(%v): got %d, want %d", c.score, got, c.want)
+		}
+	}
 }
