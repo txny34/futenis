@@ -1,3 +1,4 @@
+import { CallTracker } from "./hud-calls";
 import { EventKind, Mode, PART_NAMES, Phase, SimEvent, Snap } from "./snapshot";
 
 const NAMES = ["Rojo", "Azul"] as const;
@@ -11,6 +12,9 @@ const PART_LABELS: Readonly<Record<string, string>> = {
 };
 const SPIN_LABELS = ["Efecto: cortado", "Efecto: plano", "Efecto: liftado"] as const;
 const FLASH_MS = 900;
+const CALL_MS = 1800;
+const SERVE_HINT = "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado";
+const HUMAN_TEAM = 0;
 const UNSET = -1;
 
 /** DOM overlay. Only reflects what the sim says; touches the DOM only on change. */
@@ -22,6 +26,10 @@ export class Hud {
   private readonly flash = el("flash");
   private readonly fps = el("fps");
   private readonly spin = el("spin");
+  private readonly call = el("call");
+  private readonly hint = el("hint");
+  private readonly calls = new CallTracker();
+  private callUntil = 0;
   private last0 = UNSET;
   private last1 = UNSET;
   private lastPhase = UNSET;
@@ -35,7 +43,10 @@ export class Hud {
     this.help.textContent = HELP_TEXT;
     this.fps.hidden = true;
     this.flash.hidden = true;
-    root.append(this.score, this.msg, this.flash, this.spin, this.fps, this.help, this.err);
+    this.call.hidden = true;
+    this.hint.hidden = true;
+    this.hint.textContent = SERVE_HINT;
+    root.append(this.score, this.msg, this.call, this.hint, this.flash, this.spin, this.fps, this.help, this.err);
   }
 
   setScale(scale: number): void { this.root.style.setProperty("--hud-scale", String(scale)); }
@@ -55,6 +66,12 @@ export class Hud {
   }
 
   onEvent(e: SimEvent, humanSlot: number, nowMs: number): void {
+    const call = this.calls.onEvent(e);
+    if (call !== null) {
+      this.call.textContent = call;
+      this.call.hidden = false;
+      this.callUntil = nowMs + CALL_MS;
+    }
     if ((e.kind !== EventKind.Kick && e.kind !== EventKind.BodyHit) || e.player !== humanSlot) return;
     const part = PART_LABELS[PART_NAMES[e.part] ?? "none"] ?? "";
     const q = e.kind === EventKind.Kick ? QUALITY_LABELS[e.quality] ?? "" : "Rebote";
@@ -66,6 +83,7 @@ export class Hud {
 
   update(snap: Float64Array, nowMs: number): void {
     if (!this.flash.hidden && nowMs > this.flashUntil) this.flash.hidden = true;
+    if (!this.call.hidden && nowMs > this.callUntil) this.call.hidden = true;
     const s0 = snap[Snap.Score0];
     const s1 = snap[Snap.Score1];
     const phase = snap[Snap.Phase];
@@ -81,6 +99,7 @@ export class Hud {
     this.score.hidden = playground;
     this.score.innerHTML = `<span class="p0">${s0}</span> – <span class="p1">${s1}</span>`;
     this.msg.textContent = playground ? "Playground" : message(phase, server, s0, s1);
+    this.hint.hidden = playground || phase !== Phase.Serve || server !== HUMAN_TEAM;
     this.help.textContent = playground ? HELP_TEXT + PLAYGROUND_HELP : HELP_TEXT;
   }
 

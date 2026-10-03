@@ -77,6 +77,7 @@ function gamePanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
   const set = (patch: Partial<Settings["game"]>): void => up((p) => ({ ...p, game: { ...p.game, ...patch } }));
   return [
     toggle("Círculo de desvío de puntería", s.game.showAimCircle, (showAimCircle) => set({ showAimCircle })),
+    toggle("Cámara dinámica (off = fija)", s.game.dynamicCamera, (dynamicCamera) => set({ dynamicCamera })),
     toggle("Vibración de cámara", s.game.cameraShake, (cameraShake) => set({ cameraShake })),
     slider({ label: "Escala del HUD", min: HUD_SCALE_MIN, max: HUD_SCALE_MAX, step: HUD_STEP,
       value: s.game.hudScale, format: (v) => fmtPct(v * PERCENT), onInput: (hudScale) => set({ hudScale }) }),

@@ -59,6 +59,7 @@ function applySettings(app: App, s: Settings): void {
   app.view.applyVideo(s.video.quality, s.video.shadows);
   app.state.fpsCap = s.video.fpsCap;
   app.state.cameraShake = s.game.cameraShake;
+  app.view.rig.dynamic = s.game.dynamicCamera;
   app.hud.setFpsVisible(s.video.showFps);
   app.hud.setScale(s.game.hudScale);
 }

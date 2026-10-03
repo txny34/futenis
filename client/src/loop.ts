@@ -89,6 +89,6 @@ export class GameLoop {
   private onEvent(e: SimEvent, now: number): void {
     this.view.players.onEvent(e);
     this.hud.onEvent(e, HUMAN_SLOT, now);
-    if (this.state.cameraShake && e.kind === EventKind.Kick && e.quality === Quality.Perfect) this.view.shake();
+    if (this.state.cameraShake && e.kind === EventKind.Kick && e.quality === Quality.Perfect) this.view.rig.shake();
   }
 }

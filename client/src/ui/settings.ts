@@ -6,7 +6,7 @@ export type FpsCap = 60 | 144 | 240 | 0; // 0 = sin límite
 export interface ControlSettings { mouseSensitivity: number }
 export interface VideoSettings { quality: Quality; shadows: boolean; fpsCap: FpsCap; showFps: boolean }
 export interface AudioSettings { master: number; sfx: number; music: number }
-export interface GameplaySettings { showAimCircle: boolean; cameraShake: boolean; hudScale: number }
+export interface GameplaySettings { showAimCircle: boolean; cameraShake: boolean; dynamicCamera: boolean; hudScale: number }
 
 export interface Settings {
   readonly controls: ControlSettings;
@@ -32,7 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   controls: { mouseSensitivity: 1 },
   video: { quality: "high", shadows: true, fpsCap: 0, showFps: false },
   audio: { master: 80, sfx: 80, music: 60 },
-  game: { showAimCircle: true, cameraShake: true, hudScale: 1 },
+  game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1 },
 };
 
 type Rec = Record<string, unknown>;
@@ -83,6 +83,7 @@ export function validateSettings(raw: unknown): Settings {
     game: {
       showAimCircle: bool(g.showAimCircle, d.game.showAimCircle),
       cameraShake: bool(g.cameraShake, d.game.cameraShake),
+      dynamicCamera: bool(g.dynamicCamera, d.game.dynamicCamera),
       hudScale: num(g.hudScale, HUD_SCALE_MIN, HUD_SCALE_MAX, d.game.hudScale),
     },
   };
