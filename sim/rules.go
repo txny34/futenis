@@ -28,11 +28,11 @@ const servePlayerZOffset = CourtHalfWidth / 2
 // Score, and appends EvPoint / EvGameOver when a point is decided. Events
 // are only judged while Phase == PhaseRally; during PhasePoint the ball may
 // still be flying but no event changes the score. ModePlayground never
-// scores (docs/design/contact-v2.md "Modos y 2v2"): the ball just keeps
-// bouncing and RespawnBall is the only way to reset it.
+// scores: it runs the ball-machine judge instead (applyPlayground,
+// docs/design/training.md).
 func applyRules(s *State, ev []Event) []Event {
 	if s.Cfg.Mode == ModePlayground {
-		return ev
+		return applyPlayground(s, ev)
 	}
 	switch s.Phase {
 	case PhaseRally:
@@ -286,13 +286,17 @@ func setupDoublesPositions(s *State) {
 	s.Players[3] = Player{Pos: Vec3{X: servePlayerOffset, Z: -servePlayerZOffset}, Team: 1, Slot: 1, OnGround: true, Stamina: 1}
 }
 
-// setupPlayground places a minimal 1v1-shaped pair straight into PhaseRally
-// with no serve/scoring state: ModePlayground is a free sandbox
-// (docs/design/contact-v2.md "Modos y 2v2").
+// setupPlayground places the lone human straight into PhaseRally with no
+// serve/scoring state (Entrenamiento, docs/design/training.md §2): slot 1
+// stays zero/inactive, and the first continuous feed is scheduled one
+// FeedInterval in (on demand waits for Match.Feed).
 func setupPlayground(s *State) {
 	s.Phase = PhaseRally
 	s.Rally = RallyState{LastTeam: -1, LastPlayer: -1}
 	s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset}, Team: 0, OnGround: true, Stamina: 1}
-	s.Players[1] = Player{Pos: Vec3{X: servePlayerOffset}, Team: 1, OnGround: true, Stamina: 1}
 	s.Ball = Ball{Pos: Vec3{Y: serveBallHeight}}
+	s.Feed = FeedState{}
+	if !s.Cfg.FeedOnDemand {
+		s.Feed.NextTick = s.Tick + uint32(s.Cfg.feedIntervalTicks)
+	}
 }

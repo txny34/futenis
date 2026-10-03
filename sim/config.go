@@ -129,6 +129,22 @@ type Config struct {
 	// who opens serve, or the same team always gets the first-serve edge.
 	FirstServer int8
 
+	// --- Entrenamiento / ball machine (docs/design/training.md §1) ---
+	// Appended after FirstServer so every existing field keeps its wire
+	// position. Each feed samples a deterministic value inside every
+	// [Min, Max] range (feed.go); Sanitize clamps and swaps Min > Max.
+	MachineZMin, MachineZMax       float64 // m, lateral position of the machine
+	MachineXMin, MachineXMax       float64 // m from the net, machine depth on side 1
+	FeedZMin, FeedZMax             float64 // m, Z of the target bounce on side 0
+	FeedXMin, FeedXMax             float64 // m from the net, |X| of the target bounce on side 0
+	FeedShots                      uint8   // bitmask of FeedShotDrive|FeedShotLob|FeedShotSmash; 0 -> drive
+	FeedPowerMin, FeedPowerMax     float64 // 0..1, interpolates the shot type's speed
+	FeedQualityMin, FeedQualityMax float64 // 0..1, 1 = exact target, lower = deviation up to feedDevMax
+	FeedOnDemand                   bool    // true = wait for Match.Feed(); false = continuous
+	FeedInterval                   float64 // s, dead ball -> next continuous feed
+	FeedVolleyOnly                 bool    // true = must strike before it bounces on side 0
+	FeedValidBounce                uint8   // 1 or 2 bounces allowed on side 0 before striking
+
 	// Derived, cached by Sanitize() so Step never recomputes a ticksOf
 	// conversion on the hot path. Unexported: not part of the live-tuning
 	// wire format (config_layout.go flattens the tunable fields only).
@@ -139,6 +155,7 @@ type Config struct {
 	serveTimeLimitTicks int
 	dashTicks           int
 	dashCooldownTicks   int
+	feedIntervalTicks   int
 }
 
 // DefaultConfig returns the baseline tuned Config used by a fresh Match.
@@ -213,6 +230,16 @@ func DefaultConfig() Config {
 		GoldenPoint: false,
 		GamesPerSet: 3,
 		SetsToWin:   1,
+
+		MachineZMin: -3, MachineZMax: 3,
+		MachineXMin: 8, MachineXMax: 9.5,
+		FeedZMin: -3.5, FeedZMax: 3.5,
+		FeedXMin: 4, FeedXMax: 8.5,
+		FeedShots:    FeedShotDrive,
+		FeedPowerMin: 0.3, FeedPowerMax: 0.7,
+		FeedQualityMin: 0.7, FeedQualityMax: 1,
+		FeedInterval:    1.5,
+		FeedValidBounce: 1,
 	}
 	c.Sanitize()
 	return c

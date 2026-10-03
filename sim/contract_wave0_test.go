@@ -250,7 +250,7 @@ func TestNumPlayersForMode(t *testing.T) {
 	}{
 		{Mode1v1, 2},
 		{Mode2v2, 4},
-		{ModePlayground, 2},
+		{ModePlayground, 1},
 	}
 	for _, c := range cases {
 		if got := numPlayersForMode(c.mode); got != c.want {
@@ -268,8 +268,8 @@ func TestNewMatch_PlaygroundStartsInRallyWithNoServe(t *testing.T) {
 	if s.Phase != PhaseRally {
 		t.Fatalf("Phase: got %v, want PhaseRally", s.Phase)
 	}
-	if s.NumPlayers != 2 {
-		t.Fatalf("NumPlayers: got %d, want 2", s.NumPlayers)
+	if s.NumPlayers != 1 {
+		t.Fatalf("NumPlayers: got %d, want 1 (Entrenamiento)", s.NumPlayers)
 	}
 }
 

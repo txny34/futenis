@@ -137,3 +137,26 @@ func TestConfigureSetsMatchFormatAndAlternatesServer(t *testing.T) {
 		t.Fatal("reset must keep scoring mode")
 	}
 }
+
+func TestPlaygroundRunsNoBotAndFeedsOnDemand(t *testing.T) {
+	ss := defaultSession()
+	if err := ss.configure(int(sim.ModePlayground), int(ai.Pro), 5, 0); err != nil { // mask 0: would be all bots
+		t.Fatal(err)
+	}
+	in := [sim.MaxPlayers]sim.PlayerInput{{MoveX: 0.25}}
+	ss.drv.fill(ss.match, &in)
+	if in[0].MoveX != 0.25 {
+		t.Fatalf("bot must not run in playground: %+v", in[0])
+	}
+	if ss.match.State().NumPlayers != 1 {
+		t.Fatal("playground is single player")
+	}
+	if err := ss.respawnBall(); err != nil {
+		t.Fatal(err)
+	}
+	out := make([]float64, outLen)
+	runFrame(ss.match, in, 1, out, &ss.drv)
+	if !ss.match.State().Feed.Live || out[outCurr+sim.SnapFeedCount] != 1 {
+		t.Fatalf("respawnBall must feed a ball: %+v", ss.match.State().Feed)
+	}
+}

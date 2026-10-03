@@ -41,10 +41,14 @@ const (
 
 // numPlayersForMode returns how many of State.Players are active for mode.
 func numPlayersForMode(mode Mode) int8 {
-	if mode == Mode2v2 {
+	switch mode {
+	case Mode2v2:
 		return 4
+	case ModePlayground:
+		return 1 // Entrenamiento: only the human vs the ball machine (docs/design/training.md §2)
+	default:
+		return 2
 	}
-	return 2
 }
 
 // ticksOf converts a duration in seconds to a tick count at TickRate,
@@ -231,6 +235,12 @@ const (
 	EvSetWon     // Side won the current set (Rally.Sets incremented)
 	EvAce        // Side's serve was never touched by the receiver and won the point outright
 	EvMatchWon   // Side won the match (Config.SetsToWin sets); replaces EvGameOver for ScoringPadel
+
+	// Entrenamiento additions (docs/design/training.md §2), appended after
+	// EvMatchWon. Only emitted in ModePlayground.
+	EvFeed       // the ball machine launched (Pos = mouth)
+	EvReturnOK   // legal return of a machine ball (Player = 0)
+	EvReturnFail // the streak broke
 )
 
 // Event is emitted by Step. Side meaning depends on Kind:
@@ -344,7 +354,7 @@ type State struct {
 	Tick       uint32
 	Phase      Phase
 	Server     int8 // team that serves next / is serving
-	NumPlayers int8 // 2 (Mode1v1/ModePlayground) or 4 (Mode2v2); how many of Players are active
+	NumPlayers int8 // 1 (ModePlayground), 2 (Mode1v1) or 4 (Mode2v2); how many of Players are active
 	Score      [2]int
 	Ball       Ball
 	Players    [MaxPlayers]Player
@@ -365,4 +375,7 @@ type State struct {
 
 	Rally RallyState
 	Cfg   Config
+
+	// Feed is the ball machine (ModePlayground only, docs/design/training.md).
+	Feed FeedState
 }

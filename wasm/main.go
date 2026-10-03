@@ -2,7 +2,7 @@
 
 // Command wasm is the only bridge between sim and the browser. It exposes a
 // global `futenis` object (init, step, reset, configure, respawnBall,
-// getConfig, setConfig). Each frame does a single JS<->Go crossing: inputs
+// getConfig, setConfig, feed = respawnBall alias). Each frame does a single JS<->Go crossing: inputs
 // are copied in, snapshots + events copied out, using pre-allocated
 // package-level buffers. Bots (ai.Bot) for non-human slots run inside step,
 // before every sim tick. Layout lives in layout.go; session logic in
@@ -35,6 +35,7 @@ func main() {
 	api.Set("reset", js.FuncOf(resetFn))
 	api.Set("configure", js.FuncOf(configureFn))
 	api.Set("respawnBall", js.FuncOf(respawnBallFn))
+	api.Set("feed", js.FuncOf(respawnBallFn))
 	api.Set("getConfig", js.FuncOf(getConfigFn))
 	api.Set("setConfig", js.FuncOf(setConfigFn))
 	api.Set("configLen", sim.CfgLen)

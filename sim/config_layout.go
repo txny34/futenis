@@ -99,6 +99,27 @@ const (
 	cfgSetsToWin
 	cfgFirstServer
 
+	// Entrenamiento additions (docs/design/training.md §1) are appended
+	// after cfgFirstServer, the previous end of the layout, so no existing
+	// index moves. Booleans are written as 0/1.
+	cfgMachineZMin
+	cfgMachineZMax
+	cfgMachineXMin
+	cfgMachineXMax
+	cfgFeedZMin
+	cfgFeedZMax
+	cfgFeedXMin
+	cfgFeedXMax
+	cfgFeedShots
+	cfgFeedPowerMin
+	cfgFeedPowerMax
+	cfgFeedQualityMin
+	cfgFeedQualityMax
+	cfgFeedOnDemand
+	cfgFeedInterval
+	cfgFeedVolleyOnly
+	cfgFeedValidBounce
+
 	// CfgScalarLen is the number of scalar (non-Parts) tunable floats.
 	CfgScalarLen
 )
@@ -184,6 +205,7 @@ func WriteConfig(c *Config, dst []float64) {
 	dst[cfgSetsToWin] = float64(c.SetsToWin)
 	dst[cfgFirstServer] = float64(c.FirstServer)
 
+	writeFeedBlock(c, dst)
 	writePartsBlock(c, dst[CfgPartsStart:])
 }
 
@@ -279,6 +301,7 @@ func ReadConfig(src []float64) Config {
 	c.SetsToWin = int(src[cfgSetsToWin])
 	c.FirstServer = int8(src[cfgFirstServer])
 
+	readFeedBlock(&c, src)
 	c.Parts = readPartsBlock(src[CfgPartsStart:])
 	c.Sanitize()
 	return c
@@ -311,4 +334,36 @@ func boolToFloat(b bool) float64 {
 		return 1
 	}
 	return 0
+}
+
+// writeFeedBlock flattens the Entrenamiento fields (docs/design/training.md §1).
+func writeFeedBlock(c *Config, dst []float64) {
+	dst[cfgMachineZMin], dst[cfgMachineZMax] = c.MachineZMin, c.MachineZMax
+	dst[cfgMachineXMin], dst[cfgMachineXMax] = c.MachineXMin, c.MachineXMax
+	dst[cfgFeedZMin], dst[cfgFeedZMax] = c.FeedZMin, c.FeedZMax
+	dst[cfgFeedXMin], dst[cfgFeedXMax] = c.FeedXMin, c.FeedXMax
+	dst[cfgFeedShots] = float64(c.FeedShots)
+	dst[cfgFeedPowerMin], dst[cfgFeedPowerMax] = c.FeedPowerMin, c.FeedPowerMax
+	dst[cfgFeedQualityMin], dst[cfgFeedQualityMax] = c.FeedQualityMin, c.FeedQualityMax
+	dst[cfgFeedOnDemand] = boolToFloat(c.FeedOnDemand)
+	dst[cfgFeedInterval] = c.FeedInterval
+	dst[cfgFeedVolleyOnly] = boolToFloat(c.FeedVolleyOnly)
+	dst[cfgFeedValidBounce] = float64(c.FeedValidBounce)
+}
+
+// readFeedBlock is writeFeedBlock's inverse. Integer fields are clamped to
+// their type's range before the cast so a hostile float never wraps;
+// Sanitize then applies the documented bounds.
+func readFeedBlock(c *Config, src []float64) {
+	c.MachineZMin, c.MachineZMax = src[cfgMachineZMin], src[cfgMachineZMax]
+	c.MachineXMin, c.MachineXMax = src[cfgMachineXMin], src[cfgMachineXMax]
+	c.FeedZMin, c.FeedZMax = src[cfgFeedZMin], src[cfgFeedZMax]
+	c.FeedXMin, c.FeedXMax = src[cfgFeedXMin], src[cfgFeedXMax]
+	c.FeedShots = uint8(clamp(src[cfgFeedShots], 0, float64(FeedShotAll)))
+	c.FeedPowerMin, c.FeedPowerMax = src[cfgFeedPowerMin], src[cfgFeedPowerMax]
+	c.FeedQualityMin, c.FeedQualityMax = src[cfgFeedQualityMin], src[cfgFeedQualityMax]
+	c.FeedOnDemand = src[cfgFeedOnDemand] != 0
+	c.FeedInterval = src[cfgFeedInterval]
+	c.FeedVolleyOnly = src[cfgFeedVolleyOnly] != 0
+	c.FeedValidBounce = uint8(clamp(src[cfgFeedValidBounce], 0, maxFeedValidBounce))
 }
