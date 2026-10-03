@@ -15,30 +15,29 @@ const want = new THREE.Vector3();
 const from = new THREE.Vector3();
 const to = new THREE.Vector3();
 const qDelta = new THREE.Quaternion();
-const qWorld = new THREE.Quaternion();
-const qParent = new THREE.Quaternion();
 const qIdentity = new THREE.Quaternion();
 
 /**
- * Rotates `bone` so the world vector bone->effector turns toward
- * bone->desired, blended by weight (0..1). Updates the bone's world matrices.
+ * Rotates `bone` so bone->effector turns toward bone->desired (world points),
+ * blended by weight (0..1). Solved in the PARENT's local space so it stays
+ * correct under non-uniform (squash/stretch) scale. Updates world matrices.
  */
 export function aimBone(
   bone: THREE.Object3D, effector: THREE.Vector3, desired: THREE.Vector3, weight: number,
 ): void {
-  bone.getWorldPosition(pa);
-  from.subVectors(effector, pa);
-  to.subVectors(desired, pa);
-  if (from.lengthSq() < EPS || to.lengthSq() < EPS || weight <= 0) return;
+  if (weight <= 0) return;
+  from.copy(effector);
+  to.copy(desired);
+  if (bone.parent) {
+    bone.parent.worldToLocal(from);
+    bone.parent.worldToLocal(to);
+  }
+  from.sub(bone.position);
+  to.sub(bone.position);
+  if (from.lengthSq() < EPS || to.lengthSq() < EPS) return;
   qDelta.setFromUnitVectors(from.normalize(), to.normalize());
   qDelta.slerp(qIdentity, 1 - Math.min(weight, 1));
-  bone.getWorldQuaternion(qWorld);
-  qWorld.premultiply(qDelta);
-  if (bone.parent) {
-    bone.parent.getWorldQuaternion(qParent);
-    qWorld.premultiply(qParent.invert());
-  }
-  bone.quaternion.copy(qWorld);
+  bone.quaternion.premultiply(qDelta);
   bone.updateMatrixWorld(true);
 }
 

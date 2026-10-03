@@ -46,8 +46,9 @@ export const PELVIS_PROFILE: ReadonlyArray<readonly [number, number]> = [
   [0, -0.12], [0.1, -0.11], [0.155, -0.05], [0.165, 0.02], [0.15, 0.07], [0, 0.08],
 ];
 export const LOWER_TORSO_PROFILE: ReadonlyArray<readonly [number, number]> = [
-  [0, -0.1], [0.15, -0.09], [0.155, 0.02], [0.17, 0.14], [0, 0.15],
+  [0, -0.1], [0.145, -0.09], [0.15, 0.02], [0.17, 0.14], [0, 0.15],
 ];
+// V-taper: narrow waist, broad flat shoulders, sloped top leaves the neck visible.
 export const UPPER_TORSO_PROFILE: ReadonlyArray<readonly [number, number]> = [
-  [0, -0.08], [0.17, -0.08], [0.19, 0.1], [0.2, 0.21], [0.15, 0.28], [0.05, 0.3], [0, 0.3],
+  [0, -0.08], [0.165, -0.08], [0.2, 0.08], [0.235, 0.2], [0.2, 0.26], [0.09, 0.285], [0, 0.29],
 ];

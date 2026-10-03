@@ -1,104 +1,116 @@
-import type { PlayerAction } from "./engine";
+import * as THREE from "three";
+import type { HumanInput } from "./engine";
+import { Btn } from "./snapshot";
 
-// Camera sits behind side 0 looking along +X (Y up). Screen right = forward x up
-// = (1,0,0) x (0,1,0) = (0,0,1) = +Z; screen up (into the court) = +X.
-// Both players use pure screen space: up=+X, down=-X, right=+Z, left=-Z.
-interface Bindings {
-  readonly up: string;
-  readonly down: string;
-  readonly left: string;
-  readonly right: string;
-  readonly kick: string;
-  readonly lob: string;
-}
+// Single human on slot 0. Camera sits behind team 0 looking along +X, so
+// screen up = +X and screen right = +Z: W=+X, S=-X, D=+Z, A=-Z.
+// Everything is a held LEVEL (PlayerInput v2); the sim detects edges itself.
+const KEY_UP = "KeyW";
+const KEY_DOWN = "KeyS";
+const KEY_LEFT = "KeyA";
+const KEY_RIGHT = "KeyD";
+const KEY_JUMP = "Space";
+const SPRINT_KEYS = ["ShiftLeft", "ShiftRight"] as const;
+const PREVENT_DEFAULT = new Set(["Space", "ArrowUp", "ArrowDown"]);
+const MOUSE_LEFT = 1; // PointerEvent.buttons bit
+const MOUSE_RIGHT = 2;
+const SPIN_MIN = -1;
+const SPIN_MAX = 1;
+const DEFAULT_TARGET_X = 5; // middle of the rival half until the mouse moves
 
-export type Side = 0 | 1;
-
-const BINDINGS: readonly [Bindings, Bindings] = [
-  { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", kick: "KeyF", lob: "KeyG" },
-  { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", kick: "KeyK", lob: "KeyL" },
-];
-const SIDES: readonly Side[] = [0, 1];
-const CHARGE_TIME_S = 0.6;
-const MS_PER_S = 1000;
-const AIM_FORWARD = 1; // sim forces the shot toward the rival side
-const LOB_LOFT = 1;
-const FLAT_LOFT = 0;
-const PREVENT_DEFAULT = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"]);
-
-const emptyAction = (): PlayerAction => ({ moveX: 0, moveZ: 0, kick: false, aimX: AIM_FORWARD, aimZ: 0, loft: 0, power: 0 });
-
-/** Keyboard -> PlayerAction. Knows nothing about rendering or rules. */
-export class Keyboard {
+/** Keyboard + mouse -> HumanInput. Knows nothing about rules. Allocation-free per frame. */
+export class Controls {
+  /** False while a menu is open: pointer/keys are ignored and levels drop to zero. */
+  enabled = false;
   private readonly down = new Set<string>();
-  private readonly chargeStart: [number, number] = [-1, -1]; // -1 = not charging
-  private readonly kickPending: [boolean, boolean] = [false, false];
-  private readonly actions: [PlayerAction, PlayerAction] = [emptyAction(), emptyAction()];
+  private mouseButtons = 0;
+  private spin = 0;
+  private hasPointer = false;
+  private readonly ndc = new THREE.Vector2();
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private readonly hit = new THREE.Vector3();
+  private readonly action: HumanInput = { moveX: 0, moveZ: 0, targetX: DEFAULT_TARGET_X, targetZ: 0, buttons: 0, spin: 0 };
   private pressHandler: ((code: string) => void) | null = null;
 
-  attach(target: Window): void {
-    target.addEventListener("keydown", (e) => this.handleDown(e));
-    target.addEventListener("keyup", (e) => this.handleUp(e));
-    target.addEventListener("blur", () => this.down.clear());
+  attach(canvas: HTMLElement): void {
+    window.addEventListener("keydown", (e) => this.onKeyDown(e));
+    window.addEventListener("keyup", (e) => this.down.delete(e.code));
+    window.addEventListener("blur", () => this.releaseAll());
+    canvas.addEventListener("pointermove", (e) => this.onPointer(e, canvas));
+    canvas.addEventListener("pointerdown", (e) => this.onPointer(e, canvas));
+    window.addEventListener("pointerup", (e) => { this.mouseButtons = e.buttons; });
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
   }
 
-  /** Non-repeating key press callback (e.g. R to reset). */
-  onKeyPress(fn: (code: string) => void): void {
-    this.pressHandler = fn;
-  }
+  /** Non-repeating key press callback (B respawn, R reset...). */
+  onKeyPress(fn: (code: string) => void): void { this.pressHandler = fn; }
 
-  /** 0..1 charge of a held kick, for UI. */
-  charge(side: Side, nowMs: number): number {
-    const start = this.chargeStart[side];
-    return start < 0 ? 0 : Math.min(1, (nowMs - start) / MS_PER_S / CHARGE_TIME_S);
-  }
+  /** Current wheel spin level -1/0/+1, for the HUD. */
+  get spinLevel(): number { return this.spin; }
 
-  /** Fills and returns the reused action for a side. Call clearKicks() after stepping. */
-  action(side: Side): PlayerAction {
-    const a = this.actions[side];
-    const b = BINDINGS[side];
-    a.moveX = this.axis(b.down, b.up);
-    a.moveZ = this.axis(b.left, b.right);
-    a.kick = this.kickPending[side];
-    if (!a.kick) a.aimZ = a.moveZ;
+  /** Fills and returns the reused input, projecting the cursor onto the court plane. */
+  sample(camera: THREE.Camera): HumanInput {
+    const a = this.action;
+    if (!this.enabled) {
+      a.moveX = 0; a.moveZ = 0; a.buttons = 0;
+      return a;
+    }
+    a.moveX = this.axis(KEY_DOWN, KEY_UP);
+    a.moveZ = this.axis(KEY_LEFT, KEY_RIGHT);
+    a.buttons = this.buttons();
+    a.spin = this.spin;
+    if (this.hasPointer) this.project(camera, a);
     return a;
   }
 
-  /** Kicks are edge-triggered: send once, then clear. */
-  clearKicks(): void {
-    this.kickPending[0] = false;
-    this.kickPending[1] = false;
+  releaseAll(): void {
+    this.down.clear();
+    this.mouseButtons = 0;
+  }
+
+  private project(camera: THREE.Camera, a: HumanInput): void {
+    this.raycaster.setFromCamera(this.ndc, camera);
+    if (this.raycaster.ray.intersectPlane(this.floor, this.hit) === null) return;
+    a.targetX = this.hit.x; // clamp to the rival half is the sim's job
+    a.targetZ = this.hit.z;
+  }
+
+  private buttons(): number {
+    let b = 0;
+    if (this.mouseButtons & MOUSE_LEFT) b |= Btn.Strike;
+    if (this.mouseButtons & MOUSE_RIGHT) b |= Btn.Lob;
+    if (this.down.has(KEY_JUMP)) b |= Btn.Jump;
+    if (this.down.has(SPRINT_KEYS[0]) || this.down.has(SPRINT_KEYS[1])) b |= Btn.Sprint;
+    return b;
   }
 
   private axis(neg: string, pos: string): number {
     return (this.down.has(pos) ? 1 : 0) - (this.down.has(neg) ? 1 : 0);
   }
 
-  private handleDown(e: KeyboardEvent): void {
+  private onKeyDown(e: KeyboardEvent): void {
+    if (!this.enabled) return;
     if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
     if (e.repeat) return;
     this.down.add(e.code);
-    for (const side of SIDES) {
-      if (e.code === BINDINGS[side].kick) this.chargeStart[side] = performance.now();
-    }
     this.pressHandler?.(e.code);
   }
 
-  private handleUp(e: KeyboardEvent): void {
-    if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
-    for (const side of SIDES) {
-      if (e.code === BINDINGS[side].kick && this.chargeStart[side] >= 0) this.releaseKick(side);
-    }
-    this.down.delete(e.code);
+  private onPointer(e: PointerEvent, canvas: HTMLElement): void {
+    // offsetX/Y are relative to the canvas (the event target): no DOMRect allocation.
+    const w = canvas.clientWidth || 1;
+    const h = canvas.clientHeight || 1;
+    this.ndc.set((e.offsetX / w) * 2 - 1, -(e.offsetY / h) * 2 + 1);
+    this.hasPointer = true;
+    this.mouseButtons = this.enabled ? e.buttons : 0;
   }
 
-  private releaseKick(side: Side): void {
-    const b = BINDINGS[side];
-    const a = this.actions[side];
-    a.power = this.charge(side, performance.now());
-    a.loft = this.down.has(b.lob) ? LOB_LOFT : FLAT_LOFT;
-    a.aimZ = this.axis(b.left, b.right); // screen left/right
-    this.kickPending[side] = true;
-    this.chargeStart[side] = -1;
+  private onWheel(e: WheelEvent): void {
+    if (!this.enabled) return;
+    e.preventDefault();
+    const dir = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0; // wheel up = topspin
+    this.spin = Math.max(SPIN_MIN, Math.min(SPIN_MAX, this.spin + dir));
   }
 }

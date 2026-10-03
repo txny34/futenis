@@ -25,15 +25,31 @@ func partError(ps *PartSpec, hRel, dH float64) float64 {
 // given relative ball height/horizontal distance, and that error. Ties go
 // to the lower-indexed part (deterministic). PartNone (err 2) means no part
 // reaches (docs/design/contact-v2.md §6, §7.2).
-//
-// TODO(wave1): applyStrikes (strike.go) also has to enforce Lob eligibility
-// (PartSpec.AllowLob) and the Bicycle-specific "airborne + BufCharge>=0.9"
-// gate; bestPart only picks the part, it does not know about ShotType or
-// the player's charge/airborne state.
 func bestPart(cfg *Config, hRel, dH float64) (BodyPart, float64) {
+	return bestPartConstrained(cfg, hRel, dH, true, false)
+}
+
+// bestPartConstrained is bestPart with the two eligibility gates strike.go's
+// applyStrikes needs (docs/design/contact-v2.md §7.2, §7.5):
+//
+//   - bicycleEligible: PartBicycle only counts as reachable when the
+//     player is airborne with a (near-)full charge; otherwise it is
+//     skipped entirely so a lower-error grounded part wins instead of the
+//     table simply reporting PartNone when only the bicycle's height band
+//     would have matched.
+//   - serveOnly: during a serve the padel rules restrict contact to foot
+//     or knee ("golpear con pie o rodilla", below the waist); every part
+//     above PartKnee is skipped.
+func bestPartConstrained(cfg *Config, hRel, dH float64, bicycleEligible, serveOnly bool) (BodyPart, float64) {
 	best := PartNone
 	bestErr := 2.0
 	for i := PartFoot; i < PartCount; i++ {
+		if i == PartBicycle && !bicycleEligible {
+			continue
+		}
+		if serveOnly && i > PartKnee {
+			continue
+		}
 		u := partError(&cfg.Parts[i], hRel, dH)
 		if u < bestErr {
 			bestErr = u

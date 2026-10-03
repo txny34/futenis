@@ -79,7 +79,7 @@ func TestRunFrameWritesCountAndCurr(t *testing.T) {
 	for i := range out {
 		out[i] = -999
 	}
-	runFrame(m, [sim.MaxPlayers]sim.PlayerInput{}, 3, out)
+	runFrame(m, [sim.MaxPlayers]sim.PlayerInput{}, 3, out, nil)
 	if c := out[outEventCount]; c < 0 || c > maxEvents {
 		t.Fatalf("event count %v out of range", c)
 	}
@@ -103,7 +103,7 @@ func TestRunFrameHeldInputPersistsAcrossTicks(t *testing.T) {
 	in := [sim.MaxPlayers]sim.PlayerInput{{Buttons: sim.BtnStrike}}
 	out := make([]float64, outLen)
 
-	runFrame(m, in, 5, out)
+	runFrame(m, in, 5, out, nil)
 
 	st := m.State()
 	if st.Players[0].Held&sim.BtnStrike == 0 {

@@ -28,6 +28,8 @@ const SHOULDER_DROP = 0.02;
 const HEAD_TOP_OFFSET = BODY.headCenter - BODY.headBase + BODY.headRadius;
 const BROW_FORWARD = 0.12;
 const BROW_UP = 0.03;
+/** Standing height of the brow (header contact) socket. */
+export const BROW_REST_Y = BODY.headCenter + BROW_UP;
 
 type BoneSpec = readonly [BoneName, BoneName | null, number, number, number];
 
@@ -82,4 +84,25 @@ export function resetRig(rig: Rig): void {
     b.scale.set(1, 1, 1);
   }
   rig.bones.hips.position.set(0, rig.hipsRestY, 0);
+}
+
+const ankleL = new THREE.Vector3();
+const ankleR = new THREE.Vector3();
+const toeL = new THREE.Vector3();
+const toeR = new THREE.Vector3();
+
+/**
+ * Keeps the lowest ankle at rest height so bent-knee poses plant the feet on
+ * the floor instead of floating/sinking. Call after posing, before IK.
+ */
+export function groundSnap(rig: Rig): void {
+  rig.root.updateMatrixWorld(true);
+  rig.bones.footL.getWorldPosition(ankleL);
+  rig.bones.footR.getWorldPosition(ankleR);
+  rig.bones.toeL.getWorldPosition(toeL);
+  rig.bones.toeR.getWorldPosition(toeR);
+  const rootY = rig.root.matrixWorld.elements[13];
+  const ankleGap = Math.min(ankleL.y, ankleR.y) - rootY - BODY.ankle;
+  const toeGap = Math.min(toeL.y, toeR.y) - rootY - BODY.toe;
+  rig.bones.hips.position.y -= Math.min(ankleGap, toeGap);
 }

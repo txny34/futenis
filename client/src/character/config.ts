@@ -39,7 +39,7 @@ export const BODY = {
   headCenter: 1.66,
   headRadius: 0.14, // top = 1.80; ~6 heads tall (toy proportions)
   hipHalfWidth: 0.1,
-  shoulderHalfWidth: 0.2,
+  shoulderHalfWidth: 0.23,
   upperArm: 0.27,
   foreArm: 0.25,
   footForward: 0.13,

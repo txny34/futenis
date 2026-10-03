@@ -921,3 +921,26 @@ SpeedMin, SpeedMax, DevBase, DevMax, SpinMin, SpinMax, AllowLob∈{0,1}`, por ca
    mapean el *release* de `BtnStrike`/`BtnLob` al viejo pipeline de patada (apuntando a `TargetX/Z` en
    vez de `AimX/AimZ`, potencia fija en vez de carga real). Esto es un shim documentado con
    `TODO(wave1)`, no el solver final de §7-§9.
+
+### 20.6 API JS wave 1 (agente D: `ai/` + `wasm/`)
+
+Todas las funciones devuelven `null` en éxito o un `string` de error (nunca tiran excepción).
+Ninguna se llama en medio de un `step`: se aplican **entre frames**.
+
+| Función | Descripción |
+|---|---|
+| `futenis.configure(mode, difficulty, pointsToWin, humanMask)` | Reconstruye el match. `mode`: 0=1v1, 1=2v2, 2=playground. `difficulty`: 0=Easy, 1=Normal, 2=Hard, 3=Pro (todos los bots). `pointsToWin`: 1..99. `humanMask`: bit *i* = slot *i* lo controla el cliente; los demás slots activos los maneja `ai.Bot` **dentro de `step`, antes de cada tick** (el cliente puede dejar esos bloques del input en cero). Default sin llamar: 1v1, `humanMask = 0b1111` (todo humano, como wave 0). Error → la sesión no cambia. |
+| `futenis.reset()` | Reinicia el match conservando modo, puntos, dificultad, máscara y la `Config` tuneada. |
+| `futenis.respawnBall()` | Sólo `mode=2` (playground); en otro modo devuelve error. |
+| `futenis.getConfig(u8)` | Llena un `Uint8Array` de `futenis.configLen * 8` bytes (float64 LE, orden `sim/config_layout.go`, `CfgLen = 122`). |
+| `futenis.setConfig(u8)` | Lee el mismo layout, rechaza NaN/Inf, aplica `ReadConfig` (+`Sanitize`) al estado actual. `Mode` y `PointsToWin` se **ignoran** (sólo se cambian con `configure`). |
+| `futenis.configLen` | Número (= `sim.CfgLen`). |
+
+Un solo cruce JS↔Go por frame en `step` se mantiene: los bots corren del lado Go.
+
+**Bot (`ai/`)**: `ai.New(difficulty, slot) Bot`, `(*Bot).Think(s *sim.State, slot int) sim.PlayerInput`.
+Desvío respecto de §12: el "tiempo de reacción" no es un ring de inputs retrasados sino una **creencia
+de la pelota** que se resincroniza `ReactionTicks` después de que la pelota real diverge de lo predicho
+(golpe/rebote inesperado) — el bot sigue jugando sobre información vieja, más humano y sin desfasar sus
+propios botones. Errores humanos vía `sim.Hash64` (tick, slot, `Bot.Seed`). El chequeo de alcance usa
+hoy `Config.KickReach` (shim wave 0); al aterrizar `strike.go` hay que pasarlo a `PartSpec.Reach`.

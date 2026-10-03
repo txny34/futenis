@@ -2,29 +2,23 @@ package sim
 
 import "math"
 
-// Tunable kick-shaping constants for the wave-0 v1-compat strike path (see
-// performKick). Named so the aiming/lift math stays readable; these are
-// removed once wave1's strike.go replaces this shim with the real §7-§9
-// solver.
+// floorBounceMinSpeed is the minimum downward speed (m/s) required for a
+// floor impact to bounce; slower impacts are treated as the ball coming to
+// rest (rolling) and emit no EvBounceFloor event.
+const floorBounceMinSpeed = 0.5
+
+// netBounceDamping is the restitution applied to the X velocity when the
+// ball clips the net instead of crossing it cleanly.
+const netBounceDamping = 0.3
+
+// floorSpinFrictionMin/Max and floorSpinRestMax bound the spin-adjusted
+// floor friction/restitution so a pathological Config can't flip their sign
+// or blow past a sane physical range (docs/design/contact-v2.md §10).
 const (
-	// kickAimMinForward is the minimum forward aim component enforced on
-	// every compat kick, so a player can never aim the ball straight
-	// sideways or backward.
-	kickAimMinForward = 0.5
-	// kickLoftDrive/kickLoftLob are the fixed vertical lift ratios used by a
-	// compat Drive vs. Lob release (real charge-shaped lift is wave1).
-	kickLoftDrive = 0.25
-	kickLoftLob   = 0.6
-	// kickPower is the fixed 0..1 power used by the compat shim (no real
-	// charge measurement yet; see Player.ChargeTicks TODOs).
-	kickPower = 1.0
-	// netBounceDamping is the restitution applied to the X velocity when
-	// the ball clips the net instead of crossing it cleanly.
-	netBounceDamping = 0.3
-	// floorBounceMinSpeed is the minimum downward speed (m/s) required for
-	// a floor impact to bounce; slower impacts are treated as the ball
-	// coming to rest (rolling) and emit no EvBounceFloor event.
-	floorBounceMinSpeed = 0.5
+	floorSpinFrictionMin = 0.4
+	floorSpinFrictionMax = 1.05
+	floorSpinRestMax     = 0.95
+	wallSpinRestMax      = 1.0
 )
 
 // clamp returns v restricted to the inclusive range [lo, hi].
@@ -65,37 +59,9 @@ func forwardSign(team int8) float64 {
 	return -1
 }
 
-// movePlayers advances every active player (s.NumPlayers) by one tick from
-// their sanitized inputs, clamping each to their own team's half of the
-// court and within the walls.
-//
-// TODO(wave1): same-team capsule separation (two partners should not
-// overlap) is not implemented here; player.go adds it alongside jump/
-// stamina/acceleration.
-func movePlayers(s *State, inputs [MaxPlayers]PlayerInput) {
-	for i := int8(0); i < s.NumPlayers; i++ {
-		p := &s.Players[i]
-		in := inputs[i]
-
-		dir := Vec3{X: in.MoveX, Z: in.MoveZ}
-		if l := dir.Len(); l > 1 {
-			dir = dir.Scale(1 / l)
-		}
-
-		p.Vel = dir.Scale(s.Cfg.PlayerSpeed)
-		p.Pos = p.Pos.AddScaled(p.Vel, Dt)
-		p.Pos.Y = 0
-
-		minX, maxX := sideXRange(p.Team)
-		p.Pos.X = clamp(p.Pos.X, minX, maxX)
-		zLimit := CourtHalfWidth - PlayerRadius
-		p.Pos.Z = clamp(p.Pos.Z, -zLimit, zLimit)
-	}
-}
-
-// canKick reports whether player index i is allowed to attempt a kick this
-// tick: only the designated server (Rally.ServerPlayer) may kick during
-// PhaseServe, anyone may kick during PhaseRally.
+// canKick reports whether player index i is allowed to attempt a strike
+// this tick: only the designated server (Rally.ServerPlayer) may strike
+// during PhaseServe, anyone may strike during PhaseRally.
 func canKick(s *State, i int8) bool {
 	switch s.Phase {
 	case PhaseServe:
@@ -105,68 +71,6 @@ func canKick(s *State, i int8) bool {
 	default:
 		return false
 	}
-}
-
-// applyKicks is the wave-0 compatibility shim for the v1 "Kick" path,
-// temporarily driven by PlayerInput v2's Buttons instead of the removed
-// edge-triggered Kick/AimX/AimZ/Loft/Power fields (docs/design/
-// contact-v2.md §16, Wave 0 task: "map Buttons.Strike release -> old kick
-// path"). It resolves at most one kick per tick (lowest player index wins
-// a tie), appending an EvKick event when it connects.
-//
-// TODO(wave1): replaced wholesale by applyStrikes/bestPart/strike
-// (strike.go, bodyparts.go) per §7.2 — real charge, body parts, deviation,
-// the analytical solver and the simultaneous-kick tie-break (§7.3).
-func applyKicks(s *State, inputs [MaxPlayers]PlayerInput, ev []Event) []Event {
-	for i := int8(0); i < s.NumPlayers; i++ {
-		p := &s.Players[i]
-		in := inputs[i]
-		shotBits := p.Held & (BtnStrike | BtnLob)
-		wantsKick := released(p, in, BtnStrike) || released(p, in, BtnLob)
-		p.Held = in.Buttons
-		if !wantsKick || !canKick(s, i) {
-			continue
-		}
-		reach := Vec3{X: p.Pos.X, Y: clamp(s.Ball.Pos.Y, 0, PlayerHeight), Z: p.Pos.Z}
-		if s.Ball.Pos.Sub(reach).Len() > s.Cfg.KickReach {
-			continue
-		}
-		ev = performKick(s, i, in, shotBits, ev)
-		break
-	}
-	return ev
-}
-
-// performKick sets the ball's velocity from the kicking player's Target and
-// the shot type latched in shotBits (BtnLob held => a lofted compat shot),
-// promotes PhaseServe to PhaseRally, and emits EvKick with Side set to the
-// kicker's TEAM (not their Players array index -- see Event.Player).
-func performKick(s *State, i int8, in PlayerInput, shotBits uint8, ev []Event) []Event {
-	p := &s.Players[i]
-	fwd := forwardSign(p.Team)
-
-	toTarget := Vec3{X: in.TargetX - s.Ball.Pos.X, Z: in.TargetZ - s.Ball.Pos.Z}
-	if fwd*toTarget.X < kickAimMinForward {
-		// Enforce a minimum forward component so a kick can never aim
-		// straight sideways/backward, mirroring v1's kickAimMinForward.
-		toTarget.X = fwd * kickAimMinForward
-	}
-	h := toTarget.Normalized()
-
-	liftY := kickLoftDrive
-	if shotBits&BtnLob != 0 {
-		liftY = kickLoftLob
-	}
-	dir := h.Add(Vec3{Y: liftY}).Normalized()
-	speed := s.Cfg.KickMinSpeed + float64((s.Cfg.KickMaxSpeed-s.Cfg.KickMinSpeed)*kickPower)
-
-	s.Ball.Vel = dir.Scale(speed)
-	s.Ball.Resting = false
-	s.Ball.Out = false
-	if s.Phase == PhaseServe {
-		s.Phase = PhaseRally
-	}
-	return append(ev, Event{Kind: EvKick, Tick: s.Tick, Pos: s.Ball.Pos, Side: p.Team, Player: i})
 }
 
 // stepBall integrates the ball one fixed tick under gravity and air drag,
@@ -211,12 +115,13 @@ func resolveNet(s *State, prevPos Vec3, ev []Event) []Event {
 }
 
 // resolveFloor clamps the ball to the floor and either bounces it (scaling
-// speed by FloorRestitution/FloorFriction and emitting EvBounceFloor) or lets
-// it come to rest when the impact is too slow to count as a bounce. Coming
-// to rest still emits EvBounceFloor once (edge-triggered via Ball.Resting)
-// so the padel "second bounce" rule can still be judged even when the ball
-// never bounces hard enough to leave the floor again; without this, a rally
-// could get stuck forever once the ball settled instead of ending the point.
+// speed by a spin-adjusted restitution/friction, docs/design/contact-v2.md
+// §10, and emitting EvBounceFloor) or lets it come to rest when the impact
+// is too slow to count as a bounce. Coming to rest still emits
+// EvBounceFloor once (edge-triggered via Ball.Resting) so the padel "second
+// bounce" rule can still be judged even when the ball never bounces hard
+// enough to leave the floor again; without this, a rally could get stuck
+// forever once the ball settled instead of ending the point.
 func resolveFloor(s *State, ev []Event) []Event {
 	b := &s.Ball
 	if b.Pos.Y >= BallRadius {
@@ -239,9 +144,12 @@ func resolveFloor(s *State, ev []Event) []Event {
 	}
 
 	b.Resting = false
-	b.Vel.Y = incoming * s.Cfg.FloorRestitution
-	b.Vel.X *= s.Cfg.FloorFriction
-	b.Vel.Z *= s.Cfg.FloorFriction
+	fric := clamp(float64(s.Cfg.FloorFriction+s.Cfg.SpinFloorFriction*b.Spin), floorSpinFrictionMin, floorSpinFrictionMax)
+	rest := clamp(float64(s.Cfg.FloorRestitution*(1-s.Cfg.SpinFloorRest*b.Spin)), 0, floorSpinRestMax)
+	b.Vel.Y = incoming * rest
+	b.Vel.X *= fric
+	b.Vel.Z *= fric
+	b.Spin *= s.Cfg.SpinDecay
 	return append(ev, Event{Kind: EvBounceFloor, Tick: s.Tick, Pos: b.Pos, Side: sideOf(b.Pos.X), Player: -1})
 }
 
@@ -269,32 +177,50 @@ func resolveWalls(s *State, prevPos Vec3, ev []Event) []Event {
 }
 
 // reflectWalls performs the actual X/Z wall reflections for resolveWalls,
-// emitting one EvHitWall per wall actually hit this tick.
+// emitting one EvHitWall per wall actually hit this tick, then applies the
+// spin model's wall effect once for the whole tick (docs/design/
+// contact-v2.md §10): backspin eats restitution and pushes the ball down
+// ("la bandeja muere en el vidrio"); spin decays per bounce regardless of
+// sign.
 func reflectWalls(s *State, ev []Event) []Event {
 	b := &s.Ball
+	cfg := &s.Cfg
+	restW := clamp(float64(cfg.WallRestitution*(1+cfg.SpinWallRest*math.Min(b.Spin, 0))), 0, wallSpinRestMax)
 	maxX := CourtHalfLength - BallRadius
 	maxZ := CourtHalfWidth - BallRadius
+	hit := false
 
 	switch {
 	case b.Pos.X > maxX:
 		b.Pos.X = maxX
-		b.Vel.X = float64(-b.Vel.X * s.Cfg.WallRestitution)
+		b.Vel.X = float64(-b.Vel.X * restW)
 		ev = append(ev, Event{Kind: EvHitWall, Tick: s.Tick, Pos: b.Pos, Side: sideOf(b.Pos.X), Player: -1})
+		hit = true
 	case b.Pos.X < -maxX:
 		b.Pos.X = -maxX
-		b.Vel.X = float64(-b.Vel.X * s.Cfg.WallRestitution)
+		b.Vel.X = float64(-b.Vel.X * restW)
 		ev = append(ev, Event{Kind: EvHitWall, Tick: s.Tick, Pos: b.Pos, Side: sideOf(b.Pos.X), Player: -1})
+		hit = true
 	}
 
 	switch {
 	case b.Pos.Z > maxZ:
 		b.Pos.Z = maxZ
-		b.Vel.Z = float64(-b.Vel.Z * s.Cfg.WallRestitution)
+		b.Vel.Z = float64(-b.Vel.Z * restW)
 		ev = append(ev, Event{Kind: EvHitWall, Tick: s.Tick, Pos: b.Pos, Side: sideOf(b.Pos.X), Player: -1})
+		hit = true
 	case b.Pos.Z < -maxZ:
 		b.Pos.Z = -maxZ
-		b.Vel.Z = float64(-b.Vel.Z * s.Cfg.WallRestitution)
+		b.Vel.Z = float64(-b.Vel.Z * restW)
 		ev = append(ev, Event{Kind: EvHitWall, Tick: s.Tick, Pos: b.Pos, Side: sideOf(b.Pos.X), Player: -1})
+		hit = true
+	}
+
+	if hit {
+		if b.Spin < 0 {
+			b.Vel.Y -= float64(cfg.SpinWallDrop * (-b.Spin))
+		}
+		b.Spin *= cfg.SpinDecay
 	}
 	return ev
 }

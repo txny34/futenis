@@ -1,109 +1,125 @@
 import { StrikePart } from "./config";
 import { Bones } from "./rig";
+import { SideRig } from "./sides";
 
-// Per-part strike poses (right side strikes). `s` is the swing: -1 full
-// wind-up, 0 impact, +1 full follow-through. `w` blends the whole pose.
-// The same function renders the charge wind-up (s<0) and the strike.
+// Per-part strike poses, written for the kick side `x` and mirrored by x.d.
+// `s` is the swing: -1 full wind-up, 0 impact, +1 full follow-through.
+// `w` blends the whole pose. Arm "out": right arm -z, left arm +z, so the
+// kick-side arm goes out with -d and the plant-side arm with +d.
 
 function sw(s: number, wind: number, follow: number): number {
   return s < 0 ? -s * wind : s * follow;
 }
 
-function armsOut(b: Bones, w: number, amount: number): void {
-  b.upperArmL.rotation.z += w * amount;
-  b.upperArmR.rotation.z -= w * amount;
+function armsOut(x: SideRig, w: number, kick: number, plant: number): void {
+  x.kArm.rotation.z -= x.d * w * kick;
+  x.pArm.rotation.z += x.d * w * plant;
 }
 
-function foot(b: Bones, s: number, w: number): void {
-  b.upLegR.rotation.x += w * sw(s, 0.8, -1.5);
-  b.legR.rotation.x += w * sw(s, 1.5, 0.1);
-  b.upLegL.rotation.x += w * 0.1;
-  b.legL.rotation.x += w * 0.25;
-  b.spine.rotation.x -= w * 0.15;
-  b.spine.rotation.y += w * sw(s, 0.35, -0.3);
-  armsOut(b, w, 0.7);
+/** Support leg: loaded knee, heel up, weight on the ball of the foot. */
+function plant(x: SideRig, w: number, bend: number): void {
+  x.pUp.rotation.x -= w * bend * 0.6;
+  x.pLeg.rotation.x += w * bend;
+  x.pFoot.rotation.x += w * 0.2;
 }
 
-function knee(b: Bones, s: number, w: number): void {
-  b.upLegR.rotation.x += w * sw(s, 0.3, -1.7);
-  b.legR.rotation.x += w * sw(s, 0.8, 2.0);
-  b.legL.rotation.x += w * 0.2;
-  b.spine.rotation.x += w * sw(s, -0.15, 0.1);
-  armsOut(b, w, 0.9);
+/** Hip vs shoulder counter-rotation (coiled on wind-up, uncoiled after). */
+function coil(b: Bones, x: SideRig, s: number, w: number, hip: number, shoulder: number): void {
+  b.hips.rotation.y += x.d * w * sw(s, hip, -hip * 0.8);
+  b.chest.rotation.y += x.d * w * sw(s, -shoulder, shoulder);
 }
 
-function chest(b: Bones, s: number, w: number): void {
-  b.spine.rotation.x += w * sw(s, -0.4, 0.25);
-  b.chest.rotation.x += w * sw(s, -0.2, 0.15);
-  b.upperArmL.rotation.x += w * 0.4;
-  b.upperArmR.rotation.x += w * 0.4;
-  armsOut(b, w, 1.2);
-  b.legL.rotation.x += w * 0.3;
-  b.legR.rotation.x += w * 0.3;
-  b.upLegL.rotation.x -= w * 0.15;
-  b.upLegR.rotation.x -= w * 0.15;
+function foot(b: Bones, x: SideRig, s: number, w: number): void {
+  x.kUp.rotation.x += w * (-0.7 + sw(s, 1.7, -1.4));
+  x.kLeg.rotation.x += w * (0.35 + sw(s, 1.95, -0.3));
+  x.kFoot.rotation.x += w * 0.5;
+  plant(x, w, 0.75);
+  coil(b, x, s, w, 0.5, 0.45);
+  b.spine.rotation.z -= x.d * w * 0.22;
+  b.spine.rotation.x -= w * (0.12 + Math.max(0, s) * 0.3);
+  armsOut(x, w, 0.7, 1.4);
+  x.pArm.rotation.x -= w * 0.4;
+  x.kArm.rotation.x += w * sw(s, -0.5, 0.7);
+  x.pFore.rotation.x -= w * 0.4;
 }
 
-function shoulder(b: Bones, s: number, w: number): void {
-  b.spine.rotation.z += w * sw(s, 0.3, -0.35);
-  b.spine.rotation.y += w * sw(s, -0.5, 0.45);
-  b.shoulderR.rotation.z -= w * 0.3;
-  b.upperArmL.rotation.z += w * 0.7;
-  b.upperArmR.rotation.x += w * 0.3;
-  b.legL.rotation.x += w * 0.25;
+function knee(b: Bones, x: SideRig, s: number, w: number): void {
+  x.kUp.rotation.x += w * sw(s, 0.6, -2.0);
+  x.kLeg.rotation.x += w * sw(s, 0.6, 2.3);
+  x.kFoot.rotation.x += w * 0.4;
+  plant(x, w, 0.5);
+  coil(b, x, s, w, 0.3, 0.3);
+  b.spine.rotation.x += w * sw(s, -0.3, 0.4);
+  armsOut(x, w, 1.1, 1.1);
+  x.kFore.rotation.x -= w * 0.7;
+  x.pFore.rotation.x -= w * 0.7;
 }
 
-function head(b: Bones, s: number, w: number): void {
-  b.spine.rotation.x += w * sw(s, -0.45, 0.35);
-  b.neck.rotation.x += w * sw(s, -0.3, 0.45);
-  b.upperArmL.rotation.x += w * 0.6;
-  b.upperArmR.rotation.x += w * 0.6;
-  armsOut(b, w, 0.4);
-  b.footL.rotation.x += w * 0.45;
-  b.footR.rotation.x += w * 0.45;
+function chest(b: Bones, x: SideRig, s: number, w: number): void {
+  b.spine.rotation.x += w * sw(s, -0.65, 0.35);
+  b.chest.rotation.x += w * sw(s, -0.35, 0.2);
+  b.neck.rotation.x += w * sw(s, 0.35, -0.1);
+  x.kArm.rotation.x += w * 0.7;
+  x.pArm.rotation.x += w * 0.7;
+  armsOut(x, w, 1.4, 1.4);
+  plant(x, w, 0.5);
+  x.kUp.rotation.x -= w * 0.3;
+  x.kLeg.rotation.x += w * 0.5;
 }
 
-function bicycle(b: Bones, s: number, w: number): void {
-  b.hips.rotation.x += w * sw(s, -1.0, -2.3);
-  b.upLegR.rotation.x += w * sw(s, 0.6, -1.4);
-  b.legR.rotation.x += w * sw(s, 1.3, 0.1);
-  b.upLegL.rotation.x += w * sw(s, -1.3, 0.5);
-  b.legL.rotation.x += w * sw(s, 0.2, 0.9);
-  armsOut(b, w, 1.3);
+function shoulder(b: Bones, x: SideRig, s: number, w: number): void {
+  b.spine.rotation.z += x.d * w * sw(s, 0.45, -0.5);
+  b.spine.rotation.y += x.d * w * sw(s, -0.7, 0.6);
+  b.chest.rotation.y += x.d * w * sw(s, -0.3, 0.3);
+  x.kShoulder.rotation.z -= x.d * w * 0.45;
+  armsOut(x, w, 0.5, 1.0);
+  x.kArm.rotation.x += w * 0.6;
+  plant(x, w, 0.5);
+  x.kLeg.rotation.x += w * 0.3;
 }
 
-const POSES: Readonly<Record<StrikePart, (b: Bones, s: number, w: number) => void>> = {
-  foot, knee, chest, shoulder, head, bicycle,
-};
-
-export function applyStrikePose(b: Bones, part: StrikePart, s: number, w: number): void {
-  if (w > 0) POSES[part](b, s, w);
+function head(b: Bones, x: SideRig, s: number, w: number): void {
+  b.spine.rotation.x += w * sw(s, -0.6, 0.45);
+  b.chest.rotation.x += w * sw(s, -0.25, 0.2);
+  b.neck.rotation.x += w * sw(s, -0.5, 0.9);
+  b.head.rotation.x += w * sw(s, -0.2, 0.35);
+  x.kArm.rotation.x += w * sw(s, 0.5, 1.2);
+  x.pArm.rotation.x += w * sw(s, 0.5, 1.2);
+  armsOut(x, w, 0.5, 0.5);
+  x.kFore.rotation.x -= w * 0.6;
+  x.pFore.rotation.x -= w * 0.6;
+  const crouch = sw(s, 0.35, 0);
+  const knees = sw(s, 0.7, 0.05);
+  x.kUp.rotation.x -= w * crouch;
+  x.pUp.rotation.x -= w * crouch;
+  x.kLeg.rotation.x += w * knees;
+  x.pLeg.rotation.x += w * knees;
+  x.kFoot.rotation.x += w * 0.6;
+  x.pFoot.rotation.x += w * 0.6;
 }
 
-/** Strike timeline: impact happens at IMPACT_T of the normalized clip. */
-export const IMPACT_T = 0.3;
-const IMPACT_SWING = 0.15;
-const RECOVER_START = 0.75;
-const IK_HALF_WIDTH = 0.18;
-
-/** Swing value for strike time t (fast ease-in swing, eased follow-through). */
-export function strikeSwing(t: number): number {
-  if (t < IMPACT_T) {
-    const u = t / IMPACT_T;
-    return -1 + (1 + IMPACT_SWING) * u * u;
-  }
-  const u = (t - IMPACT_T) / (1 - IMPACT_T);
-  return IMPACT_SWING + (1 - IMPACT_SWING) * Math.sin(Math.min(u * 2, 1) * Math.PI * 0.5);
+/**
+ * Bicycle: pelvis rolls backward about the lateral (X) axis until the torso
+ * is horizontal facing up at impact (hips.x ~ -PI/2). The support leg swings
+ * up first, then the kick leg scissors over it to the ball.
+ */
+function bicycle(b: Bones, x: SideRig, s: number, w: number): void {
+  b.hips.rotation.x += w * (-1.55 + sw(s, 0.95, -0.35));
+  x.pUp.rotation.x += w * (-1.4 + sw(s, 1.4, 0.9));
+  x.pLeg.rotation.x += w * (0.3 + sw(s, 0, 0.9));
+  x.kUp.rotation.x += w * (-1.6 + sw(s, 1.9, -0.6));
+  x.kLeg.rotation.x += w * (0.1 + sw(s, 1.6, 0));
+  x.kFoot.rotation.x += w * 0.4;
+  b.neck.rotation.x += w * 0.45;
+  armsOut(x, w, 1.4, 1.4);
+  x.kFore.rotation.x -= w * 0.5;
+  x.pFore.rotation.x -= w * 0.5;
 }
 
-/** Pose weight: full until recovery, then fades back to locomotion. */
-export function strikeWeight(t: number): number {
-  if (t <= 0 || t >= 1) return 0;
-  return t < RECOVER_START ? 1 : 1 - (t - RECOVER_START) / (1 - RECOVER_START);
-}
+type PoseFn = (b: Bones, x: SideRig, s: number, w: number) => void;
+const POSES: Readonly<Record<StrikePart, PoseFn>> = { foot, knee, chest, shoulder, head, bicycle };
 
-/** Bell (0..1..0) centred on impact; drives IK weight and squash/stretch. */
-export function impactBell(t: number): number {
-  const x = (t - IMPACT_T) / IK_HALF_WIDTH;
-  return Math.abs(x) >= 1 ? 0 : 0.5 + 0.5 * Math.cos(x * Math.PI);
+export function applyStrikePose(b: Bones, x: SideRig, part: StrikePart, s: number, w: number): void {
+  if (w > 0) POSES[part](b, x, s, w);
 }
+export { IMPACT_T } from "./timing";

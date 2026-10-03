@@ -7,22 +7,30 @@ import { Bones } from "./rig";
 
 const TAU = Math.PI * 2;
 const ARM_REST_OUT = 0.14;
-const IDLE_KNEE = 0.08;
+const READY_THIGH = 0.32;
+const READY_KNEE = 0.62;
+const READY_TOES = 0.18;
+const READY_LEAN = 0.18;
+const READY_ARM_FWD = 0.35;
+const READY_ELBOW = 0.9;
+const READY_BOUNCE_HZ = 1.6;
+const READY_BOUNCE_KNEE = 0.06;
 const BREATH_HZ = 0.3;
 const BREATH_ROT = 0.03;
 const BREATH_SCALE = 0.02;
 
-const RUN_LEG_AMP = 0.55;
-const SPRINT_LEG_AMP = 0.35;
-const RUN_KNEE_BASE = 0.2;
-const RUN_KNEE_SWING = 1.0;
-const SPRINT_KNEE_SWING = 0.5;
-const RUN_ARM_AMP = 0.6;
-const SPRINT_ARM_AMP = 0.35;
-const RUN_ELBOW = 0.5;
-const RUN_LEAN = 0.12;
-const SPRINT_LEAN = 0.22;
-const RUN_TWIST = 0.15;
+const RUN_LEG_AMP = 0.6;
+const SPRINT_LEG_AMP = 0.55;
+const RUN_KNEE_BASE = 0.25;
+const RUN_KNEE_SWING = 1.1;
+const SPRINT_KNEE_SWING = 0.6;
+const RUN_ARM_AMP = 0.9;
+const SPRINT_ARM_AMP = 0.5;
+const RUN_ELBOW = 0.9;
+const RUN_LEAN = 0.15;
+const SPRINT_LEAN = 0.4;
+const HIP_TWIST = 0.2;
+const CHEST_COUNTER_TWIST = 0.35;
 const RUN_BOUNCE = 0.04;
 
 const AIR_TUCK_THIGH = 0.7;
@@ -32,18 +40,33 @@ const AIR_TRAIL_KNEE = 0.5;
 const AIR_ARMS_UP = 1.1;
 const AIR_LEAN = 0.12;
 
-/** Always-on stance: arms slightly out, soft knees, breathing (fades with k). */
-export function applyIdle(b: Bones, time: number, k: number): void {
+/** Arms slightly out so they never clip the torso (always on). */
+export function applyRest(b: Bones): void {
   b.upperArmL.rotation.z += ARM_REST_OUT;
   b.upperArmR.rotation.z -= ARM_REST_OUT;
-  b.upLegL.rotation.x -= IDLE_KNEE * k;
-  b.upLegR.rotation.x -= IDLE_KNEE * k;
-  b.legL.rotation.x += 2 * IDLE_KNEE * k;
-  b.legR.rotation.x += 2 * IDLE_KNEE * k;
+}
+
+/** Padel-style ready stance: bent knees, on the balls of the feet, bouncing. */
+export function applyIdle(b: Bones, time: number, k: number): void {
+  const bounce = Math.sin(time * TAU * READY_BOUNCE_HZ) * READY_BOUNCE_KNEE;
+  const thigh = (READY_THIGH + bounce * 0.5) * k;
+  const knee = (READY_KNEE + bounce) * k;
+  b.upLegL.rotation.x -= thigh;
+  b.upLegR.rotation.x -= thigh;
+  b.legL.rotation.x += knee;
+  b.legR.rotation.x += knee;
+  b.footL.rotation.x += READY_TOES * k;
+  b.footR.rotation.x += READY_TOES * k;
+  b.spine.rotation.x += READY_LEAN * k;
+  b.upperArmL.rotation.x -= READY_ARM_FWD * k;
+  b.upperArmR.rotation.x -= READY_ARM_FWD * k;
+  b.foreArmL.rotation.x -= READY_ELBOW * k;
+  b.foreArmR.rotation.x -= READY_ELBOW * k;
   const breath = Math.sin(time * TAU * BREATH_HZ) * k;
   b.chest.rotation.x -= breath * BREATH_ROT;
-  b.chest.scale.set(1 + breath * BREATH_SCALE, 1 + breath * BREATH_SCALE, 1 + breath * BREATH_SCALE);
-  b.neck.rotation.x += breath * BREATH_ROT;
+  const sc = 1 + breath * BREATH_SCALE;
+  b.chest.scale.set(sc, sc, sc);
+  b.neck.rotation.x += breath * BREATH_ROT - READY_LEAN * k * 0.5;
 }
 
 /** Run/sprint cycle at `phase` (radians). k = speed weight, sprint = 0..1. */
@@ -59,11 +82,12 @@ export function applyLocomotion(b: Bones, phase: number, k: number, sprint: numb
   b.legR.rotation.x += k * (RUN_KNEE_BASE + knee * Math.max(0, -c));
   b.upperArmL.rotation.x += s * arm;
   b.upperArmR.rotation.x -= s * arm;
-  b.foreArmL.rotation.x -= RUN_ELBOW * (1 + sprint) * k;
-  b.foreArmR.rotation.x -= RUN_ELBOW * (1 + sprint) * k;
+  b.foreArmL.rotation.x -= RUN_ELBOW * k;
+  b.foreArmR.rotation.x -= RUN_ELBOW * k;
   b.spine.rotation.x += (RUN_LEAN + SPRINT_LEAN * sprint) * k;
-  b.spine.rotation.y += s * RUN_TWIST * k;
-  b.chest.rotation.y -= s * RUN_TWIST * k;
+  b.hips.rotation.y += s * HIP_TWIST * k;
+  b.chest.rotation.y -= s * CHEST_COUNTER_TWIST * k;
+  b.neck.rotation.x -= (RUN_LEAN + SPRINT_LEAN * sprint) * k * 0.6;
   b.hips.position.y += RUN_BOUNCE * k * (Math.abs(c) - 0.5);
 }
 

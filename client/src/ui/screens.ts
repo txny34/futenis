@@ -49,11 +49,12 @@ export function matchSetup(mode: GameMode, onGo: (o: MatchOptions) => void, onBa
   let difficulty: Difficulty = "normal";
   let pointsToWin = DEFAULT_POINTS;
   const pts = POINTS_CHOICES.map((p) => ({ value: p, label: String(p) }));
-  const rows: HTMLElement[] = [
-    segmented("Dificultad de la IA", DIFFICULTIES, difficulty, (d) => { difficulty = d; }),
-  ];
-  if (mode !== "playground") {
-    rows.push(segmented("Puntos para ganar", pts, pointsToWin, (p) => { pointsToWin = p; }));
+  const rows: HTMLElement[] = [];
+  if (mode !== "playground") { // playground: no AI rival, no scoring
+    rows.push(
+      segmented("Dificultad de la IA", DIFFICULTIES, difficulty, (d) => { difficulty = d; }),
+      segmented("Puntos para ganar", pts, pointsToWin, (p) => { pointsToWin = p; }),
+    );
   }
   const actions = el("div", "fx-actions");
   actions.append(

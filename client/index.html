@@ -11,15 +11,26 @@
   <style>
     html, body { margin: 0; height: 100%; background: #0d1117; color: #e6edf3; font-family: system-ui, sans-serif; overflow: hidden; }
     #app { position: fixed; inset: 0; }
-    #hud { position: fixed; inset: 0; pointer-events: none; }
-    #score { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 32px; font-weight: 700; text-shadow: 0 2px 6px #000; }
+    #hud { position: fixed; inset: 0; pointer-events: none; --hud-scale: 1; }
+    #hud[hidden] { display: none; }
+    #score { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: calc(32px * var(--hud-scale)); font-weight: 700; text-shadow: 0 2px 6px #000; }
     #score .p0 { color: #ff5a5a; } #score .p1 { color: #5aa0ff; }
-    #msg { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); font-size: 20px; text-shadow: 0 2px 6px #000; }
-    #help { position: absolute; bottom: 10px; left: 12px; font-size: 13px; opacity: 0.75; line-height: 1.5; }
+    #msg { position: absolute; top: calc(58px * var(--hud-scale)); left: 50%; transform: translateX(-50%); font-size: calc(20px * var(--hud-scale)); text-shadow: 0 2px 6px #000; }
+    #flash { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-size: calc(28px * var(--hud-scale)); font-weight: 700; text-shadow: 0 2px 8px #000; }
+    #flash[data-q="0"] { color: #ffd23f; } #flash[data-q="1"] { color: #8be28b; } #flash[data-q="2"] { color: #c9d1d9; }
+    #spin { position: absolute; bottom: calc(36px * var(--hud-scale)); right: 12px; font-size: calc(14px * var(--hud-scale)); text-shadow: 0 2px 6px #000; }
+    #fps { position: absolute; top: 8px; left: 12px; font: 12px ui-monospace, monospace; opacity: 0.8; }
+    #help { position: absolute; bottom: 10px; left: 12px; font-size: calc(13px * var(--hud-scale)); opacity: 0.75; line-height: 1.5; }
     #err { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff7b72; }
+    #app canvas { cursor: crosshair; }
   </style>
   <script type="importmap">
-    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
   </script>
   <script src="dist/wasm_exec.js"></script>
 </head>

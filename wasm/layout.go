@@ -15,7 +15,7 @@ const (
 	inputPerPlayer = 6
 	// inputLen is the total float count of the input buffer, one block per
 	// sim.MaxPlayers slot (client fills the human slots; unused/AI slots
-	// are zero until wave1 wires the AI into wasm -- "Modos y 2v2").
+	// are overwritten inside wasm by ai.Bot, see aiDriver).
 	inputLen = sim.MaxPlayers * inputPerPlayer
 	// maxEvents caps the events reported per step call; extra events are dropped.
 	maxEvents = 32
@@ -95,8 +95,10 @@ func writeEvent(out []float64, i int, e sim.Event) {
 // prev/curr snapshots and up to maxEvents events. inputs are held levels
 // (PlayerInput v2): unlike the old edge-triggered Kick, they are reused
 // as-is for every tick of this call, no per-tick clearing needed. Mutates
-// out in place to avoid allocations.
-func runFrame(m *sim.Match, inputs [sim.MaxPlayers]sim.PlayerInput, n int, out []float64) {
+// out in place to avoid allocations. drv (may be nil) overwrites the AI
+// slots' inputs before every tick, so bots react tick by tick while the
+// human inputs stay the ones copied in once per call.
+func runFrame(m *sim.Match, inputs [sim.MaxPlayers]sim.PlayerInput, n int, out []float64, drv *aiDriver) {
 	n = clamp(n, minSteps, maxSteps)
 	count := 0
 	for i := 0; i < n; i++ {
@@ -104,6 +106,7 @@ func runFrame(m *sim.Match, inputs [sim.MaxPlayers]sim.PlayerInput, n int, out [
 			st := m.State()
 			sim.WriteSnapshot(&st, out[outPrev:outCurr])
 		}
+		drv.fill(m, &inputs)
 		for _, e := range m.Step(inputs) {
 			if count < maxEvents {
 				writeEvent(out, count, e)

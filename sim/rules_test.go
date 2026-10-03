@@ -283,9 +283,13 @@ func TestResetForServe(t *testing.T) {
 		assertFloat(t, "player0.Pos.X", s.Players[0].Pos.X, -servePlayerOffset)
 		assertFloat(t, "player1.Pos.X", s.Players[1].Pos.X, servePlayerOffset)
 
-		dist := s.Ball.Pos.Sub(s.Players[0].Pos).Len()
-		if dist > s.Cfg.KickReach {
-			t.Errorf("ball is %v from the server, want <= KickReach (%v)", dist, s.Cfg.KickReach)
+		// wave1-C: the resting pre-toss ball position is cosmetic only (the
+		// real serve's legality comes from tossServe + the toss-bounce
+		// judge, not from the legacy v1 KickReach field); what matters here
+		// is that the server is positioned legally behind their own
+		// service line, so a toss can ever land there.
+		if !inServiceLineBounceZone(s.Players[0].Pos, 0, &s.Cfg) {
+			t.Errorf("server0 at %+v is not behind its own service line (ServiceLineDist=%v)", s.Players[0].Pos, s.Cfg.ServiceLineDist)
 		}
 	})
 
@@ -298,9 +302,8 @@ func TestResetForServe(t *testing.T) {
 		}
 		assertFloat(t, "ball.Pos.X", s.Ball.Pos.X, serveBallOffset)
 
-		dist := s.Ball.Pos.Sub(s.Players[1].Pos).Len()
-		if dist > s.Cfg.KickReach {
-			t.Errorf("ball is %v from the server, want <= KickReach (%v)", dist, s.Cfg.KickReach)
+		if !inServiceLineBounceZone(s.Players[1].Pos, 1, &s.Cfg) {
+			t.Errorf("server1 at %+v is not behind its own service line (ServiceLineDist=%v)", s.Players[1].Pos, s.Cfg.ServiceLineDist)
 		}
 	})
 

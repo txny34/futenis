@@ -56,12 +56,16 @@ func (m *Match) Step(inputs [MaxPlayers]PlayerInput) []Event {
 		sanitized[i] = sanitizeInput(inputs[i], s.Players[i].Team, &s.Cfg)
 	}
 
-	movePlayers(s, sanitized)
-	m.events = applyKicks(s, sanitized, m.events)
+	m.events = movePlayers(s, sanitized, m.events)
+	m.events = applyStrikes(s, sanitized, m.events)
 	// The ball keeps flying visually during the point pause; rules.go only
-	// judges events while Phase == PhaseRally.
-	if s.Phase == PhaseRally || s.Phase == PhasePoint {
+	// judges events while Phase == PhaseRally. wave1-C: once the serve has
+	// been dropped (Ball.Tossed), it must also fall/bounce under real
+	// physics while still Phase == PhaseServe, or the mandatory toss bounce
+	// (docs/design/contact-v2.md §7.5) could never happen.
+	if s.Phase == PhaseRally || s.Phase == PhasePoint || (s.Phase == PhaseServe && s.Ball.Tossed) {
 		m.events = stepBall(s, m.events)
+		m.events = applyBodyCollisions(s, m.events)
 	}
 	m.events = applyRules(s, m.events)
 	return m.events

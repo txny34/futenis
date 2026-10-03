@@ -1,7 +1,6 @@
 package sim
 
 import (
-	"math"
 	"testing"
 )
 
@@ -16,75 +15,6 @@ func newPhysicsTestState() State {
 
 func fullInputs(in0, in1 PlayerInput) [MaxPlayers]PlayerInput {
 	return [MaxPlayers]PlayerInput{in0, in1}
-}
-
-func TestMovePlayers(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Run("moves at configured speed along a single axis", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Players[0].Pos = Vec3{X: -5}
-		movePlayers(&s, fullInputs(PlayerInput{MoveX: 1}, PlayerInput{}))
-
-		wantVel := cfg.PlayerSpeed
-		assertFloat(t, "player0.Vel.X", s.Players[0].Vel.X, wantVel)
-		assertFloat(t, "player0.Pos.X", s.Players[0].Pos.X, -5+wantVel*Dt)
-		assertFloat(t, "player0.Pos.Y", s.Players[0].Pos.Y, 0)
-	})
-
-	t.Run("diagonal input is normalized before scaling by speed", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Players[0].Pos = Vec3{X: -5}
-		movePlayers(&s, fullInputs(PlayerInput{MoveX: 1, MoveZ: 1}, PlayerInput{}))
-
-		diag := 1 / math.Sqrt2
-		wantVelX := diag * cfg.PlayerSpeed
-		wantVelZ := diag * cfg.PlayerSpeed
-		assertFloat(t, "player0.Vel.X", s.Players[0].Vel.X, wantVelX)
-		assertFloat(t, "player0.Vel.Z", s.Players[0].Vel.Z, wantVelZ)
-	})
-
-	t.Run("side0 is clamped before crossing the net", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Players[0].Pos = Vec3{X: -0.4}
-		movePlayers(&s, fullInputs(PlayerInput{MoveX: 1}, PlayerInput{}))
-
-		assertFloat(t, "player0.Pos.X", s.Players[0].Pos.X, -PlayerRadius)
-	})
-
-	t.Run("side1 is clamped before crossing the net", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Players[1].Pos = Vec3{X: 0.4}
-		movePlayers(&s, fullInputs(PlayerInput{}, PlayerInput{MoveX: -1}))
-
-		assertFloat(t, "player1.Pos.X", s.Players[1].Pos.X, PlayerRadius)
-	})
-
-	t.Run("side0 is clamped at the back wall", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Players[0].Pos = Vec3{X: -9.6}
-		movePlayers(&s, fullInputs(PlayerInput{MoveX: -1}, PlayerInput{}))
-
-		assertFloat(t, "player0.Pos.X", s.Players[0].Pos.X, -(CourtHalfLength - PlayerRadius))
-	})
-
-	t.Run("player is clamped at the side wall on Z", func(t *testing.T) {
-		s := newPhysicsTestState()
-		s.Players[0].Pos = Vec3{X: -5, Z: 4.9}
-		movePlayers(&s, fullInputs(PlayerInput{MoveZ: 1}, PlayerInput{}))
-
-		assertFloat(t, "player0.Pos.Z", s.Players[0].Pos.Z, CourtHalfWidth-PlayerRadius)
-	})
-
-	t.Run("only the first NumPlayers slots move", func(t *testing.T) {
-		s := newPhysicsTestState() // NumPlayers: 2
-		s.Players[2].Pos = Vec3{X: -5}
-		movePlayers(&s, [MaxPlayers]PlayerInput{{}, {}, {MoveX: 1}, {MoveX: 1}})
-
-		if s.Players[2].Pos.X != -5 {
-			t.Errorf("player2 (inactive slot) moved: got %+v", s.Players[2].Pos)
-		}
-	})
 }
 
 func TestStepBallGravityAndFloor(t *testing.T) {

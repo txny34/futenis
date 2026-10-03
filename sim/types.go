@@ -228,6 +228,14 @@ type RallyState struct {
 	// the fields so the contract is frozen.
 	ServeAttempt uint8 // 1 = first serve, 2 = second serve (after a fault)
 	ServeBox     int8  // 0 = right diagonal box, 1 = left diagonal box; alternates every point (serveBoxForScore)
+
+	// wave1-C: real-padel serve judge state (docs/design/contact-v2.md
+	// §7.5, serve.go). Zero value for all three is correct at the start of
+	// every fresh serve attempt (resetForServe/replayServe rebuild
+	// RallyState from scratch).
+	ServeTossBounced bool // true once the pre-strike drop has bounced legally, once, behind the service line on the server's own side
+	ServeBoxPending  bool // true from the server's opening strike (EvKick/EvBodyHit) until that serve's own bounce on the receiving side is judged (box/let/fault)
+	ServeNetTouch    bool // true if the serve's post-strike return flight has clipped the net; distinguishes a Let (still lands in the box) from a normal legal bounce
 }
 
 // serveBoxForScore returns which diagonal service box the server must serve

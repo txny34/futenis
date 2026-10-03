@@ -12,8 +12,11 @@ const serveBallOffset = 6.5
 const serveBallHeight = 0.5
 
 // servePlayerOffset is how far from the net each player starts for a new
-// serve.
-const servePlayerOffset = 7.0
+// serve. wave1-C: must clear the server's own ServiceLineDist (6.95m) by
+// more than ServeTossOffset (0.5m) toward the net, or the mandatory toss
+// bounce (docs/design/contact-v2.md §7.5) would be geometrically
+// impossible from the default serve position.
+const servePlayerOffset = 8.0
 
 // servePlayerZOffset is how far right/left of the center line the two
 // partners of a 2v2 team start for a new serve. Wave 0 placeholder: real
@@ -34,6 +37,10 @@ func applyRules(s *State, ev []Event) []Event {
 	switch s.Phase {
 	case PhaseRally:
 		return judgeRally(s, ev)
+	case PhaseServe:
+		// wave1-C: real-padel serve (docs/design/contact-v2.md §7.5) --
+		// judges the pre-strike toss bounce; see serve.go.
+		return judgeServe(s, ev)
 	case PhasePoint:
 		s.Rally.PauseTicks--
 		if s.Rally.PauseTicks <= 0 {
@@ -49,7 +56,31 @@ func applyRules(s *State, ev []Event) []Event {
 func judgeRally(s *State, ev []Event) []Event {
 	n := len(ev)
 	for i := 0; i < n; i++ {
-		winner, decided := judgeEvent(&s.Rally, ev[i])
+		e := ev[i]
+		// wave1-C: a touch before the serve's own mandatory toss bounce
+		// (docs/design/contact-v2.md §7.5: "golpearla sin que haya picado
+		// ... es falta") is never a legal rally start, even though
+		// strike.go already flipped Phase to PhaseRally for it.
+		if s.Rally.LastTeam < 0 && !s.Rally.ServeTossBounced && (e.Kind == EvKick || e.Kind == EvBodyHit) {
+			// serveFault always leaves PhaseRally (either a retry resets to
+			// PhaseServe, or a double fault awards the point), so there is
+			// never anything left in this tick worth re-judging.
+			return serveFault(s, e.Side, ev)
+		}
+		// wave1-C: while RallyState.ServeBoxPending, this crossing is still
+		// the serve's own return flight -- it needs the real-padel box/let/
+		// fault judge (serve.go) instead of the generic one-touch rules.
+		if s.Rally.ServeBoxPending {
+			handled, nev := judgeServeReturn(s, e, ev)
+			ev = nev
+			if handled {
+				if s.Phase != PhaseRally {
+					return ev // a fault/let/point already left PhaseRally
+				}
+				continue
+			}
+		}
+		winner, decided := judgeEvent(&s.Rally, e)
 		if decided {
 			return awardPoint(s, winner, ev)
 		}
@@ -68,7 +99,10 @@ func judgeEvent(r *RallyState, e Event) (winner int8, decided bool) {
 		return judgeFirstKick(r, e)
 	}
 	switch e.Kind {
-	case EvKick:
+	case EvKick, EvBodyHit:
+		// wave1-C: EvBodyHit counts as a touch exactly like EvKick (docs/
+		// design/contact-v2.md §7.4): bouncing off your own capsule after
+		// the grace period is a double touch, same as kicking it twice.
 		return judgeKickEvent(r, k, e)
 	case EvBounceFloor:
 		return judgeBounceEvent(r, k, e)
@@ -87,10 +121,15 @@ func judgeEvent(r *RallyState, e Event) (winner int8, decided bool) {
 // judgeFirstKick handles the serve's opening kick, when RallyState has no
 // LastTeam yet.
 func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
-	if e.Kind == EvKick {
+	if e.Kind == EvKick || e.Kind == EvBodyHit {
 		r.LastTeam = e.Side
 		r.LastPlayer = e.Player
 		r.BouncesOnSide = [2]int{}
+		// wave1-C: LastTeam is only ever -1 right after resetForServe/
+		// replayServe, so this first touch is always the serve's opening
+		// strike -- open the serve-return box judge (docs/design/
+		// contact-v2.md §7.5; see serve.go).
+		r.ServeBoxPending = true
 	}
 	return 0, false
 }
@@ -135,12 +174,34 @@ func faultOnKickerSide(r *RallyState, k int8) (int8, bool) {
 	return 1 - k, true
 }
 
+// deuceCap is how many points past Cfg.PointsToWin a deuce can run before
+// the match is decided outright regardless of the 2-point margin
+// (wave1-C scoring decision, documented here since Config has no field for
+// it: a padel/volleyball-style "win by 2" decided every game eventually,
+// without an unbounded deuce loop to reason about or test).
+const deuceCap = 2
+
+// hasWonGame reports whether winnerScore has clinched the game against
+// loserScore: either the classic "first to PointsToWin, win by 2" rule
+// (deuce-style, like padel/volleyball), or the hard deuceCap that
+// guarantees every match terminates even through an extended deuce.
+func hasWonGame(winnerScore, loserScore, pointsToWin int) bool {
+	if winnerScore < pointsToWin {
+		return false
+	}
+	if winnerScore-loserScore >= 2 {
+		return true
+	}
+	return winnerScore >= pointsToWin+deuceCap
+}
+
 // awardPoint increments the winner's score, emits EvPoint, and either ends
-// the match (EvGameOver) or starts the point pause before the next serve.
+// the match (EvGameOver, once hasWonGame agrees) or starts the point pause
+// before the next serve.
 func awardPoint(s *State, winner int8, ev []Event) []Event {
 	s.Score[winner]++
 	ev = append(ev, Event{Kind: EvPoint, Tick: s.Tick, Side: winner, Player: -1})
-	if s.Score[winner] >= s.Cfg.PointsToWin {
+	if hasWonGame(s.Score[winner], s.Score[1-winner], s.Cfg.PointsToWin) {
 		s.Phase = PhaseGameOver
 		return append(ev, Event{Kind: EvGameOver, Tick: s.Tick, Side: winner, Player: -1})
 	}
@@ -171,18 +232,7 @@ func resetForServe(s *State, server int8) {
 		ServeBox:     serveBoxForScore(s.Score),
 	}
 
-	if s.NumPlayers >= 4 {
-		setupDoublesPositions(s)
-	} else {
-		s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset}, Team: 0, OnGround: true, Stamina: 1}
-		s.Players[1] = Player{Pos: Vec3{X: servePlayerOffset}, Team: 1, OnGround: true, Stamina: 1}
-	}
-
-	ballX := -serveBallOffset
-	if server == 1 {
-		ballX = serveBallOffset
-	}
-	s.Ball = Ball{Pos: Vec3{X: ballX, Y: serveBallHeight}}
+	placeServe(s, server)
 }
 
 // setupDoublesPositions places all 4 players for a 2v2 serve: each team's

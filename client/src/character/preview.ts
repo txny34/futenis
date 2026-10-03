@@ -88,10 +88,10 @@ function main(): void {
   let last = performance.now();
   let clock = 0;
   function frame(now: number): void {
-    const dt = Math.min(MAX_DT, (now - last) / 1000);
+    const dt = ctl.paused ? 0 : Math.min(MAX_DT, (now - last) / 1000);
     last = now;
     clock += dt;
-    driver.step(ctl.state, ctl.speed, clock);
+    driver.step(ctl.state, ctl.speed, clock, ctl.scrub, ctl.side);
     const f = driver.frame;
     character.root.position.y = f.rootY;
     character.update(f.pose, dt);

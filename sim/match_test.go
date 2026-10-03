@@ -184,24 +184,34 @@ func TestDeterminism(t *testing.T) {
 	}
 }
 
-// TestIntegrationServeToPoint drives a full serve with a strong, straight
-// kick aimed deep into the rival half and asserts that an EvPoint
-// eventually gets emitted before the ball returns to a serve.
+// TestIntegrationServeToPoint drives a full real-padel serve (docs/design/
+// contact-v2.md §7.5: press Strike to drop the toss, wait for the
+// mandatory bounce behind the service line, release to strike into the
+// receiver's diagonal box) and asserts that an EvPoint eventually gets
+// emitted. The press/release is driven off live State, not a hardcoded
+// tick count, so it self-corrects (re-tosses) across a let/fault retry.
 func TestIntegrationServeToPoint(t *testing.T) {
 	m := NewMatch(DefaultConfig())
 
-	const maxTicks = 10 * TickRate
+	const maxTicks = 20 * TickRate
+	const targetX, targetZ = 4.0, 1.5 // well inside the box-0 diagonal box (0..ServiceLineDist, Z>=0)
 
+	charging := false
 	sawPoint := false
 	for i := 0; i < maxTicks; i++ {
-		var in [MaxPlayers]PlayerInput
-		if i == 0 {
-			in[0] = PlayerInput{Buttons: BtnStrike, TargetX: CourtHalfLength - 1}
+		s := m.State()
+		in0 := PlayerInput{TargetX: targetX, TargetZ: targetZ}
+		switch {
+		case s.Phase == PhaseServe && !s.Ball.Tossed:
+			charging = true
+		case charging && s.Rally.ServeTossBounced:
+			charging = false // release now: the toss just bounced legally
 		}
-		if i == 1 {
-			in[0] = PlayerInput{TargetX: CourtHalfLength - 1}
+		if charging {
+			in0.Buttons = BtnStrike
 		}
-		ev := m.Step(in)
+
+		ev := m.Step([MaxPlayers]PlayerInput{in0})
 		for _, e := range ev {
 			if e.Kind == EvPoint {
 				sawPoint = true
