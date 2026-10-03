@@ -308,6 +308,11 @@ type RallyState struct {
 	// the point is won by the server's team while still true, it is an Ace
 	// (scoring.go).
 	ServeUntouched bool
+	// BodyGraze / BodyGrazeTick record that LastTeam's last touch was an
+	// EvBodyHit by LastPlayer at that tick: a strike by the same player
+	// within bodyMergeTicks is the same touch, not a double touch (rules.go).
+	BodyGraze     bool
+	BodyGrazeTick uint32
 }
 
 // serveBoxForScore returns which diagonal service box the server must serve

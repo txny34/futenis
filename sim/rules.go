@@ -147,6 +147,7 @@ func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
 		r.LastPlayer = e.Player
 		r.BouncesOnSide = [2]int{}
 		r.ShotCount++
+		markBodyGraze(r, e)
 		// wave1-C: LastTeam is only ever -1 right after resetForServe/
 		// replayServe, so this first touch is always the serve's opening
 		// strike -- open the serve-return box judge (docs/design/
@@ -163,6 +164,10 @@ func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
 // from here on the receiving team has touched the serve at least once.
 func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	if e.Side == k {
+		if mergesWithBodyGraze(r, e) {
+			r.BodyGraze = false // the strike takes over the graze: still one touch
+			return 0, false
+		}
 		return faultOnKickerSide(r, k)
 	}
 	r.LastTeam = e.Side
@@ -170,7 +175,26 @@ func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	r.BouncesOnSide = [2]int{}
 	r.ShotCount++
 	r.ServeUntouched = false
+	markBodyGraze(r, e)
 	return 0, false
+}
+
+// bodyMergeTicks is how long after a body graze the same player's strike
+// still counts as that same touch (0.1 s): the capsule meets the ball a few
+// ticks before the foot does, which the player sees as a single touch.
+const bodyMergeTicks = TickRate / 10
+
+// mergesWithBodyGraze reports whether strike e is the same player finishing
+// the touch their body just started (graze then strike inside the window).
+func mergesWithBodyGraze(r *RallyState, e Event) bool {
+	return e.Kind == EvKick && r.BodyGraze && e.Player == r.LastPlayer && e.Tick-r.BodyGrazeTick <= bodyMergeTicks
+}
+
+// markBodyGraze records whether the touch that just became LastTeam's was
+// a body graze (EvBodyHit), for mergesWithBodyGraze.
+func markBodyGraze(r *RallyState, e Event) {
+	r.BodyGraze = e.Kind == EvBodyHit
+	r.BodyGrazeTick = e.Tick
 }
 
 // judgeBounceEvent handles an EvBounceFloor: a bounce on the kicker's own

@@ -195,3 +195,25 @@ func TestClosestPointOnCapsule_ClampsToSegment(t *testing.T) {
 		})
 	}
 }
+
+// TestBodyHit_PendingStrikeTakesTheBall: while the player has a strike
+// buffered (waiting for its best contact tick), the incoming ball must not
+// bounce off their body -- the strike resolves it. Otherwise the body touch
+// plus the strike one tick later is judged a double touch (the "crazy
+// referee" bug: ~70% of bot-vs-bot points ended that way).
+func TestBodyHit_PendingStrikeTakesTheBall(t *testing.T) {
+	s := newBodyTestState()
+	s.Tick = 500
+	s.Players[0].Buffer = 3
+	s.Ball.Pos = Vec3{X: PlayerRadius + BallRadius - 0.01, Y: 1}
+	s.Ball.Vel = Vec3{X: -5}
+
+	ev := applyBodyCollisions(&s, nil)
+
+	if len(ev) != 0 {
+		t.Fatalf("got %+v, want no EvBodyHit while a strike is buffered", ev)
+	}
+	if s.Ball.Vel.X != -5 {
+		t.Errorf("ball velocity should be untouched: got %v", s.Ball.Vel.X)
+	}
+}
