@@ -211,10 +211,8 @@ func TestLobDowngradesToDriveOnShoulder(t *testing.T) {
 
 	h := strikeHash(s.Tick, s.Players[0].Team, s.Ball.Pos)
 	tgt := deviateTarget(&s.Cfg, s.Players[0].BufTarget, s.Ball.Pos, ps, 0, h)
-	speed := shotSpeed(ps, 1, 0, h, &s.Cfg)
-	speed += momentumBonus(s.Players[0].Vel, s.Ball.Pos, tgt, &s.Cfg)
-	want := solveLaunch(&s.Cfg, s.Ball.Pos, tgt, ShotDrive, speed, 1)
-	want = clampLen(want, ps.SpeedMax+s.Cfg.MomentumMax)
+	// Same launch pipeline as strike (perfect boost included), forced to Drive.
+	want := launch(&s, &s.Players[0], ps, tgt, ShotDrive, perfectBoost(&s, QualPerfect), 0, h)
 
 	ev := applyStrikes(&s, fullInputs(PlayerInput{}, PlayerInput{}), nil)
 
