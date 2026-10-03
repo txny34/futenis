@@ -69,6 +69,9 @@ func scriptedInput(g *lcg) PlayerInput {
 	if g.bool(3) {
 		buttons |= BtnSprint
 	}
+	if g.bool(13) {
+		buttons |= BtnDash
+	}
 	return PlayerInput{
 		MoveX:   g.floatRange(-1, 1),
 		MoveZ:   g.floatRange(-1, 1),

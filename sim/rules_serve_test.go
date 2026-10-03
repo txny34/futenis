@@ -245,29 +245,66 @@ func TestJudgeRally_BodyHitBeforeTossBounceIsFault(t *testing.T) {
 	assertServeFaultThenRetry(t, &s, ev)
 }
 
-// TestJudgeRally_VolleyReturnDuringServeBoxPendingFallsThroughToGenericRules
-// exercises judgeRally's full dispatch chain end to end: a legal serve
-// strike opens RallyState.ServeBoxPending, and a volley return (the
-// receiver kicks before any bounce, which judgeServeReturn does not
-// special-case) must fall through to the generic one-touch judge instead
-// of being swallowed or faulted.
-func TestJudgeRally_VolleyReturnDuringServeBoxPendingFallsThroughToGenericRules(t *testing.T) {
+// TestJudgeRally_VolleyReturnDuringServeBoxPendingForfeitsPointToServer
+// exercises judgeRally's full dispatch chain end to end: real padel
+// requires the serve to bounce once in the receiver's diagonal box before
+// anyone may play it. A volley return (the receiver kicks before any
+// bounce) is the RECEIVER's fault and must award the point to the server's
+// team immediately -- not a serve fault/replay (the server did nothing
+// wrong), and not a silent legal return either.
+func TestJudgeRally_VolleyReturnDuringServeBoxPendingForfeitsPointToServer(t *testing.T) {
 	s := newServeTestState(0)
 	s.Rally.ServeTossBounced = true
 	s.Phase = PhaseRally
 
 	ev := judgeRally(&s, []Event{{Kind: EvKick, Side: 0, Player: 0}, {Kind: EvKick, Side: 1, Player: 1}})
 
-	if !s.Rally.ServeBoxPending {
-		t.Errorf("ServeBoxPending: got false, want still true (the serve's own bounce was never judged)")
-	}
-	if s.Rally.LastTeam != 1 {
-		t.Errorf("LastTeam: got %d, want 1 (the receiver's volley return)", s.Rally.LastTeam)
-	}
+	foundPoint, foundFault := false, false
 	for _, e := range ev {
-		if e.Kind == EvServeFault || e.Kind == EvPoint {
-			t.Fatalf("got %+v, want neither a fault nor a point for a legal volley return", ev)
+		switch e.Kind {
+		case EvPoint:
+			foundPoint = true
+			if e.Side != 0 {
+				t.Errorf("EvPoint.Side: got %d, want 0 (the server)", e.Side)
+			}
+		case EvServeFault:
+			foundFault = true
 		}
+	}
+	if !foundPoint {
+		t.Fatalf("got %+v, want an EvPoint(side=0)", ev)
+	}
+	if foundFault {
+		t.Fatalf("got an EvServeFault for the receiver's early volley, want none (not the server's fault): %+v", ev)
+	}
+	if s.Rally.ServerPlayer != 0 || s.Server != 0 {
+		t.Errorf("ServerPlayer/Server: got %d/%d, want unchanged (no replay, this was a forfeited point)", s.Rally.ServerPlayer, s.Server)
+	}
+}
+
+// TestJudgeServeVolley_OwnTeamTouchFallsThroughToGenericDoubleTouch covers
+// the other half of judgeServeVolley: a touch by the SERVER's own team
+// (e.g. an own body hit) while the return is still pending must NOT be
+// swallowed as a forfeit -- it falls through to the generic one-touch
+// judge, which treats it as a double touch (receiver wins).
+func TestJudgeServeVolley_OwnTeamTouchFallsThroughToGenericDoubleTouch(t *testing.T) {
+	s := newServeTestState(0)
+	s.Rally.ServeTossBounced = true
+	s.Phase = PhaseRally
+
+	ev := judgeRally(&s, []Event{{Kind: EvKick, Side: 0, Player: 0}, {Kind: EvBodyHit, Side: 0, Player: 0}})
+
+	foundPoint := false
+	for _, e := range ev {
+		if e.Kind == EvPoint {
+			foundPoint = true
+			if e.Side != 1 {
+				t.Errorf("EvPoint.Side: got %d, want 1 (receiver wins a double touch by the server's own team)", e.Side)
+			}
+		}
+	}
+	if !foundPoint {
+		t.Fatalf("got %+v, want an EvPoint(side=1)", ev)
 	}
 }
 

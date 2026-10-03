@@ -88,11 +88,46 @@ type Config struct {
 	KickMinSpeed float64
 	KickMaxSpeed float64
 
+	// Dash (Rocket League dodge spirit, docs/design/contact-v2.md "Dash"):
+	// an instantaneous horizontal impulse, ground-only, coexisting with
+	// sprint/stamina. DashSpeed/DashTime shape the ~2.5 m / ~0.18 s impulse;
+	// DashStaminaCost/DashCooldownTime gate how often it can fire.
+	DashSpeed        float64 // m/s, velocity held for the dash's duration
+	DashTime         float64 // s, dash duration
+	DashStaminaCost  float64 // 0..1, consumed on activation
+	DashCooldownTime float64 // s, minimum time between dash activations
+
 	// Parts is the body-part contact table (§6), tunable in vivo.
 	Parts [PartCount]PartSpec
 
 	// Mode selects 1v1 / 2v2 / Playground (see MaxPlayers, State.NumPlayers).
 	Mode Mode
+
+	// --- scoring (docs/design/contact-v2.md "Puntuación de pádel") ---
+	// Real-padel points/games/sets scoring, appended after the legacy v1
+	// PointsToWin fields so every existing scalar index/field keeps its
+	// wire position. ScoringSimple (the zero value) is the untouched
+	// legacy behaviour (today's tests, ModePlayground tuning, etc);
+	// ScoringPadel opts into the real 0/15/30/40/Adv + games + sets model
+	// (scoring.go).
+	ScoringMode ScoringMode
+	// GoldenPoint: at 40-40 (deuce), the next point wins the game outright
+	// ("punto de oro") instead of requiring a 2-point advantage.
+	GoldenPoint bool
+	// GamesPerSet is how many games win a set outright (win by 2); tied at
+	// GamesPerSet-all triggers a single tiebreak game to 7 (scoring.go).
+	GamesPerSet int
+	// SetsToWin is how many sets (first to) win the match.
+	SetsToWin int
+	// FirstServer is which team serves the very first point of a fresh
+	// Match (NewMatch); 0 (the zero value) is today's default and keeps
+	// every pre-existing test/caller unchanged. A caller running many
+	// matches back to back (e.g. a bot-vs-bot tournament harness) should
+	// alternate this 0/1 per match itself -- padel's per-game service
+	// alternation (awardGamePadel) only balances serve advantage WITHIN a
+	// match; across independently-started matches, something has to vary
+	// who opens serve, or the same team always gets the first-serve edge.
+	FirstServer int8
 
 	// Derived, cached by Sanitize() so Step never recomputes a ticksOf
 	// conversion on the hot path. Unexported: not part of the live-tuning
@@ -102,6 +137,8 @@ type Config struct {
 	bufTicks            int
 	graceTicks          int
 	serveTimeLimitTicks int
+	dashTicks           int
+	dashCooldownTicks   int
 }
 
 // DefaultConfig returns the baseline tuned Config used by a fresh Match.
@@ -164,8 +201,18 @@ func DefaultConfig() Config {
 		KickMinSpeed: 8.0,
 		KickMaxSpeed: 22.0,
 
+		DashSpeed:        13.9, // ~2.5 m over DashTime
+		DashTime:         0.18,
+		DashStaminaCost:  0.25,
+		DashCooldownTime: 0.8,
+
 		Parts: defaultParts(),
 		Mode:  Mode1v1,
+
+		ScoringMode: ScoringSimple,
+		GoldenPoint: false,
+		GamesPerSet: 3,
+		SetsToWin:   1,
 	}
 	c.Sanitize()
 	return c
@@ -192,7 +239,12 @@ const (
 	BtnLob                      // held: charge; release: Lob-type shot.
 	BtnJump                     // Space
 	BtnSprint                   // Shift
+
+	// BtnDash is appended last (docs/design/contact-v2.md "Dash") so the
+	// existing bits never renumber. Press-edge triggered, like BtnJump: held
+	// = no-op after the initial press, sim detects the edge via Player.Held.
+	BtnDash
 )
 
 // btnMask is every known button bit; sanitizeInput clears unknown bits.
-const btnMask = BtnStrike | BtnLob | BtnJump | BtnSprint
+const btnMask = BtnStrike | BtnLob | BtnJump | BtnSprint | BtnDash

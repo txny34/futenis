@@ -43,6 +43,9 @@ const (
 	maxPartReach                           = 5
 	maxPartSpeed                           = 60
 	maxPartDev                             = 10
+	maxDashSpeed                           = 40 // m/s
+	minGamesPerSet, maxGamesPerSet         = 1, 20
+	minSetsToWin, maxSetsToWin             = 1, 10
 )
 
 // Sanitize clamps Config to physically sane bounds and recomputes the
@@ -159,6 +162,28 @@ func (c *Config) sanitizeSpinAndMisc() {
 	if c.Mode > ModePlayground {
 		c.Mode = Mode1v1
 	}
+
+	c.DashSpeed = clamp(c.DashSpeed, 0, maxDashSpeed)
+	c.DashTime = clamp(c.DashTime, 0, maxDurationSec)
+	c.DashStaminaCost = clamp(c.DashStaminaCost, 0, 1)
+	c.DashCooldownTime = clamp(c.DashCooldownTime, 0, maxDurationSec)
+
+	if c.ScoringMode > ScoringPadel {
+		c.ScoringMode = ScoringSimple
+	}
+	if c.GamesPerSet < minGamesPerSet {
+		c.GamesPerSet = minGamesPerSet
+	} else if c.GamesPerSet > maxGamesPerSet {
+		c.GamesPerSet = maxGamesPerSet
+	}
+	if c.SetsToWin < minSetsToWin {
+		c.SetsToWin = minSetsToWin
+	} else if c.SetsToWin > maxSetsToWin {
+		c.SetsToWin = maxSetsToWin
+	}
+	if c.FirstServer != 0 && c.FirstServer != 1 {
+		c.FirstServer = 0
+	}
 }
 
 // sanitizeParts bounds every §6 PartSpec field and keeps each part's own
@@ -209,6 +234,8 @@ func (c *Config) recomputeTickCaches() {
 	c.bufTicks = clampTickCount(ticksOf(c.StrikeBufferTime), math.MaxUint8)
 	c.graceTicks = clampTickCount(ticksOf(c.BodyGraceTime), math.MaxInt32)
 	c.serveTimeLimitTicks = clampTickCount(ticksOf(c.ServeTimeLimit), math.MaxInt32)
+	c.dashTicks = clampTickCount(ticksOf(c.DashTime), math.MaxUint16)
+	c.dashCooldownTicks = clampTickCount(ticksOf(c.DashCooldownTime), math.MaxUint16)
 }
 
 // defaultParts returns the §6 contact table. PartNone is left zero-valued

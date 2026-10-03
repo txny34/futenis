@@ -119,6 +119,7 @@ func checkSoakTick(t *testing.T, m *Match, ev []Event, tr *soakTracker, tick int
 
 	assertFinite(t, tick, s)
 	assertBounds(t, tick, s)
+	assertServerPlayerInvariant(t, tick, s)
 
 	for _, e := range ev {
 		if e.Kind == EvPoint || e.Kind == EvGameOver {
@@ -188,6 +189,30 @@ func assertBounds(t *testing.T, tick int, s State) {
 	b := s.Ball.Pos
 	if math.Abs(b.X) > soakBallBoundXZ || math.Abs(b.Z) > soakBallBoundXZ || math.Abs(b.Y) > soakBallBoundY {
 		t.Fatalf("tick %d: ball drifted out of bounds while still !Out: pos=%+v", tick, b)
+	}
+}
+
+// assertServerPlayerInvariant fails if Rally.ServerPlayer ever points at a
+// player on the wrong team (code-review hardening: a mismatch here means a
+// serveFault/replayServe call site passed a team that doesn't match the
+// frozen ServerPlayer, which would let a player toss/serve for a team they
+// don't belong to).
+func assertServerPlayerInvariant(t *testing.T, tick int, s State) {
+	t.Helper()
+	// Only meaningful during PhaseServe/PhaseRally: awardPoint (either
+	// scoring mode) sets State.Server to the NEXT point's server the
+	// instant the point is decided, but Rally.ServerPlayer -- "who served
+	// THIS point" -- is only recomputed when resetForServe actually runs,
+	// at the end of the PhasePoint pause. That gap is by design, not a bug.
+	if s.Phase != PhaseServe && s.Phase != PhaseRally {
+		return
+	}
+	sp := s.Rally.ServerPlayer
+	if sp < 0 || sp >= s.NumPlayers {
+		return // not mid-serve-contract (e.g. between points before a toss)
+	}
+	if s.Players[sp].Team != s.Server {
+		t.Fatalf("tick %d: Rally.ServerPlayer=%d has Team=%d, want == Server=%d", tick, sp, s.Players[sp].Team, s.Server)
 	}
 }
 

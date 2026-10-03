@@ -18,6 +18,7 @@ func movePlayers(s *State, inputs [MaxPlayers]PlayerInput, ev []Event) []Event {
 		in := inputs[i]
 
 		ev = stepPlayerVertical(s, i, in, ev)
+		ev = stepPlayerDash(s, i, in, ev)
 		stepPlayerHorizontal(p, in, &s.Cfg)
 		stepPlayerStamina(p, in, &s.Cfg)
 		clampPlayerToCourt(p)
@@ -56,12 +57,83 @@ func stepPlayerVertical(s *State, i int8, in PlayerInput, ev []Event) []Event {
 	return ev
 }
 
+// stepPlayerDash handles the press-edge dash impulse (docs/design/
+// contact-v2.md "Dash": a Rocket League dodge-spirited instantaneous
+// horizontal velocity, ground-only, coexisting with sprint/stamina).
+// DashCooldown ticks down every tick regardless of whether a dash is
+// currently active. While DashTicks > 0 the player is mid-dash: this
+// function only counts that down, leaving p.Vel untouched so
+// stepPlayerHorizontal can let the dash velocity stand instead of capping
+// it; once DashTicks reaches 0, normal acceleration resumes from whatever
+// velocity the dash left behind (momentum carries, RL feel). A fresh press
+// is only honored when not already dashing, on the ground, off cooldown,
+// not stamina-locked and able to afford DashStaminaCost.
+func stepPlayerDash(s *State, i int8, in PlayerInput, ev []Event) []Event {
+	p := &s.Players[i]
+	cfg := &s.Cfg
+
+	if p.DashCooldown > 0 {
+		p.DashCooldown--
+	}
+	if p.DashTicks > 0 {
+		p.DashTicks--
+		return ev
+	}
+	if !pressed(p, in, BtnDash) || !canDash(p, cfg) {
+		return ev
+	}
+
+	dir := dashDirection(p, in)
+	p.Vel.X = float64(dir.X * cfg.DashSpeed)
+	p.Vel.Z = float64(dir.Z * cfg.DashSpeed)
+	p.DashTicks = uint16(clampTickCount(cfg.dashTicks, math.MaxUint16))
+	p.DashCooldown = uint16(clampTickCount(cfg.dashCooldownTicks, math.MaxUint16))
+
+	p.Stamina -= cfg.DashStaminaCost
+	if p.Stamina <= 0 {
+		p.Stamina = 0
+		p.StaminaLock = uint16(clampTickCount(cfg.stLockTicks, math.MaxUint16))
+	}
+
+	return append(ev, Event{Kind: EvDash, Tick: s.Tick, Pos: p.Pos, Side: p.Team, Player: i, Vel: p.Vel})
+}
+
+// canDash reports whether p may start a new dash this tick: grounded (no
+// air dash in v1), not already dashing or on cooldown, not stamina-locked,
+// and able to afford DashStaminaCost.
+func canDash(p *Player, cfg *Config) bool {
+	return p.OnGround &&
+		p.DashTicks == 0 &&
+		p.DashCooldown == 0 &&
+		p.StaminaLock == 0 &&
+		p.Stamina >= cfg.DashStaminaCost
+}
+
+// dashDirection is the move-input direction normalized, or forward
+// (forwardSign(p.Team) on X) when there is no move input at all.
+func dashDirection(p *Player, in PlayerInput) Vec3 {
+	dir := Vec3{X: in.MoveX, Z: in.MoveZ}
+	if dir.X == 0 && dir.Z == 0 {
+		return Vec3{X: forwardSign(p.Team)}
+	}
+	return dir.Normalized()
+}
+
 // stepPlayerHorizontal moves p.Vel.X/Z toward a target velocity (direction *
 // cruise/sprint speed, slowed to ChargeMoveFactor while charging a strike)
 // by at most accel*Dt, where accel is PlayerAccel on the ground or the
 // reduced PlayerAirAccel in the air (§5). Momentum, not instant velocity:
-// |Δvel| per tick is bounded by accel*Dt.
+// |Δvel| per tick is bounded by accel*Dt. While a dash impulse is active
+// (p.DashTicks > 0, docs/design/contact-v2.md "Dash"), normal accel/charge
+// slow is skipped entirely so it never caps the dash velocity; only the
+// position integrates.
 func stepPlayerHorizontal(p *Player, in PlayerInput, cfg *Config) {
+	if p.DashTicks > 0 {
+		p.Pos.X += float64(p.Vel.X * Dt)
+		p.Pos.Z += float64(p.Vel.Z * Dt)
+		return
+	}
+
 	dir := Vec3{X: in.MoveX, Z: in.MoveZ}
 	if l := dir.Len(); l > 1 {
 		dir = dir.Scale(1 / l)

@@ -73,6 +73,10 @@ const (
     BtnLob                      // click der mantenido: cargar; al soltar: tiro tipo Lob
     BtnJump                     // Space
     BtnSprint                   // Shift
+
+    // Dash (§5.1), apendeado al final del bitmask -- los bits existentes no
+    // se renumeran. Flanco (press-edge), igual que BtnJump.
+    BtnDash                     // Q
 )
 ```
 
@@ -112,6 +116,8 @@ type Player struct {
     BufTarget    Vec3     // destino congelado al release (Y = BallRadius)
     BufSpin      int8     // spin congelado al release
     StruckAt     uint32   // tick del último golpe propio (gracia de colisión con el cuerpo, §7.4)
+    DashTicks    uint16   // ticks de impulso de dash restantes (0 = no está dasheando, §5.1)
+    DashCooldown uint16   // ticks hasta poder dashear de nuevo
 }
 
 type Ball struct {
@@ -164,9 +170,14 @@ type Quality  uint8 // QualPerfect=0, QualGood, QualForced
 | SpinDecay | — | 0.5 | spin se multiplica por esto en cada rebote |
 | PointPauseTime | s | 1.5 | pausa post-punto (hoy `PointPauseTicks`, 180 ticks) |
 | KickReach, KickMinSpeed, KickMaxSpeed | — | — | **se eliminan** (pasan a la tabla de partes) |
+| DashSpeed | m/s | 13.9 | velocidad del impulso de dash, constante durante `DashTime` (§5.1) |
+| DashTime | s | 0.18 | duración del impulso (~2.5 m a `DashSpeed`) |
+| DashStaminaCost | 0..1 | 0.25 | costo de stamina por dash |
+| DashCooldownTime | s | 0.8 | mínimo entre dos dashes |
 
 Los `*Time` se convierten a ticks con `ticksOf` en `Config.Sanitize()` y se cachean en campos derivados
-no tuneables (`stLockTicks`, `chargeMaxTicks`, `bufTicks`, `graceTicks`): cero cálculo por tick.
+no tuneables (`stLockTicks`, `chargeMaxTicks`, `bufTicks`, `graceTicks`, `dashTicks`, `dashCooldownTicks`):
+cero cálculo por tick.
 
 La tabla de partes (§6) también vive en `Config` como `Parts [PartCount]PartSpec` (array fijo) para
 poder tunearla en vivo.
@@ -219,6 +230,41 @@ default:
 - Drena **sólo mientras se mantiene y hay movimiento** (Shift parado no gasta).
 - Recurso visible: barra en HUD desde el snapshot.
 - Stamina se resetea a 1 en `resetForServe`.
+
+## 5.1 Dash
+
+Impulso horizontal instantáneo al estilo *dodge* de Rocket League, implementado en `sim/movement.go`
+(`stepPlayerDash`), coexistiendo con sprint/stamina en lugar de reemplazarlos: comparten el mismo
+recurso, pero son mecánicas independientes (podés dashear sin estar sprinteando, y el dash no te saca
+del sprint).
+
+```go
+// stepPlayerDash: flanco de BtnDash, sólo en piso, sin lock ni cooldown activo, con stamina suficiente.
+if pressed(p, in, BtnDash) && canDash(p, cfg) {
+    dir := dashDirection(p, in)              // input de movimiento normalizado, o forward si no hay input
+    p.Vel.XZ = dir * cfg.DashSpeed           // impulso instantáneo, no una rampa de aceleración
+    p.DashTicks = cfg.dashTicks              // ~0.18 s a 120 Hz
+    p.DashCooldown = cfg.dashCooldownTicks   // ~0.8 s
+    p.Stamina -= cfg.DashStaminaCost         // ~0.25
+}
+```
+
+- **Dirección**: la del input de movimiento (`MoveX/MoveZ`) normalizado; si no hay input de movimiento,
+  cae al forward del equipo (`forwardSign(Team)` en X). No usa la mirada del mouse/target.
+- **Duración/distancia**: `DashSpeed` se mantiene fijo durante `DashTicks` (`ticksOf(DashTime)`) ticks;
+  por defecto `DashSpeed ≈ 13.9 m/s`, `DashTime = 0.18 s` → **~2.5 m** de desplazamiento. Mientras
+  `DashTicks > 0`, `stepPlayerHorizontal` **no** aplica la curva de accel/charge-slow (no la cubre, no la
+  frena): el dash manda. Al llegar a 0, la aceleración normal retoma desde la velocidad que dejó el dash
+  (el momentum se conserva — el "feel" de Rocket League — en vez de resetear a 0).
+- **Costo/cooldown**: cuesta `DashStaminaCost` (no se puede dashear sin esa stamina) y arranca
+  `DashCooldown` (independiente de `StaminaLock`; cuenta siempre, dashee o no). No se puede volver a
+  dashear hasta que ambos — cooldown en 0 y stamina suficiente — se cumplan.
+- **Restricciones**: sólo en piso (`OnGround`; sin air-dash en v1), nunca mientras `StaminaLock > 0`, y
+  nunca mientras ya se está dasheando (`DashTicks > 0`) o en cooldown (`DashCooldown > 0`).
+- **Golpear durante un dash**: no hay restricción especial — la transferencia de momentum al tiro
+  (`momentumBonus`, §9) ya lee `Player.Vel`, así que dashear hacia un golpe lo potencia naturalmente,
+  sin lógica extra.
+- Flanco (press-edge) igual que `BtnJump`: mantener el botón no re-dashea ni extiende la ventana.
 
 ---
 
@@ -543,7 +589,7 @@ type Event struct {
     Vel     Vec3     // EvKick: velocidad post-contacto (red + feedback)
     Spin    float64  // EvKick
 }
-// Nuevos kinds (append, no reordenar): EvWhiff, EvJump, EvBodyHit, EvToss
+// Nuevos kinds (append, no reordenar): EvWhiff, EvJump, EvBodyHit, EvToss, EvDash (§5.1)
 ```
 
 `judgeEvent` trata `EvBodyHit` igual que `EvKick` (toque del `Side`). **La regla de 1 toque por lado queda
@@ -697,6 +743,18 @@ TouchEvent { Tick uint32; Side int8; Kind (Kick|BodyHit|Toss); Part; Quality; Ba
 34. `TestSnapshot_NewFields` + `TestSnapshot_OldIndicesStable`.
 35. `TestStep_ZeroAllocs` (`testing.AllocsPerRun == 0` sobre `Step` con strikes activos).
 36. `TestConfigLayout_RoundTrip` + `TestConfigSanitize`.
+
+**Dash (§5.1, movement_test.go)**
+41. `TestDash_DistanceAndDurationAt120Hz` (velocidad constante durante `dashTicks`, ~2.5 m).
+42. `TestDash_MomentumCarriesAfterOverrideEnds` (al terminar el impulso, la accel normal retoma desde la
+    velocidad del dash, no resetea a 0).
+43. `TestDash_CostsStamina`. 44. `TestDash_BlockedWithInsufficientStamina`.
+45. `TestDash_BlockedByStaminaLock`. 46. `TestDash_RequiresOnGround` (sin air-dash en v1).
+47. `TestDash_CooldownBlocksImmediateRedash` (y vuelve a permitir al vencer el cooldown).
+48. `TestDash_DirectionFallsBackToForwardWithNoMoveInput` + `TestDash_DirectionUsesMoveInputWhenPresent`.
+49. `TestDash_EmitsEvDashOnActivation`. 50. `TestDash_HeldButtonDoesNotRetrigger` (flanco, no nivel).
+51. `TestDash_ZeroAllocs`. 52. `TestDeterminism_WithDash` (scriptedInput incluye `BtnDash`); los soaks
+    existentes (`go test -run Soak ./sim/`) también lo ejercitan vía `scriptedInput`.
 
 **AI**
 37. `TestBot_Deterministic` (mismo State → mismo input). 38. `TestBot_ReturnsServe`.
@@ -873,7 +931,14 @@ spin, _pad]`. `side` es el EQUIPO (0/1); `player` es el índice en `State.Player
 ```
 1 EvBounceFloor  2 EvHitWall  3 EvHitNet  4 EvKick  5 EvPoint  6 EvGameOver  7 EvOut
 8 EvWhiff  9 EvJump  10 EvBodyHit  11 EvToss  12 EvServeFault  13 EvLet
+14 EvDash
+-- §21 "Puntuación de pádel" --
+15 EvGamePoint  16 EvBreakPoint  17 EvGameWon  18 EvSetWon  19 EvAce  20 EvMatchWon
 ```
+
+`EvGamePoint`/`EvBreakPoint`/`EvGameWon`/`EvSetWon`/`EvAce`/`EvMatchWon` sólo se emiten cuando
+`Config.ScoringMode == ScoringPadel` (§21); en `ScoringSimple` (el valor cero, todo lo que ya existía)
+el flujo sigue siendo únicamente `EvPoint`/`EvGameOver`, bit a bit igual que antes.
 
 ### 20.3 Snapshot (`sim.Snap*`, wasm `outPrev`/`outCurr` blocks)
 
@@ -892,11 +957,28 @@ posición**. A partir de ahí, todo apendeado:
 26..32 SnapP1{VelX,VelZ,Stamina,Charge,OnGround,Buffer,Flags}
 33..35 SnapP2{X,Y,Z}  36..42 SnapP2{VelX,VelZ,Stamina,Charge,OnGround,Buffer,Flags}
 43..45 SnapP3{X,Y,Z}  46..52 SnapP3{VelX,VelZ,Stamina,Charge,OnGround,Buffer,Flags}
-53 SnapLen
+
+-- apendeado, "Dash" --
+53..56 SnapP0..P3DashActive
+
+-- apendeado, §21 "Puntuación de pádel" --
+57 SnapPoints0  58 SnapPoints1  59 SnapGames0  60 SnapGames1  61 SnapSets0  62 SnapSets1
+63 SnapServerPlayer  64 SnapRallyShots
+
+-- apendeado, §22 "Predicción" --
+65 SnapLandingX  66 SnapLandingZ  67 SnapLandingTicks  68 SnapLandingOk
+69..72 SnapP0{ContactTicks,ContactPart,ContactQuality,ContactOk}
+73..76 SnapP1{ContactTicks,ContactPart,ContactQuality,ContactOk}
+77..80 SnapP2{ContactTicks,ContactPart,ContactQuality,ContactOk}
+81..84 SnapP3{ContactTicks,ContactPart,ContactQuality,ContactOk}
+
+85 SnapLen
 ```
 
 `Charge` = `ChargeTicks / chargeMaxTicks` (0 si `Config` nunca se `Sanitize()`ó). `Flags` =
-`ShotType | (StaminaLock>0)<<1`.
+`ShotType | (StaminaLock>0)<<1`. Los índices concretos de arriba (53 en más) son el estado real del
+código al cerrar esta wave; si otra wave agrega algo entre el Dash y la puntuación, **sólo se apendea al
+final** -- nunca se reordena esta lista.
 
 ### 20.4 Config live-tuning (`sim/config_layout.go`)
 
@@ -922,6 +1004,25 @@ SpeedMin, SpeedMax, DevBase, DevMax, SpinMin, SpinMax, AllowLob∈{0,1}`, por ca
    vez de `AimX/AimZ`, potencia fija en vez de carga real). Esto es un shim documentado con
    `TODO(wave1)`, no el solver final de §7-§9.
 
+### 20.7 Dash (post wave-0 addition, §5.1)
+
+Apéndices sobre el contrato congelado de §20.1-20.4, todos **append-only** (ningún índice/valor
+anterior se mueve):
+
+- **Buttons** (§20.1 sigue en `inputPerPlayer = 6`, el bitmask vive en el float `buttons`):
+  `BtnDash = 16` apendeado al final del bitmask de `sim/config.go` (después de `BtnSprint = 8`).
+- **EventKind** (§20.2): `14 EvDash` apendeado después de `13 EvLet`.
+- **Snapshot** (§20.3): apendeado después de `53 SnapLen` (que pasa a ser el offset 53, no el largo):
+  `53 SnapP0DashActive  54 SnapP1DashActive  55 SnapP2DashActive  56 SnapP3DashActive`, nuevo
+  `SnapLen = 57`. Un flag por jugador (`DashTicks > 0`), sólo para animación en el cliente.
+- **Config** (§20.4): 4 escalares apendeados después de `ServeTimeLimit` (el entonces-último campo):
+  `DashSpeed, DashTime, DashStaminaCost, DashCooldownTime`. `CfgScalarLen` pasa de 45 a 49 en este punto
+  (antes de que otras waves posteriores sigan apendeando los suyos; ver el código de
+  `sim/config_layout.go` para el índice exacto vigente — este documento fija el *principio* de
+  apéndice, no un número que vaya a quedar desactualizado en cuanto otra wave apéndice más campos).
+- Ningún cambio en `wasm/` fue necesario: `inputPerPlayer`, `eventStride` y la lectura de `buttons`
+  (`uint8(readF64(...))`) ya eran genéricos sobre el bitmask y el stride de evento.
+
 ### 20.6 API JS wave 1 (agente D: `ai/` + `wasm/`)
 
 Todas las funciones devuelven `null` en éxito o un `string` de error (nunca tiran excepción).
@@ -942,5 +1043,219 @@ Un solo cruce JS↔Go por frame en `step` se mantiene: los bots corren del lado 
 Desvío respecto de §12: el "tiempo de reacción" no es un ring de inputs retrasados sino una **creencia
 de la pelota** que se resincroniza `ReactionTicks` después de que la pelota real diverge de lo predicho
 (golpe/rebote inesperado) — el bot sigue jugando sobre información vieja, más humano y sin desfasar sus
-propios botones. Errores humanos vía `sim.Hash64` (tick, slot, `Bot.Seed`). El chequeo de alcance usa
-hoy `Config.KickReach` (shim wave 0); al aterrizar `strike.go` hay que pasarlo a `PartSpec.Reach`.
+propios botones. Errores humanos vía `sim.Hash64` (tick, slot, `Bot.Seed`).
+
+Wave 2 (contra strike/movement/serve reales):
+- Alcance/partes: espejo en `ai/predict.go` de `partError`/`bestPartConstrained` (no exportados en `sim`)
+  sobre `Config.Parts`. El bot se para **de costado** a 0.55 m de la trayectoria (dentro del `Reach` de
+  pie/rodilla, fuera de la cápsula: evita `EvBodyHit` = toque).
+- Predicción: `sim.PredictBall` (post wave-0, §22) ya es bounce-aware (red/piso/paredes + spin §10) --
+  `ai/predict.go` puede dejar de mantener su propio espejo duplicado de esas constantes y llamar
+  directamente a `sim.PredictBall`/`PredictLanding`/`PredictContact`; queda para quien posea `ai/`.
+- Release: dentro de la ventana del buffer (`StrikeBufferTime`) — el sim elige el mejor tick
+  (`improvesNextTick`). Si el saque todavía no picó en el cajón, no suelta mientras la pelota sea
+  alcanzable antes del pique (el buffer golpearía de volea = falta).
+- Carga: un drive se carga a la velocidad más alta cuyo arco libra la red por `Level.NetMargin`
+  (el solver manda un drive muy rápido derecho a la red).
+- Saque: se para detrás de la línea de saque, presiona Strike (drop), mantiene, tras el pique agrega Lob
+  (re-latchea `ShotLob`) y suelta: globo al centro del cajón diagonal.
+- Perillas por nivel: `ReactionTicks, AimNoise, Decision, PosError, TimingError, ChargeError,
+  MinSprintStamina, NetMargin, LineMargin, DropChance, UsesSpin, UsesJump`.
+
+### 20.8 Puntuación de pádel (post wave-0 addition, §21)
+
+Apéndices sobre el contrato congelado de §20.1-20.4, todos **append-only** (ningún índice/valor
+anterior se mueve):
+
+- **EventKind** (§20.2): `15 EvGamePoint  16 EvBreakPoint  17 EvGameWon  18 EvSetWon  19 EvAce
+  20 EvMatchWon`, apendeados después de `14 EvDash`. Sólo se emiten con `Config.ScoringMode ==
+  ScoringPadel`; `ScoringSimple` (valor cero) sigue emitiendo únicamente `EvPoint`/`EvGameOver`.
+- **Snapshot** (§20.3): apendeado después de los 4 flags de Dash: `SnapPoints0, SnapPoints1,
+  SnapGames0, SnapGames1, SnapSets0, SnapSets1, SnapServerPlayer, SnapRallyShots` (8 floats). Ver
+  §21.4 para el significado de cada uno.
+- **Config** (§20.4): 5 escalares apendeados después de los 4 campos de Dash: `ScoringMode,
+  GoldenPoint, GamesPerSet, SetsToWin, FirstServer`. `ScoringMode`/`GoldenPoint` son 0/1 (bool
+  escrita como float); `FirstServer` es 0 o 1 (equipo), **no** -1 -- `Sanitize` cae a 0 ante
+  cualquier otro valor.
+- `State` ganó dos campos nuevos no expuestos en el live-tuning wire (no son `Config`, son estado
+  de partido): `Games [2]int`, `Sets [2]int`. `State.Score` se reutiliza como "puntos del juego
+  actual" en `ScoringPadel` en vez de agregar un `Points` separado (mismo array, mismo reset que
+  `ScoringSimple` ya hacía para un partido nuevo). `RallyState` ganó `ShotCount int` (toques legales
+  en el rally actual) y `ServeUntouched bool` (detección de Ace, §21.5).
+
+### 20.9 Predicción (post wave-0 addition, §22)
+
+- **Snapshot** (§20.3): apendeado después del bloque de puntuación: `SnapLandingX, SnapLandingZ,
+  SnapLandingTicks, SnapLandingOk` (la pelota, sin dueño) + 4 floats por jugador
+  (`ContactTicks, ContactPart, ContactQuality, ContactOk`) × `MaxPlayers` = 16 floats. Los slots
+  inactivos (`NumPlayers < 4`) quedan en su valor cero (`ContactOk = 0`).
+- Ningún cambio en `Config`/`PlayerInput`: §22 es puramente derivado del `State` ya existente, sin
+  parámetros nuevos que tunear.
+- `sim/trajectory.go` desaparece; su único contenido (`PredictBall`) se mudó a `sim/predict.go`
+  junto con `PredictLanding`/`PredictContact` (misma firma pública de `PredictBall`, así que
+  ningún llamador -- `strike.go`, `ai/predict.go` -- necesitó cambiar una línea para seguir
+  compilando, aunque `ai/predict.go` ahora duplica trabajo que `sim.PredictBall` ya hace, ver nota
+  en §20.6 wave 2).
+
+---
+
+## 21. Puntuación de pádel
+
+`Config.ScoringMode` (`ScoringSimple` | `ScoringPadel`, `sim/scoring.go`) decide qué modelo de
+puntaje corre. **`ScoringSimple` es el valor cero**: el comportamiento legacy de wave 0
+(`State.Score` como contador plano, primero a `Config.PointsToWin` con ventaja de 2 y un
+`deuceCap` duro) queda **bit a bit intacto** -- todo test preexistente y el uso de
+`ModePlayground`/tuning siguen funcionando sin optar a nada. `ScoringPadel` es el modelo real de
+pádel: puntos (0/15/30/40/Ad) → juegos → sets.
+
+### 21.1 Puntos: 0/15/30/40 + ventaja/punto de oro
+
+`State.Score` se **reutiliza** como "puntos ganados en el juego actual" (en vez de agregar un
+campo `Points` separado): mismo array `[2]int`, mismo reset a `{0,0}` que un partido nuevo ya
+hacía. `hasWonGamePadel(pointsW, pointsL, golden)` decide si el punto recién anotado cierra el
+juego:
+
+```go
+func hasWonGamePadel(pointsW, pointsL int, golden bool) bool {
+    if golden && pointsL >= 3 && pointsW > pointsL {
+        return true // punto de oro: en cuanto hay 40-40 (3-3), el próximo punto cierra
+    }
+    return pointsW >= 4 && pointsW-pointsL >= 2 // clásico: 4+ puntos, ventaja de 2
+}
+```
+
+`Config.GoldenPoint` (default `false`) es el interruptor de "punto de oro": a 40-40 el próximo
+punto gana el juego sin necesidad de ventaja, en vez de la regla clásica de deuce/ventaja
+indefinida. `pointDisplayCode(mine, other, golden)` traduce el contador crudo a la cifra de
+display 0/15/30/40/Ad (0..4) que viaja en el snapshot (§20.8); una vez que `hasWonGamePadel` ya
+decidió el juego en cualquier dirección, el código se clampea a 40-40 (3) en vez de mostrar un
+contador obsoleto creciendo sin límite.
+
+### 21.2 Juegos y el tie-break
+
+`Config.GamesPerSet` (default 3, partidos "arcade" cortos; pádel real usa 6) es cuántos juegos
+hacen falta para cerrar un set **con ventaja de 2**. Si ambos equipos llegan empatados exactamente
+en `GamesPerSet` (`setNeedsTiebreak`), en vez de seguir indefinidamente se juega un **único juego
+de tie-break** a `tiebreakTarget = 7` puntos (ventaja de 2, fijo, no tunable): quien lo gana se
+lleva el set entero, sin importar la diferencia de juegos acumulada antes del tie-break.
+
+`State.Games [2]int` / `State.Sets [2]int` son estado de partido nuevo (no viven en `Config`: no
+son tuneables, son el marcador). `Config.SetsToWin` (default 1) es cuántos sets, primero a,
+ganan el partido.
+
+### 21.3 Saque: alterna por JUEGO, no por punto
+
+Pádel real alterna el saque entre equipos **juego a juego**, nunca según quién ganó el último
+punto (eso es `ScoringSimple`, que sigue haciendo "gana el punto, saca el ganador" -- su
+comportamiento de siempre). `awardGamePadel` hace `s.Server = 1 - s.Server` **incondicionalmente**
+en cuanto el juego se cierra, sin mirar quién lo ganó; el orden de saque entre compañeros dentro
+de ese equipo sigue siendo `serverPlayerIndex` (§19.5, sin cambios).
+
+`Config.FirstServer` (0 o 1, default 0) decide qué equipo abre el saque del partido
+(`NewMatch`/`resetForServe`). La alternancia por juego **dentro** de un partido ya reparte el saque
+pareja una vez que el partido avanza, pero **no** corrige la ventaja de "siempre sacar primero" si
+se corren muchos partidos independientes seguidos (p.ej. un torneo bot-vs-bot): quien arma ese
+harness debe alternar `FirstServer` 0/1 entre partidos él mismo -- el campo es el mecanismo, no la
+política.
+
+### 21.4 Eventos nuevos
+
+| Evento | Side | Cuándo |
+|---|---|---|
+| `EvGamePoint` | el equipo que sirve | el punto recién anotado deja a ese equipo a un punto de ganar el juego actual |
+| `EvBreakPoint` | el equipo que NO sirve | idem, pero para el receptor (rompería el saque) |
+| `EvGameWon` | ganador del juego | el juego se cerró (`hasWonGamePadel` o el tie-break) |
+| `EvSetWon` | ganador del set | el set se cerró (`hasWonSetGames` o el tie-break) |
+| `EvAce` | el sacador | ver §21.5 |
+| `EvMatchWon` | ganador del partido | `Sets[ganador] >= Config.SetsToWin`; **reemplaza** a `EvGameOver` en `ScoringPadel` (`ScoringSimple` sigue emitiendo `EvGameOver`, nunca ambos a la vez) |
+
+`EvGamePoint`/`EvBreakPoint` se calculan mirando, para cada equipo, si **el próximo** punto (no el
+que se acaba de jugar) cerraría el juego -- es decir, se emiten como advertencia de cara al punto
+que viene, no como resumen del que ya pasó.
+
+### 21.5 Ace
+
+Un Ace es un saque legal que el receptor **nunca llega a tocar**: `RallyState.ServeUntouched` se
+pone en `true` en cuanto el pique del saque es válido (`judgeServeBounce` limpia
+`ServeBoxPending`), y se limpia a `false` en el primer toque legal del receptor
+(`judgeKickEvent`). Si el punto se decide (segundo pique del lado receptor sin que nadie lo haya
+tocado) mientras sigue en `true` y lo gana el equipo que sacó, `awardPointPadel` antepone un
+`EvAce` al `EvPoint`.
+
+### 21.6 Volea de un saque que todavía no picó
+
+Bug encontrado por el agente de IA (bot-vs-bot) y corregido antes de cerrar esta wave: el pádel
+real exige que el saque **pique una vez en el cajón** antes de que el receptor pueda jugarlo --
+devolverlo de volea es falta del receptor, no del sacador. `judgeServeVolley` (`serve.go`)
+intercepta cualquier `EvKick`/`EvBodyHit` del equipo receptor mientras `RallyState.ServeBoxPending`
+sigue activo y le **otorga el punto al sacador de inmediato**, sin pasar por
+`serveFault`/`replayServe` (no es falta del sacador: no se gasta un intento de saque, no hay doble
+falta). Un toque del propio equipo sacador en esa misma ventana (p.ej. un body hit contra su propio
+saque) no se intercepta: cae al juez genérico de un-toque-por-equipo, que lo trata como doble
+toque normal.
+
+**Invariante reforzado**: `State.Players[Rally.ServerPlayer].Team == State.Server` debe cumplirse
+siempre que `Phase` sea `PhaseServe` o `PhaseRally` (se relaja durante `PhasePoint`: `Server` ya
+apunta al próximo sacador apenas se otorga el punto, pero `ServerPlayer` -- "quién sacó ESTE punto"
+-- no se recalcula hasta que `resetForServe` corre al final de la pausa). Verificado en
+`TestInvariant_ServerPlayerTeamMatchesServer` y en el soak (`assertServerPlayerInvariant`).
+
+---
+
+## 22. Predicción (marcador de pique y anillo de timing)
+
+Lookahead de trayectoria puro, determinista y sin allocs, para que el cliente pueda dibujar
+*dónde* va a picar la pelota y *cuándo* un jugador la alcanzaría si se quedara parado donde está --
+sin tener que re-simular nada del lado del cliente (`sim/predict.go`).
+
+### 22.1 `PredictBall` ahora es bounce-aware
+
+Antes de esta wave, `PredictBall` sólo integraba gravedad+drag (sin rebotes), y `strike.go`
+(`improvesNextTick`) y `ai/predict.go` cada uno mantenía su propio espejo de la resolución de
+red/piso/pared de `physics.go` por separado -- dos copias del mismo modelo de rebote a mantener en
+sync a mano. `PredictBall` ahora espeja exactamente `stepBall` (mismo orden: red → piso → pared,
+mismo modelo de spin §10), sin mutar `State` ni emitir eventos:
+
+```go
+func PredictBall(b Ball, cfg *Config, ticks int) Ball
+```
+
+Misma firma pública que antes, así que ningún llamador existente rompió. `ai/predict.go` queda con
+una duplicación ahora innecesaria (ver nota en §20.6/§20.9) -- limpiarla es tarea de quien posea
+`ai/`.
+
+### 22.2 `PredictLanding`: el próximo pique
+
+```go
+func PredictLanding(s *State) (pos Vec3, ticks int, ok bool)
+```
+
+Devuelve el próximo contacto de la pelota con el piso (rebote real o quedar en reposo -- el mismo
+flanco que `resolveFloor` usaría para emitir `EvBounceFloor`), y en cuántos ticks a partir de
+ahora. `ok = false` si no pica dentro de `predictLandingHorizonTicks` (3 s) -- por ejemplo, ya está
+en reposo, o vuela para siempre dado el `Config` actual. El cliente usa esto para el **marcador de
+pique**: un punto/retícula en el piso que se mueve a medida que la trayectoria predicha cambia
+tick a tick.
+
+### 22.3 `PredictContact`: el anillo de timing
+
+```go
+func PredictContact(s *State, player int) (ticks int, part BodyPart, quality Quality, ok bool)
+```
+
+Responde "si este jugador se quedara exactamente donde está, ¿en qué tick y con qué parte del
+cuerpo la tocaría, y qué calidad resultaría?" -- usando las mismas tablas que `strike.go`
+(`bestPart`/`qualityOf`), sobre la trayectoria predicha con `PredictBall`. **Simplificación
+deliberada** (vs. un intercept-solver completo tipo `ai/`): no considera que el jugador podría
+moverse; es una lectura de "si no te movés, así te va", suficiente para un indicador de HUD de
+"se acerca, prepará el golpe" en vez de una IA de posicionamiento. `ok = false` si ninguna parte
+entra en rango dentro de `predictContactHorizonTicks` (1.5 s, igual que `StrikeBufferTime` orden de
+magnitud). El cliente usa `ticks` para un **anillo que se va cerrando** (estilo osu!) hasta el
+contacto perfecto, y `part`/`quality` para el feedback visual de qué golpe sería y qué tan bien
+saldría si se soltara ahora mismo.
+
+### 22.4 Snapshot
+
+Ver §20.9/§20.3: la pelota aporta un bloque (`SnapLanding*`, sin dueño) y cada jugador activo
+aporta su propio bloque de contacto (`SnapP*Contact*`); los slots inactivos quedan en cero
+(`ContactOk = 0`).

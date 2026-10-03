@@ -18,7 +18,7 @@ func NewMatch(cfg Config) *Match {
 	if cfg.Mode == ModePlayground {
 		setupPlayground(&m.state)
 	} else {
-		resetForServe(&m.state, 0)
+		resetForServe(&m.state, cfg.FirstServer)
 	}
 	return m
 }

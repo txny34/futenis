@@ -74,6 +74,63 @@ const (
 	SnapP3Buffer
 	SnapP3Flags
 
+	// Dash addition (docs/design/contact-v2.md "Dash"): appended at the end
+	// so every index above keeps its position. One flag per player (1 =
+	// DashTicks > 0, i.e. the dash impulse is currently overriding normal
+	// accel) for client-side animation; the sim itself never reads these
+	// back.
+	SnapP0DashActive
+	SnapP1DashActive
+	SnapP2DashActive
+	SnapP3DashActive
+
+	// --- scoring additions (docs/design/contact-v2.md "Puntuación de
+	// pádel"), appended after the Dash flags: nothing above this line ever
+	// moves. Only meaningful when Cfg.ScoringMode == ScoringPadel; in
+	// ScoringSimple, SnapPoints0/1 mirror the legacy flat Score and
+	// SnapGames0/1/SnapSets0/1 stay 0. ---
+	SnapPoints0 // pointDisplayCode(Score[0], Score[1], GoldenPoint): 0/15/30/40/Adv as 0..4
+	SnapPoints1
+	SnapGames0
+	SnapGames1
+	SnapSets0
+	SnapSets1
+	SnapServerPlayer // Rally.ServerPlayer: which State.Players index serves this point
+	SnapRallyShots   // Rally.ShotCount: legal touches so far this rally
+
+	// --- prediction additions (docs/design/contact-v2.md "Predicción
+	// (marcador de pique y anillo de timing)"), appended after the scoring
+	// block: nothing above this line ever moves. SnapLanding* describes the
+	// BALL's next floor contact (PredictLanding), independent of any
+	// player; SnapP*Contact* describes, per player, the earliest predicted
+	// contact if that player stayed exactly where they are (PredictContact)
+	// -- the client uses this to draw a landing marker and a per-player
+	// "timing ring" that closes at the predicted contact tick. ---
+	SnapLandingX
+	SnapLandingZ
+	SnapLandingTicks
+	SnapLandingOk // 1 if PredictLanding found a floor contact within its horizon, else 0 (X/Z/Ticks are 0)
+
+	SnapP0ContactTicks
+	SnapP0ContactPart
+	SnapP0ContactQuality
+	SnapP0ContactOk
+
+	SnapP1ContactTicks
+	SnapP1ContactPart
+	SnapP1ContactQuality
+	SnapP1ContactOk
+
+	SnapP2ContactTicks
+	SnapP2ContactPart
+	SnapP2ContactQuality
+	SnapP2ContactOk
+
+	SnapP3ContactTicks
+	SnapP3ContactPart
+	SnapP3ContactQuality
+	SnapP3ContactOk
+
 	SnapLen
 )
 
@@ -99,6 +156,58 @@ func WriteSnapshot(s *State, dst []float64) {
 	dst[SnapP3X], dst[SnapP3Y], dst[SnapP3Z] = s.Players[3].Pos.X, s.Players[3].Pos.Y, s.Players[3].Pos.Z
 
 	writePlayerExtras(s, dst)
+	writeDashFlags(s, dst)
+	writeScoring(s, dst)
+	writePrediction(s, dst)
+}
+
+// writePrediction fills the "Predicción" snapshot block (docs/design/
+// contact-v2.md "Predicción (marcador de pique y anillo de timing)"):
+// PredictLanding once for the ball, PredictContact once per active player
+// (inactive slots -- NumPlayers < 4 -- get SnapLen's zero value: Ok=0).
+func writePrediction(s *State, dst []float64) {
+	landing, landingTicks, landingOk := PredictLanding(s)
+	dst[SnapLandingX] = landing.X
+	dst[SnapLandingZ] = landing.Z
+	dst[SnapLandingTicks] = float64(landingTicks)
+	dst[SnapLandingOk] = boolToFloat(landingOk)
+
+	starts := [MaxPlayers]int{SnapP0ContactTicks, SnapP1ContactTicks, SnapP2ContactTicks, SnapP3ContactTicks}
+	for i, base := range starts {
+		if int8(i) >= s.NumPlayers {
+			continue
+		}
+		ticks, part, quality, ok := PredictContact(s, i)
+		dst[base+0] = float64(ticks)
+		dst[base+1] = float64(part)
+		dst[base+2] = float64(quality)
+		dst[base+3] = boolToFloat(ok)
+	}
+}
+
+// writeScoring fills the "Puntuación de pádel" snapshot block
+// (docs/design/contact-v2.md "Puntuación de pádel"). In ScoringSimple,
+// Points0/1 mirror the flat Score (pointDisplayCode degenerates to the raw
+// value for the low range Simple actually uses) and Games/Sets stay 0.
+func writeScoring(s *State, dst []float64) {
+	golden := s.Cfg.GoldenPoint
+	dst[SnapPoints0] = float64(pointDisplayCode(s.Score[0], s.Score[1], golden))
+	dst[SnapPoints1] = float64(pointDisplayCode(s.Score[1], s.Score[0], golden))
+	dst[SnapGames0] = float64(s.Games[0])
+	dst[SnapGames1] = float64(s.Games[1])
+	dst[SnapSets0] = float64(s.Sets[0])
+	dst[SnapSets1] = float64(s.Sets[1])
+	dst[SnapServerPlayer] = float64(s.Rally.ServerPlayer)
+	dst[SnapRallyShots] = float64(s.Rally.ShotCount)
+}
+
+// writeDashFlags fills the per-player DashActive flags appended at the end
+// of the layout (docs/design/contact-v2.md "Dash").
+func writeDashFlags(s *State, dst []float64) {
+	flags := [MaxPlayers]int{SnapP0DashActive, SnapP1DashActive, SnapP2DashActive, SnapP3DashActive}
+	for i, idx := range flags {
+		dst[idx] = boolToFloat(s.Players[i].DashTicks > 0)
+	}
 }
 
 // writePlayerExtras writes every player's Vel/Stamina/Charge/OnGround/

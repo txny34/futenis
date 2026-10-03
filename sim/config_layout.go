@@ -82,6 +82,23 @@ const (
 	// addresses by position.
 	cfgServeTimeLimit
 
+	// Dash additions (docs/design/contact-v2.md "Dash") are appended after
+	// cfgServeTimeLimit, the previous end of the layout, so no existing
+	// index moves.
+	cfgDashSpeed
+	cfgDashTime
+	cfgDashStaminaCost
+	cfgDashCooldownTime
+
+	// Scoring additions (docs/design/contact-v2.md "Puntuación de pádel")
+	// are appended after cfgDashCooldownTime, the previous end of the
+	// layout, so no existing index moves. GoldenPoint is written as 0/1.
+	cfgScoringMode
+	cfgGoldenPoint
+	cfgGamesPerSet
+	cfgSetsToWin
+	cfgFirstServer
+
 	// CfgScalarLen is the number of scalar (non-Parts) tunable floats.
 	CfgScalarLen
 )
@@ -155,6 +172,17 @@ func WriteConfig(c *Config, dst []float64) {
 	dst[cfgPointsToWin] = float64(c.PointsToWin)
 	dst[cfgMode] = float64(c.Mode)
 	dst[cfgServeTimeLimit] = c.ServeTimeLimit
+
+	dst[cfgDashSpeed] = c.DashSpeed
+	dst[cfgDashTime] = c.DashTime
+	dst[cfgDashStaminaCost] = c.DashStaminaCost
+	dst[cfgDashCooldownTime] = c.DashCooldownTime
+
+	dst[cfgScoringMode] = float64(c.ScoringMode)
+	dst[cfgGoldenPoint] = boolToFloat(c.GoldenPoint)
+	dst[cfgGamesPerSet] = float64(c.GamesPerSet)
+	dst[cfgSetsToWin] = float64(c.SetsToWin)
+	dst[cfgFirstServer] = float64(c.FirstServer)
 
 	writePartsBlock(c, dst[CfgPartsStart:])
 }
@@ -239,6 +267,17 @@ func ReadConfig(src []float64) Config {
 	c.PointsToWin = int(src[cfgPointsToWin])
 	c.Mode = Mode(src[cfgMode])
 	c.ServeTimeLimit = src[cfgServeTimeLimit]
+
+	c.DashSpeed = src[cfgDashSpeed]
+	c.DashTime = src[cfgDashTime]
+	c.DashStaminaCost = src[cfgDashStaminaCost]
+	c.DashCooldownTime = src[cfgDashCooldownTime]
+
+	c.ScoringMode = ScoringMode(src[cfgScoringMode])
+	c.GoldenPoint = src[cfgGoldenPoint] != 0
+	c.GamesPerSet = int(src[cfgGamesPerSet])
+	c.SetsToWin = int(src[cfgSetsToWin])
+	c.FirstServer = int8(src[cfgFirstServer])
 
 	c.Parts = readPartsBlock(src[CfgPartsStart:])
 	c.Sanitize()

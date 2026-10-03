@@ -146,6 +146,7 @@ func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
 		r.LastTeam = e.Side
 		r.LastPlayer = e.Player
 		r.BouncesOnSide = [2]int{}
+		r.ShotCount++
 		// wave1-C: LastTeam is only ever -1 right after resetForServe/
 		// replayServe, so this first touch is always the serve's opening
 		// strike -- open the serve-return box judge (docs/design/
@@ -157,7 +158,9 @@ func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
 
 // judgeKickEvent handles an EvKick once a rally is underway: a kick by the
 // current kicker's own team is a double touch (faultOnKickerSide); a kick
-// by the other team is a legal return that becomes the new LastTeam.
+// by the other team is a legal return that becomes the new LastTeam. A
+// legal return also clears ServeUntouched (scoring.go's Ace detection):
+// from here on the receiving team has touched the serve at least once.
 func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	if e.Side == k {
 		return faultOnKickerSide(r, k)
@@ -165,6 +168,8 @@ func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	r.LastTeam = e.Side
 	r.LastPlayer = e.Player
 	r.BouncesOnSide = [2]int{}
+	r.ShotCount++
+	r.ServeUntouched = false
 	return 0, false
 }
 
@@ -216,10 +221,24 @@ func hasWonGame(winnerScore, loserScore, pointsToWin int) bool {
 	return winnerScore >= pointsToWin+deuceCap
 }
 
-// awardPoint increments the winner's score, emits EvPoint, and either ends
-// the match (EvGameOver, once hasWonGame agrees) or starts the point pause
-// before the next serve.
+// awardPoint dispatches to the configured scoring model (docs/design/
+// contact-v2.md "Puntuación de pádel"): ScoringSimple keeps today's flat
+// point-tally behaviour (awardPointSimple) untouched; ScoringPadel runs the
+// real points/games/sets model (scoring.go's awardPointPadel).
 func awardPoint(s *State, winner int8, ev []Event) []Event {
+	if s.Cfg.ScoringMode == ScoringPadel {
+		return awardPointPadel(s, winner, ev)
+	}
+	return awardPointSimple(s, winner, ev)
+}
+
+// awardPointSimple increments the winner's score, emits EvPoint, and either
+// ends the match (EvGameOver, once hasWonGame agrees) or starts the point
+// pause before the next serve. This is the legacy v1 "first to
+// Config.PointsToWin, win by 2" model, kept byte-for-byte for
+// ScoringSimple (the zero value -- every pre-existing test and
+// Playground/tuning use).
+func awardPointSimple(s *State, winner int8, ev []Event) []Event {
 	s.Score[winner]++
 	ev = append(ev, Event{Kind: EvPoint, Tick: s.Tick, Side: winner, Player: -1})
 	if hasWonGame(s.Score[winner], s.Score[1-winner], s.Cfg.PointsToWin) {

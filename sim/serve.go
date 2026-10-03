@@ -148,9 +148,28 @@ func judgeServeReturn(s *State, e Event, ev []Event) (handled bool, out []Event)
 		return true, serveFault(s, k, ev)
 	case EvOut:
 		return true, serveFault(s, k, ev)
+	case EvKick, EvBodyHit:
+		return judgeServeVolley(s, k, e, ev)
 	default:
 		return false, ev
 	}
+}
+
+// judgeServeVolley handles a touch while the serve's own return flight is
+// still pending (RallyState.ServeBoxPending): real padel requires the serve
+// to bounce once in the receiver's diagonal box before anyone may play it.
+// The receiving team touching it early (a volley return) forfeits the
+// point to the server's team OUTRIGHT -- this is the receiver's fault, not
+// the server's, so it bypasses serveFault/replayServe entirely (no serve
+// attempt is consumed, no double-fault bookkeeping). A touch by the
+// server's own team (e.Side == k, e.g. an own body hit before the ball even
+// lands) is left unhandled so the generic one-touch double-touch rule
+// (judgeKickEvent) decides it instead.
+func judgeServeVolley(s *State, k int8, e Event, ev []Event) (handled bool, out []Event) {
+	if e.Side == k {
+		return false, ev
+	}
+	return true, awardPoint(s, k, ev)
 }
 
 // judgeServeBounce resolves the serve's own first bounce after the
@@ -169,6 +188,11 @@ func judgeServeBounce(s *State, k int8, e Event, ev []Event) []Event {
 	}
 	r.ServeBoxPending = false
 	r.BouncesOnSide[e.Side]++
+	// scoring.go's Ace detection: the serve just landed legally and the
+	// receiving team has not touched it yet. judgeKickEvent clears this the
+	// moment they do; if the point is decided before that (a second bounce
+	// on the receiving side with nobody touching it), it is an Ace.
+	r.ServeUntouched = true
 	return ev
 }
 

@@ -169,6 +169,15 @@ type Player struct {
 	BufTarget   Vec3     // destination frozen at release (Y = BallRadius)
 	BufSpin     int8     // spin frozen at release
 	StruckAt    uint32   // tick of this player's last contact (body-collision grace, §7.4)
+
+	// Dash (Rocket League dodge spirit, coexists with sprint/stamina;
+	// docs/design/contact-v2.md "Dash"). DashTicks is ticks of override
+	// remaining on the current dash impulse (0 = not dashing); while > 0,
+	// movement.go's stepPlayerHorizontal lets it stand in place of normal
+	// accel instead of capping it. DashCooldown is ticks remaining before
+	// another dash may be triggered, independent of DashTicks.
+	DashTicks    uint16
+	DashCooldown uint16
 }
 
 // Phase is which stage of a point the match is in.
@@ -206,6 +215,22 @@ const (
 	EvToss       // the server released/dropped the ball for a serve attempt (§7.5)
 	EvServeFault // a serve attempt failed (out of the diagonal box, net-no-cross, wall before bounce, or a miss) — docs/design/contact-v2.md §7.5
 	EvLet        // the serve touched the net but still landed in the correct box; the attempt repeats without counting as a fault
+
+	// Dash addition (docs/design/contact-v2.md "Dash"), appended after EvLet
+	// so every existing numeric value keeps its wire meaning.
+	EvDash // a player triggered the dash impulse
+
+	// Real-padel scoring additions (docs/design/contact-v2.md "Puntuación
+	// de pádel"), appended after EvDash so every existing numeric value
+	// keeps its wire meaning. Only ever emitted when Config.ScoringMode ==
+	// ScoringPadel (scoring.go); ScoringSimple keeps emitting the legacy
+	// EvPoint/EvGameOver pair exactly as before.
+	EvGamePoint  // Side is one point away from winning the current game
+	EvBreakPoint // Side (the non-server team) is one point away from winning the server's game
+	EvGameWon    // Side won the current game (Rally.Games incremented)
+	EvSetWon     // Side won the current set (Rally.Sets incremented)
+	EvAce        // Side's serve was never touched by the receiver and won the point outright
+	EvMatchWon   // Side won the match (Config.SetsToWin sets); replaces EvGameOver for ScoringPadel
 )
 
 // Event is emitted by Step. Side meaning depends on Kind:
@@ -262,6 +287,17 @@ type RallyState struct {
 	// (resetForServe/replayServe rebuild RallyState from scratch); reset to
 	// 0 the moment the ball is tossed. See enforceServeClock in rules.go.
 	ServeWaitTicks int
+
+	// --- scoring (docs/design/contact-v2.md "Puntuación de pádel") ---
+	// ShotCount is how many legal touches (EvKick/EvBodyHit that became a
+	// new LastTeam) have happened so far this rally, for readability/HUD
+	// (snapshot.go SnapRallyShots). Reset to 0 by resetForServe/replayServe.
+	ShotCount int
+	// ServeUntouched stays true from a legal serve bounce (judgeServeBounce
+	// clearing ServeBoxPending) until the receiving team's first touch; if
+	// the point is won by the server's team while still true, it is an Ace
+	// (scoring.go).
+	ServeUntouched bool
 }
 
 // serveBoxForScore returns which diagonal service box the server must serve
@@ -317,6 +353,15 @@ type State struct {
 	// time that team served, so serverPlayerIndex can alternate partners in
 	// 2v2. -1 until that team has served at least once.
 	LastServerPlayer [2]int8
+
+	// Games/Sets are only meaningful when Cfg.ScoringMode == ScoringPadel
+	// (scoring.go); ScoringSimple never touches them and they stay zero.
+	// Score doubles as "points won in the current game" for ScoringPadel
+	// (0,1,2,3,... -> 0/15/30/40/Adv display, scoring.go's pointDisplayCode)
+	// instead of a separate Points field, since a fresh game always resets
+	// it the same way ScoringSimple resets it for a fresh match.
+	Games [2]int
+	Sets  [2]int
 
 	Rally RallyState
 	Cfg   Config
