@@ -24,14 +24,38 @@ func serveBoxXRange(server int8, cfg *Config) (xMin, xMax float64) {
 	return -cfg.ServiceLineDist, 0
 }
 
-// serveBoxZRange returns the inclusive Z range for diagonal box 0 (right)
-// or 1 (left). Box 0/1 are a fixed physical Z-half of the court (not
-// relative to either player's exact standing position): real padel's
-// "diagonal" geometry collapses to this because the server's own
-// right/left half and the receiver's right/left half are the same
-// physical half of the court, just crossed in X by the net.
-func serveBoxZRange(box int8) (zMin, zMax float64) {
-	if box == 0 {
+// rightSign returns the Z sign of team's own right, seen from its own back
+// wall facing the net: team 0 faces +X so its right is +Z; team 1 faces -X
+// so its right is -Z (docs/design/contact-v2.md §7.5 side convention).
+func rightSign(team int8) float64 {
+	if team == 0 {
+		return 1
+	}
+	return -1
+}
+
+// ServeBoxZSign returns the Z sign of the physical court half that
+// server's serve must land in for RallyState.ServeBox box: box 0 is the
+// RECEIVER's right, box 1 the receiver's left. Exported so the bot (ai/)
+// can aim/stand without duplicating the side convention.
+func ServeBoxZSign(server, box int8) float64 {
+	z := rightSign(1 - server)
+	if box != 0 {
+		return -z
+	}
+	return z
+}
+
+// serveStandZ returns where the server stands in Z for box: its own right
+// for box 0 (even point total), its own left for box 1 -- always the half
+// diagonally opposite the target box, so the serve crosses the court.
+func serveStandZ(server, box int8) float64 {
+	return -ServeBoxZSign(server, box) * servePlayerZOffset
+}
+
+// serveBoxZRange returns the inclusive Z range of server's diagonal box.
+func serveBoxZRange(server, box int8) (zMin, zMax float64) {
+	if ServeBoxZSign(server, box) > 0 {
 		return 0, CourtHalfWidth
 	}
 	return -CourtHalfWidth, 0
@@ -41,7 +65,7 @@ func serveBoxZRange(box int8) (zMin, zMax float64) {
 // serve into diagonal box.
 func inServeBox(pos Vec3, server, box int8, cfg *Config) bool {
 	xMin, xMax := serveBoxXRange(server, cfg)
-	zMin, zMax := serveBoxZRange(box)
+	zMin, zMax := serveBoxZRange(server, box)
 	return pos.X >= xMin && pos.X <= xMax && pos.Z >= zMin && pos.Z <= zMax
 }
 
@@ -53,6 +77,23 @@ func inServiceLineBounceZone(pos Vec3, server int8, cfg *Config) bool {
 		return false
 	}
 	return math.Abs(pos.X) > cfg.ServiceLineDist
+}
+
+// newServiceTurn reports whether the point about to be served by team
+// starts a new service turn (2v2 partner rotation, serverPlayerIndex):
+// ScoringPadel -- the first point of a game, or in a tiebreak every point
+// where the serve changes hands (total points 0, 1, 3, 5, ...);
+// ScoringSimple (no games) -- whenever team regains the serve from the
+// other team (Rally.ServerPlayer still names the previous point's server).
+func newServiceTurn(s *State, team int8) bool {
+	if s.Cfg.ScoringMode != ScoringPadel {
+		return s.Players[s.Rally.ServerPlayer].Team != team
+	}
+	total := s.Score[0] + s.Score[1]
+	if isTiebreak(s) {
+		return total == 0 || total%2 == 1
+	}
+	return total == 0
 }
 
 // --- the drop (toss) ----------------------------------------------------
@@ -163,9 +204,14 @@ func judgeServeReturn(s *State, e Event, ev []Event) (handled bool, out []Event)
 // attempt is consumed, no double-fault bookkeeping). A touch by the
 // server's own team (e.Side == k, e.g. an own body hit before the ball even
 // lands) is left unhandled so the generic one-touch double-touch rule
-// (judgeKickEvent) decides it instead.
+// (judgeKickEvent) decides it instead -- EXCEPT a touch by the server's
+// partner (2v2): real padel calls a serve that hits the server's own
+// partner a serve fault (counts toward a double fault), not a lost point.
 func judgeServeVolley(s *State, k int8, e Event, ev []Event) (handled bool, out []Event) {
 	if e.Side == k {
+		if e.Player != s.Rally.ServerPlayer {
+			return true, serveFault(s, k, ev)
+		}
 		return false, ev
 	}
 	return true, awardPoint(s, k, ev)
@@ -244,17 +290,35 @@ func replayServe(s *State, server int8, attempt uint8) {
 // placeServe positions every active player and the ball for a serve by
 // `server` (shared by resetForServe's fresh point and replayServe's
 // same-point retry).
+// The server stands on the half diagonally opposite RallyState.ServeBox
+// (serveStandZ); the receiver(s) stand per their slot (1v1: diagonal to
+// the server).
 func placeServe(s *State, server int8) {
+	z := serveStandZ(server, s.Rally.ServeBox)
 	if s.NumPlayers >= 4 {
 		setupDoublesPositions(s)
+		putServerOnSide(s, server, z)
 	} else {
 		s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset}, Team: 0, OnGround: true, Stamina: 1}
 		s.Players[1] = Player{Pos: Vec3{X: servePlayerOffset}, Team: 1, OnGround: true, Stamina: 1}
+		s.Players[server].Pos.Z = z
+		s.Players[1-server].Pos.Z = -z
 	}
 
 	ballX := -serveBallOffset
 	if server == 1 {
 		ballX = serveBallOffset
 	}
-	s.Ball = Ball{Pos: Vec3{X: ballX, Y: serveBallHeight}}
+	s.Ball = Ball{Pos: Vec3{X: ballX, Y: serveBallHeight, Z: z}}
+}
+
+// putServerOnSide swaps the serving team's two partners' Z (2v2) when the
+// server (RallyState.ServerPlayer) is not already standing at z.
+func putServerOnSide(s *State, server int8, z float64) {
+	sp := s.Rally.ServerPlayer
+	if s.Players[sp].Pos.Z == z {
+		return
+	}
+	a, b := teamPlayers(server)
+	s.Players[a].Pos.Z, s.Players[b].Pos.Z = s.Players[b].Pos.Z, s.Players[a].Pos.Z
 }

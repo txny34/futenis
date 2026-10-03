@@ -20,16 +20,21 @@ func TestServeBoxXRange(t *testing.T) {
 	}
 }
 
+// TestServeBoxZRange: box 0 is the RECEIVER's right (diagonal serve), so
+// the physical Z half depends on who serves. Previously box 0 was +Z for
+// both servers, which made team 0's serve go down the line, not diagonal.
 func TestServeBoxZRange(t *testing.T) {
 	cases := []struct {
-		box              int8
+		server, box      int8
 		wantMin, wantMax float64
 	}{
-		{0, 0, CourtHalfWidth},
-		{1, -CourtHalfWidth, 0},
+		{0, 0, -CourtHalfWidth, 0},
+		{0, 1, 0, CourtHalfWidth},
+		{1, 0, 0, CourtHalfWidth},
+		{1, 1, -CourtHalfWidth, 0},
 	}
 	for _, c := range cases {
-		min, max := serveBoxZRange(c.box)
+		min, max := serveBoxZRange(c.server, c.box)
 		assertFloat(t, "min", min, c.wantMin)
 		assertFloat(t, "max", max, c.wantMax)
 	}
@@ -47,13 +52,14 @@ func TestInServeBox(t *testing.T) {
 		box    int8
 		want   bool
 	}{
-		{"server0 box0: center of the box is legal", Vec3{X: 3, Z: 2}, 0, 0, true},
-		{"server0 box0: on the box boundaries is legal", Vec3{X: cfg.ServiceLineDist, Z: CourtHalfWidth}, 0, 0, true},
-		{"server0 box0: net-line edge (X=0) is legal", Vec3{X: 0, Z: 1}, 0, 0, true},
-		{"server0 box0: wrong Z half (box 1 territory) is illegal", Vec3{X: 3, Z: -2}, 0, 0, false},
-		{"server0 box0: past the service line is illegal", Vec3{X: cfg.ServiceLineDist + 0.01, Z: 2}, 0, 0, false},
-		{"server0 box0: on the server's own side is illegal", Vec3{X: -3, Z: 2}, 0, 0, false},
-		{"server0 box1: negative Z half is legal", Vec3{X: 3, Z: -2}, 0, 1, true},
+		// Server 0's box 0 is team 1's right = -Z (diagonal; was +Z before the fix).
+		{"server0 box0: center of the box is legal", Vec3{X: 3, Z: -2}, 0, 0, true},
+		{"server0 box0: on the box boundaries is legal", Vec3{X: cfg.ServiceLineDist, Z: -CourtHalfWidth}, 0, 0, true},
+		{"server0 box0: net-line edge (X=0) is legal", Vec3{X: 0, Z: -1}, 0, 0, true},
+		{"server0 box0: wrong Z half (box 1 territory) is illegal", Vec3{X: 3, Z: 2}, 0, 0, false},
+		{"server0 box0: past the service line is illegal", Vec3{X: cfg.ServiceLineDist + 0.01, Z: -2}, 0, 0, false},
+		{"server0 box0: on the server's own side is illegal", Vec3{X: -3, Z: -2}, 0, 0, false},
+		{"server0 box1: positive Z half is legal", Vec3{X: 3, Z: 2}, 0, 1, true},
 		{"server1 box0: negative X half, Z>=0 is legal", Vec3{X: -3, Z: 2}, 1, 0, true},
 		{"server1 box0: positive X (server's own side) is illegal", Vec3{X: 3, Z: 2}, 1, 0, false},
 		{"server1 box1: negative X, negative Z is legal", Vec3{X: -3, Z: -2}, 1, 1, true},

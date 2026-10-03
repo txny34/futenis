@@ -307,7 +307,10 @@ func TestResetForServe(t *testing.T) {
 		}
 	})
 
-	t.Run("2v2 places all 4 players and alternates the serving partner next time", func(t *testing.T) {
+	// The partner now changes per SERVICE TURN, not per point (real padel,
+	// §19.5): the same team serving again with no change of hands keeps
+	// the same server; regaining the serve hands it to the partner.
+	t.Run("2v2 places all 4 players and alternates the serving partner next turn", func(t *testing.T) {
 		s := newRulesTestState()
 		s.NumPlayers = 4
 		s.LastServerPlayer = [2]int8{-1, -1}
@@ -323,8 +326,13 @@ func TestResetForServe(t *testing.T) {
 		}
 
 		resetForServe(&s, 0)
+		if s.Rally.ServerPlayer != 0 {
+			t.Fatalf("same turn: ServerPlayer got %d, want 0", s.Rally.ServerPlayer)
+		}
+		resetForServe(&s, 1)
+		resetForServe(&s, 0)
 		if s.Rally.ServerPlayer != 1 {
-			t.Fatalf("second serve by the same team: ServerPlayer got %d, want 1 (alternate partner)", s.Rally.ServerPlayer)
+			t.Fatalf("team 0's next turn: ServerPlayer got %d, want 1 (alternate partner)", s.Rally.ServerPlayer)
 		}
 	})
 }

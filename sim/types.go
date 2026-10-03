@@ -274,7 +274,7 @@ type RallyState struct {
 	// serve adapted to feet, overriding the original self-toss design),
 	// set by resetForServe (rules.go) and the serve judge (serve.go).
 	ServeAttempt uint8 // 1 = first serve, 2 = second serve (after a fault)
-	ServeBox     int8  // 0 = right diagonal box, 1 = left diagonal box; alternates every point (serveBoxForScore)
+	ServeBox     int8  // 0 = RECEIVER's right box, 1 = receiver's left (diagonal to the server, ServeBoxZSign); alternates every point (serveBoxForScore)
 
 	// Real-padel serve judge state (docs/design/contact-v2.md
 	// §7.5, serve.go). Zero value for all three is correct at the start of
@@ -318,22 +318,25 @@ func serveBoxForScore(score [2]int) int8 {
 	return int8(total % 2)
 }
 
-// serverPlayerIndex returns which of State.Players is allowed to serve for
-// team, alternating between partners each time that team serves again
-// (docs/design/contact-v2.md "Modos y 2v2": chosen serve-order rule — NOT real padel's full round-robin across all 4 players turn by
-// turn across games, which needs a game/set model this codebase doesn't
-// have yet; this is the simplest rule that still gives both partners the
-// serve). In 1v1 there is exactly one player per team, so it is always
-// that player.
-//
-// teamPlayers(team) fixes the array-index convention: team 0 = {0,1}, team
-// 1 = {2,3} (slot 0 = right, slot 1 = left).
+// serverPlayerIndex returns which of State.Players serves for team. 1v1:
+// always that team's only player. 2v2 (docs/design/contact-v2.md §19.5,
+// real padel): one player keeps the serve for a whole service turn
+// (newServiceTurn, serve.go); each new turn of that team hands it to the
+// partner of whoever served its previous turn, so with games alternating
+// teams the order is A1, B1, A2, B2, ... teamPlayers fixes the indices:
+// team 0 = {0,1}, team 1 = {2,3}.
 func serverPlayerIndex(s *State, team int8) int8 {
 	if s.NumPlayers < 4 {
 		return team
 	}
 	a, b := teamPlayers(team)
-	if s.LastServerPlayer[team] == a {
+	last := s.LastServerPlayer[team]
+	switch {
+	case last < 0:
+		return a
+	case !newServiceTurn(s, team):
+		return last
+	case last == a:
 		return b
 	}
 	return a
@@ -355,8 +358,8 @@ type State struct {
 	Ball       Ball
 	Players    [MaxPlayers]Player
 
-	// LastServerPlayer remembers, per team, which Players index served last
-	// time that team served, so serverPlayerIndex can alternate partners in
+	// LastServerPlayer remembers, per team, which Players index served that
+	// team's last service turn, so serverPlayerIndex can rotate partners in
 	// 2v2. -1 until that team has served at least once.
 	LastServerPlayer [2]int8
 

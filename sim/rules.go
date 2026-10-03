@@ -300,14 +300,20 @@ func resetForServe(s *State, server int8) {
 }
 
 // setupDoublesPositions places all 4 players for a 2v2 serve: each team's
-// two partners start on either side of the center line (Slot 0 = right, 1 =
-// left), per the teamPlayers index convention (team 0 = {0,1}, team 1 =
-// {2,3}).
+// two partners start on either side of the center line, Slot 0 on that
+// team's OWN right (rightSign: +Z for team 0, -Z for team 1), Slot 1 on its
+// left, per the teamPlayers index convention (team 0 = {0,1}, team 1 =
+// {2,3}). placeServe then moves the server onto its serve side.
 func setupDoublesPositions(s *State) {
-	s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset, Z: servePlayerZOffset}, Team: 0, Slot: 0, OnGround: true, Stamina: 1}
-	s.Players[1] = Player{Pos: Vec3{X: -servePlayerOffset, Z: -servePlayerZOffset}, Team: 0, Slot: 1, OnGround: true, Stamina: 1}
-	s.Players[2] = Player{Pos: Vec3{X: servePlayerOffset, Z: servePlayerZOffset}, Team: 1, Slot: 0, OnGround: true, Stamina: 1}
-	s.Players[3] = Player{Pos: Vec3{X: servePlayerOffset, Z: -servePlayerZOffset}, Team: 1, Slot: 1, OnGround: true, Stamina: 1}
+	for i := int8(0); i < 4; i++ {
+		team, slot := i/2, i%2
+		z := rightSign(team) * servePlayerZOffset
+		if slot == 1 {
+			z = -z
+		}
+		x := -forwardSign(team) * servePlayerOffset
+		s.Players[i] = Player{Pos: Vec3{X: x, Z: z}, Team: team, Slot: slot, OnGround: true, Stamina: 1}
+	}
 }
 
 // setupPlayground places the lone human straight into PhaseRally with no

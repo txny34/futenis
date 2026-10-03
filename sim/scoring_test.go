@@ -31,7 +31,7 @@ func TestHasWonGamePadel(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := hasWonGamePadel(c.w, c.l, c.golden); got != c.wantDecided {
+			if got := hasWonGamePadel(c.w, c.l, gamePoints, c.golden); got != c.wantDecided {
 				t.Errorf("hasWonGamePadel(%d,%d,golden=%v): got %v, want %v", c.w, c.l, c.golden, got, c.wantDecided)
 			}
 		})
@@ -330,8 +330,8 @@ func TestAwardPointPadel_AceWhenServeNeverTouched(t *testing.T) {
 	s.Phase = PhaseRally
 
 	ev := judgeRally(&s, []Event{
-		{Kind: EvKick, Side: 0, Player: 0},                    // server's opening strike
-		{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: 1}}, // legal landing in the box
+		{Kind: EvKick, Side: 0, Player: 0},                     // server's opening strike
+		{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: -1}}, // legal landing in box 0 (receiver team 1's right = -Z, diagonal fix)
 	})
 	// First bounce only legalizes the box; nothing decided yet.
 	for _, e := range ev {
@@ -341,7 +341,7 @@ func TestAwardPointPadel_AceWhenServeNeverTouched(t *testing.T) {
 	}
 
 	ev = judgeRally(&s, []Event{
-		{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: 1}}, // second bounce, still untouched
+		{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: -1}}, // second bounce, still untouched
 	})
 
 	foundAce, foundPoint := false, false
@@ -373,7 +373,7 @@ func TestAwardPointPadel_NoAceWhenReceiverTouchesFirst(t *testing.T) {
 
 	judgeRally(&s, []Event{
 		{Kind: EvKick, Side: 0, Player: 0},
-		{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: 1}},
+		{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: -1}},
 	})
 	if !s.Rally.ServeUntouched {
 		t.Fatalf("ServeUntouched: got false, want true right after the legal serve bounce")
