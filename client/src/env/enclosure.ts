@@ -1,25 +1,28 @@
 import * as THREE from "three";
 import { THEME } from "./theme";
 
-// Visual padel enclosure (sim walls are unchanged): 3 m glass on both back
-// walls and the first 2 m of each side wall, metal mesh up to 4 m, mesh on
-// the middle of the sides, dark metal posts. The near back wall (behind the
+// Visual padel enclosure (sim walls are unchanged): framed 2 m glass panels,
+// 3 m tall on both back walls and the first 2 m of each side wall, then the
+// 2 m tall "escalón" panel, metal mesh above the glass up to 4 m / 3 m, mesh
+// on the middle of the sides, dark metal posts. The near back wall (behind the
 // human camera) gets no mesh and almost invisible glass so it never blocks view.
 const HALF_L = 10;
 const HALF_W = 5;
 const GLASS_H = 3;
 const FENCE_TOP = 4;
 const SIDE_GLASS_LEN = 2;
+const STEP_GLASS_H = 2; // second side panel, one step lower
+const PANEL_W = 2; // glass is split into framed panels this wide
 const MID_MESH_H = 3;
 const POST_W = 0.08;
 const POST_SPACING = 2;
 const TEX_PX = 64;
-const WIRE_PX = 5;
-const MESH_CELL_M = 0.1; // one texture tile = 10 cm grid
+const WIRE_PX = 9;
+const MESH_CELL_M = 0.08; // one texture tile = 8 cm grid
 const MESH_ALPHA_TEST = 0.4;
-const GLASS_OPACITY = 0.07;
-const NEAR_GLASS_OPACITY = 0.015;
-const EDGE_OPACITY = 0.55;
+const GLASS_OPACITY = 0.17;
+const NEAR_GLASS_OPACITY = 0.03;
+const EDGE_OPACITY = 0.9;
 const NEAR_EDGE_OPACITY = 0.08;
 const METAL_ROUGHNESS = 0.45;
 const METAL_METALNESS = 0.7;
@@ -70,13 +73,23 @@ function place(o: THREE.Object3D, h: number, x: number, y0: number, z: number, a
   o.rotation.y = alongZ ? Math.PI / 2 : 0;
 }
 
-function glassPanel(m: Mats, w: number, x: number, z: number, alongZ: boolean, near: boolean): THREE.Object3D[] {
-  const geo = new THREE.PlaneGeometry(w, GLASS_H);
-  const pane = new THREE.Mesh(geo, near ? m.nearGlass : m.glass);
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), near ? m.nearEdge : m.edge);
-  place(pane, GLASS_H, x, 0, z, alongZ);
-  place(edge, GLASS_H, x, 0, z, alongZ);
-  return [pane, edge];
+function glassPanel(m: Mats, w: number, h: number, x: number, z: number, alongZ: boolean, near: boolean): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
+  const n = Math.max(1, Math.round(w / PANEL_W));
+  const pw = w / n;
+  const geo = new THREE.PlaneGeometry(pw, h);
+  const edges = new THREE.EdgesGeometry(geo);
+  for (let i = 0; i < n; i++) {
+    const off = -w / 2 + pw * (i + 0.5);
+    const px = alongZ ? x : x + off;
+    const pz = alongZ ? z + off : z;
+    const pane = new THREE.Mesh(geo, near ? m.nearGlass : m.glass);
+    const edge = new THREE.LineSegments(edges, near ? m.nearEdge : m.edge);
+    place(pane, h, px, 0, pz, alongZ);
+    place(edge, h, px, 0, pz, alongZ);
+    out.push(pane, edge);
+  }
+  return out;
 }
 
 function meshPanel(m: Mats, w: number, h: number, x: number, y0: number, z: number, alongZ: boolean): THREE.Mesh {
@@ -110,17 +123,21 @@ export function buildEnclosure(): THREE.Group {
   const m = makeMats();
   const g = new THREE.Group();
   const backW = 2 * HALF_W;
-  const midLen = 2 * (HALF_L - SIDE_GLASS_LEN);
-  g.add(...glassPanel(m, backW, -HALF_L, 0, true, true));
-  g.add(...glassPanel(m, backW, HALF_L, 0, true, false));
+  const midHalf = HALF_L - 2 * SIDE_GLASS_LEN;
+  g.add(...glassPanel(m, backW, GLASS_H, -HALF_L, 0, true, true));
+  g.add(...glassPanel(m, backW, GLASS_H, HALF_L, 0, true, false));
   g.add(meshPanel(m, backW, FENCE_TOP - GLASS_H, HALF_L, GLASS_H, 0, true));
   for (const z of [-HALF_W, HALF_W]) {
     for (const sx of [-1, 1]) {
+      const near = sx < 0; // near-side glass fades so it never frames the view
       const cx = sx * (HALF_L - SIDE_GLASS_LEN / 2);
-      g.add(...glassPanel(m, SIDE_GLASS_LEN, cx, z, false, sx < 0)); // near-side glass fades so it never frames the view
+      const stepX = sx * (HALF_L - SIDE_GLASS_LEN * 1.5);
+      g.add(...glassPanel(m, SIDE_GLASS_LEN, GLASS_H, cx, z, false, near));
       g.add(meshPanel(m, SIDE_GLASS_LEN, FENCE_TOP - GLASS_H, cx, GLASS_H, z, false));
+      g.add(...glassPanel(m, SIDE_GLASS_LEN, STEP_GLASS_H, stepX, z, false, near));
+      g.add(meshPanel(m, SIDE_GLASS_LEN, MID_MESH_H - STEP_GLASS_H, stepX, STEP_GLASS_H, z, false));
     }
-    g.add(meshPanel(m, midLen, MID_MESH_H, 0, 0, z, false));
+    g.add(meshPanel(m, 2 * midHalf, MID_MESH_H, 0, 0, z, false));
   }
   g.add(posts(m));
   return g;

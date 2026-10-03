@@ -49,7 +49,6 @@
 .act__ring { fill: none; stroke: var(--hud-accent); stroke-width: 4; stroke-linecap: round; }
 .act--strike .act__ring { stroke: var(--hud-ring); }
 .act__icon { fill: none; stroke: var(--hud-text); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
-.act--sprint .act__icon { fill: var(--hud-text); stroke-width: 1.5; }
 .act__label { font-size: calc(12px * var(--hud-scale)); font-weight: 600; white-space: nowrap; }
 .act__key {
   font: 600 calc(10px * var(--hud-scale)) / 1.4 var(--fx-body, system-ui); color: var(--hud-muted);
@@ -60,10 +59,15 @@
 .act.is-warn .act__ring { stroke: var(--hud-warn); }
 .act.is-warn .act__icon { stroke: var(--hud-warn); fill: var(--hud-warn); }
 
-/* Spin chip (same anatomy as a button, no ring) */
-.act-spin { border-left: 1px solid var(--hud-border); padding-left: calc(12px * var(--hud-scale)); }
-.act-spin[data-spin="-1"] .act__icon { stroke: var(--hud-team1); transform: scaleX(-1); transform-origin: 32px 32px; }
-.act-spin[data-spin="1"] .act__icon { stroke: var(--hud-ring); }
+/* Crosshair while the pointer is locked: above center like the reference (keep in sync with AIM_NDC_Y in input.ts) */
+#crosshair {
+  position: absolute; top: 37.5%; left: 50%; width: 14px; height: 14px; transform: translate(-50%, -50%);
+  background:
+    linear-gradient(var(--hud-text), var(--hud-text)) center / 2px 100% no-repeat,
+    linear-gradient(var(--hud-text), var(--hud-text)) center / 100% 2px no-repeat;
+  opacity: .8; filter: drop-shadow(0 0 2px #000);
+}
+#crosshair[hidden] { display: none; }
 
 @media (max-width: 640px) {
   #actions { gap: 6px; padding: 6px 8px; }
@@ -113,8 +117,9 @@
 .popup[hidden] { display: none; }
 .popup[data-tone="perfect"] { color: #ffd23f; }
 .popup[data-tone="good"] { color: var(--hud-accent); font-size: calc(24px * var(--hud-scale)); }
-.popup.is-live { animation: fx-pop .9s ease-out both; }
-@keyframes fx-pop {
+.popup[data-tone="miss"] { color: var(--hud-warn); font-size: calc(20px * var(--hud-scale)); }
+.popup.is-live { animation: hud-pop .9s ease-out both; }
+@keyframes hud-pop {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
   15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); }
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), -260%) scale(1); }

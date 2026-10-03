@@ -13,6 +13,8 @@ const FPS_CAP_SLACK_MS = 0.5; // rAF jitter tolerance so a 60 cap on a 60 Hz scr
 const HIT_STOP_MS = 50; // perfect-hit freeze frame
 const POPUP_LIFT_M = 0.8; // popup starts this far above the contact point
 const POPUP_DIR_SPEED = 4; // m/s of lateral (Z) shot speed mapped to full drift
+const SERVE_AIM_MIN_X = 1; // serve aim assist: keep the crosshair target inside the service box depth
+const SERVE_AIM_MAX_X = 6.2; // a bit short of the service line (6.95)
 export const HUMAN_SLOT = 0;
 
 /** Mutable state the menu/settings drive. Read every frame, never reallocated. */
@@ -94,7 +96,6 @@ export class GameLoop {
     this.view.render(this.frame.prev, this.frame.curr, this.acc / TICK_S, live && !frozen ? dt : 0, this.human);
     this.hud.update(this.frame.curr, now);
     this.hud.setFps(this.fps);
-    this.hud.setSpin(this.controls.spinLevel);
     this.checkMatchOver();
   };
 
@@ -105,6 +106,7 @@ export class GameLoop {
       return;
     }
     const input = this.controls.sample(this.view.camera);
+    this.assistServeAim(input);
     this.human.targetX = input.targetX;
     this.human.targetZ = input.targetZ;
     this.engine.setInput(HUMAN_SLOT, input);
@@ -117,6 +119,13 @@ export class GameLoop {
       for (let i = 0; i < this.frame.eventCount; i++) this.onEvent(this.frame.events[i], now);
     }
     this.acc = Math.min(this.acc, TICK_S);
+  }
+
+  /** While the human serves, the aim depth is held inside the service box (the box is drawn on court). */
+  private assistServeAim(input: { targetX: number }): void {
+    const s = this.frame.curr;
+    if (s[Snap.Phase] !== Phase.Serve || s[Snap.Server] !== 0) return;
+    input.targetX = Math.max(SERVE_AIM_MIN_X, Math.min(SERVE_AIM_MAX_X, input.targetX));
   }
 
   private onEvent(e: SimEvent, now: number): void {

@@ -19,16 +19,13 @@ const BREATH_HZ = 0.3;
 const BREATH_ROT = 0.03;
 const BREATH_SCALE = 0.02;
 
-const RUN_LEG_AMP = 0.6;
-const SPRINT_LEG_AMP = 0.55;
+// Single run cycle (sprint was folded in): roughly the old run/sprint midpoint.
+const RUN_LEG_AMP = 0.85;
 const RUN_KNEE_BASE = 0.25;
-const RUN_KNEE_SWING = 1.1;
-const SPRINT_KNEE_SWING = 0.6;
-const RUN_ARM_AMP = 0.9;
-const SPRINT_ARM_AMP = 0.5;
+const RUN_KNEE_SWING = 1.4;
+const RUN_ARM_AMP = 1.1;
 const RUN_ELBOW = 0.9;
-const RUN_LEAN = 0.15;
-const SPRINT_LEAN = 0.4;
+const RUN_LEAN = 0.3;
 const HIP_TWIST = 0.2;
 const CHEST_COUNTER_TWIST = 0.35;
 const RUN_BOUNCE = 0.04;
@@ -69,13 +66,13 @@ export function applyIdle(b: Bones, time: number, k: number): void {
   b.neck.rotation.x += breath * BREATH_ROT - READY_LEAN * k * 0.5;
 }
 
-/** Run/sprint cycle at `phase` (radians). k = speed weight, sprint = 0..1. */
-export function applyLocomotion(b: Bones, phase: number, k: number, sprint: number): void {
+/** Run cycle at `phase` (radians). k = speed weight (amplitude grows with speed). */
+export function applyLocomotion(b: Bones, phase: number, k: number): void {
   const s = Math.sin(phase);
   const c = Math.cos(phase);
-  const leg = (RUN_LEG_AMP + SPRINT_LEG_AMP * sprint) * k;
-  const knee = RUN_KNEE_SWING + SPRINT_KNEE_SWING * sprint;
-  const arm = (RUN_ARM_AMP + SPRINT_ARM_AMP * sprint) * k;
+  const leg = RUN_LEG_AMP * k;
+  const knee = RUN_KNEE_SWING;
+  const arm = RUN_ARM_AMP * k;
   b.upLegL.rotation.x -= s * leg;
   b.upLegR.rotation.x += s * leg;
   b.legL.rotation.x += k * (RUN_KNEE_BASE + knee * Math.max(0, c));
@@ -84,10 +81,10 @@ export function applyLocomotion(b: Bones, phase: number, k: number, sprint: numb
   b.upperArmR.rotation.x -= s * arm;
   b.foreArmL.rotation.x -= RUN_ELBOW * k;
   b.foreArmR.rotation.x -= RUN_ELBOW * k;
-  b.spine.rotation.x += (RUN_LEAN + SPRINT_LEAN * sprint) * k;
+  b.spine.rotation.x += RUN_LEAN * k;
   b.hips.rotation.y += s * HIP_TWIST * k;
   b.chest.rotation.y -= s * CHEST_COUNTER_TWIST * k;
-  b.neck.rotation.x -= (RUN_LEAN + SPRINT_LEAN * sprint) * k * 0.6;
+  b.neck.rotation.x -= RUN_LEAN * k * 0.6;
   b.hips.position.y += RUN_BOUNCE * k * (Math.abs(c) - 0.5);
 }
 

@@ -3,17 +3,15 @@ import type { ShotKindId } from "./feel/shots";
 import { ActionBar } from "./hud-actions";
 import { Callouts } from "./hud-callouts";
 import { CallTracker } from "./hud-calls";
-import { Popups, POPUP_GOOD, POPUP_PERFECT } from "./hud-popups";
+import { Popups, POPUP_GOOD, POPUP_MISS, POPUP_PERFECT } from "./hud-popups";
 import { Scoreboard } from "./hud-score";
 import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
 
 const NAMES = ["Local", "Visita"] as const; // team colors come from the theme, so no color names
 const HELP_TEXT =
-  "WASD mover · Mouse apuntar · Click izq. patear (mantener = carga) · Click der. globo · " +
-  "Rueda efecto · Espacio salto · Shift sprint · Q dash · Esc pausa";
+  "WASD mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · Espacio salto · " +
+  "Q dash · Ctrl mouse libre · Esc pausa";
 const PLAYGROUND_HELP = " · B nueva pelota";
-const SPIN_LABELS = ["Cortado", "Plano", "Liftado"] as const;
-const SPIN_KEY = "Rueda";
 const CALL_MS = 1800;
 const SERVE_HINT = "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado";
 const HUMAN_TEAM = 0;
@@ -28,20 +26,18 @@ export class Hud {
   private readonly err = el("err");
   private readonly help = el("help");
   private readonly fps = el("fps");
-  private readonly spin = el("spin");
+  private readonly crosshair = el("crosshair");
   private readonly call = el("call");
   private readonly hint = el("hint");
   private readonly calls = new CallTracker();
   private readonly board = new Scoreboard();
   private readonly banner = new Callouts();
   private readonly popups = new Popups();
-  private readonly spinText = document.createElement("span");
   private readonly actions: ActionBar;
   private callUntil = 0;
   private lastPhase = UNSET;
   private lastServer = UNSET;
   private lastMode = UNSET;
-  private lastSpin = UNSET;
   private lastFps = UNSET;
   private dashAt = -Infinity;
   private dashCooldownMs = DEFAULT_DASH_COOLDOWN_S * MS_PER_S;
@@ -53,11 +49,11 @@ export class Hud {
     this.hint.hidden = true;
     this.hint.textContent = SERVE_HINT;
     applyThemeCss(root);
-    this.buildSpinChip();
-    this.actions = new ActionBar(this.spin);
+    this.crosshair.hidden = true;
+    this.actions = new ActionBar();
     root.append(
       this.board.score, this.board.shots, this.msg, this.banner.root, this.call, this.hint,
-      this.popups.root, this.actions.root, this.fps, this.help, this.err,
+      this.popups.root, this.crosshair, this.actions.root, this.fps, this.help, this.err,
     );
   }
 
@@ -73,12 +69,8 @@ export class Hud {
     this.fps.textContent = `${r} FPS`;
   }
 
-  setSpin(level: number): void {
-    if (level === this.lastSpin) return;
-    this.lastSpin = level;
-    this.spinText.textContent = SPIN_LABELS[level + 1] ?? "";
-    this.spin.dataset.spin = String(level);
-  }
+  /** Center crosshair, shown while the pointer is locked. */
+  setCrosshair(visible: boolean): void { this.crosshair.hidden = !visible; }
 
   /** New match: drop transient banners/cooldowns. */
   resetMatch(): void {
@@ -102,6 +94,7 @@ export class Hud {
   hitPopup(quality: number, x: number, y: number, dir: number, nowMs: number): void {
     if (quality === Quality.Perfect) this.popups.spawn(POPUP_PERFECT, "perfect", x, y, dir, nowMs);
     else if (quality === Quality.Good) this.popups.spawn(POPUP_GOOD, "good", x, y, dir, nowMs);
+    else this.popups.spawn(POPUP_MISS, "miss", x, y, dir, nowMs);
   }
 
   update(snap: Float64Array, nowMs: number): void {
@@ -125,18 +118,6 @@ export class Hud {
   }
 
   error(text: string): void { this.err.textContent = text; }
-
-  /** Spin indicator chip living in the action bar: icon + level + key label. */
-  private buildSpinChip(): void {
-    this.spin.innerHTML =
-      `<svg viewBox="0 0 64 64" class="act__svg" aria-hidden="true"><circle cx="32" cy="32" r="25" class="act__track"/>` +
-      `<path class="act__icon" d="M20 32 a12 12 0 1 1 12 12 M32 44 l-5 -4 M32 44 l-5 4"/></svg>`;
-    this.spinText.className = "act__label";
-    const key = document.createElement("kbd");
-    key.className = "act__key";
-    key.textContent = SPIN_KEY;
-    this.spin.append(this.spinText, key);
-  }
 }
 
 function message(phase: number, server: number): string {

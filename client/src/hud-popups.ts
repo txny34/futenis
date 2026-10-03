@@ -1,4 +1,4 @@
-// Floating hit text ("¡PERFECTO!" / "¡BIEN!") that rises from the contact
+// Floating hit text ("¡PERFECTO!" / "¡BIEN!" / "FALLIDO") that rises from the contact
 // point and drifts toward the shot direction while fading. Small pool of
 // DOM nodes; position/drift go through CSS custom properties.
 const POOL = 3;
@@ -8,6 +8,7 @@ const ANIM_CLASS = "is-live";
 
 export const POPUP_PERFECT = "¡PERFECTO!";
 export const POPUP_GOOD = "¡BIEN!";
+export const POPUP_MISS = "FALLIDO";
 
 interface Popup { readonly el: HTMLDivElement; until: number }
 
@@ -27,7 +28,7 @@ export class Popups {
     }
   }
 
-  /** x/y: normalized screen point (0..1). dir: -1 left, 0 straight, +1 right. tone: "perfect" | "good". */
+  /** x/y: normalized screen point (0..1). dir: -1 left, 0 straight, +1 right. tone: "perfect" | "good" | "miss". */
   spawn(text: string, tone: string, x: number, y: number, dir: number, nowMs: number): void {
     const p = this.pool[this.next];
     this.next = (this.next + 1) % POOL;
