@@ -41,6 +41,7 @@ type Bot struct {
 	holdTicks   int     // ticks the current charge has been held
 	shot        uint8   // BtnStrike or BtnLob while charging, else 0
 	aimed       bool    // target/shot latched for the coming contact
+	mistimed    bool    // this shot will be released far too early (Level.MissChance)
 	pendingShot uint8   // shot to press once the charge window opens
 	chargeWant  int     // desired charge ticks for the latched shot
 	cooldown    int     // ticks left of a released strike buffer (no re-press)
@@ -118,7 +119,7 @@ func unit(h uint64) float64 { return float64(h>>11) * 0x1p-53 }
 // signed maps hash bits to [-1, 1).
 func signed(h uint64) float64 { return unit(h)*2 - 1 }
 
-func (b *Bot) resetCharge() { b.shot, b.holdTicks, b.aimed = 0, 0, false }
+func (b *Bot) resetCharge() { b.shot, b.holdTicks, b.aimed, b.mistimed = 0, 0, false, false }
 
 // release lets go of the charge and blocks re-pressing while the sim's
 // strike buffer is live (a re-press would cancel it).

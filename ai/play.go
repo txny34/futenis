@@ -69,6 +69,10 @@ func (b *Bot) isChaser(s *sim.State, slot int) bool {
 	return mine < theirs || mine == theirs && slot < mate
 }
 
+// mistimeTicks is how much earlier than its buffer window a mistimed shot
+// is released: far enough that the strike buffer expires before contact.
+const mistimeTicks = 30
+
 // strike presses (latching aim) once contact is within the charge window,
 // and releases as soon as a contact falls inside the strike buffer window
 // (sim's improvesNextTick then picks the best tick of that window).
@@ -92,6 +96,9 @@ func (b *Bot) strike(s *sim.State, slot int, in sim.PlayerInput) sim.PlayerInput
 	window := buf - 1
 	if b.Level.TimingError > 0 {
 		window += int(unit(b.hash(s, slot, 3)) * float64(b.Level.TimingError+1))
+	}
+	if b.mistimed {
+		window += mistimeTicks
 	}
 	if b.holdTicks > 1 && (contactSoon(b.belief, me, cfg, window, maxContactErr, b.win.min) || b.holdTicks > maxHoldTicks) {
 		b.release(cfg)
@@ -122,6 +129,7 @@ func (b *Bot) chooseShot(s *sim.State, slot int) {
 	wide := sim.CourtHalfWidth - b.Level.LineMargin
 	shot := sim.BtnStrike
 	b.spin = 0
+	b.mistimed = unit(b.hash(s, slot, 9)) < b.Level.MissChance
 	if unit(b.hash(s, slot, 4)) < b.Level.Decision {
 		b.aimZ = -math.Copysign(wide, oz)
 		b.aimX = fwd * (sim.CourtHalfLength - b.Level.LineMargin - 0.5)

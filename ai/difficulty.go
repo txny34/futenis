@@ -47,16 +47,20 @@ type Level struct {
 	// DropChance is how often a smart shot is a short backspin drop when
 	// the opponent is deep.
 	DropChance float64
+	// MissChance is 0..1, how often a shot is badly mistimed (released far
+	// too early, a whiff). With the aim assist nobody hits the net or out,
+	// so these misses are what end rallies between bots.
+	MissChance float64
 	// UsesSpin / UsesJump enable spin selection and jumping for high balls.
 	UsesSpin, UsesJump bool
 }
 
 // levels are the presets indexed by Difficulty.
 var levels = [difficultyCount]Level{
-	Easy:   {ReactionTicks: 30, AimNoise: 2.0, Decision: 0.3, PosError: 0.5, TimingError: 6, ChargeError: 0.35, MinSprintStamina: 0.0, NetMargin: 0.6, LineMargin: 1.5, DropChance: 0.05},
-	Normal: {ReactionTicks: 18, AimNoise: 1.2, Decision: 0.6, PosError: 0.35, TimingError: 3, ChargeError: 0.2, MinSprintStamina: 0.2, NetMargin: 0.5, LineMargin: 1.2, DropChance: 0.15, UsesSpin: true},
-	Hard:   {ReactionTicks: 9, AimNoise: 0.6, Decision: 0.85, PosError: 0.25, TimingError: 1, ChargeError: 0.1, MinSprintStamina: 0.3, NetMargin: 0.35, LineMargin: 0.9, DropChance: 0.25, UsesSpin: true, UsesJump: true},
-	Pro:    {ReactionTicks: 0, AimNoise: 0.25, Decision: 1.0, PosError: 0.15, TimingError: 0, ChargeError: 0, MinSprintStamina: 0.35, NetMargin: 0.2, LineMargin: 0.6, DropChance: 0.35, UsesSpin: true, UsesJump: true},
+	Easy:   {ReactionTicks: 30, AimNoise: 2.0, Decision: 0.3, PosError: 0.5, TimingError: 6, ChargeError: 0.35, MinSprintStamina: 0.0, NetMargin: 0.6, LineMargin: 1.5, DropChance: 0.05, MissChance: 0.22},
+	Normal: {ReactionTicks: 18, AimNoise: 1.2, Decision: 0.6, PosError: 0.35, TimingError: 3, ChargeError: 0.2, MinSprintStamina: 0.2, NetMargin: 0.5, LineMargin: 1.2, DropChance: 0.15, MissChance: 0.12, UsesSpin: true},
+	Hard:   {ReactionTicks: 9, AimNoise: 0.6, Decision: 0.85, PosError: 0.25, TimingError: 1, ChargeError: 0.1, MinSprintStamina: 0.3, NetMargin: 0.35, LineMargin: 0.9, DropChance: 0.25, MissChance: 0.06, UsesSpin: true, UsesJump: true},
+	Pro:    {ReactionTicks: 0, AimNoise: 0.25, Decision: 1.0, PosError: 0.15, TimingError: 0, ChargeError: 0, MinSprintStamina: 0.35, NetMargin: 0.2, LineMargin: 0.6, DropChance: 0.35, MissChance: 0.03, UsesSpin: true, UsesJump: true},
 }
 
 // LevelOf returns the preset for d (out-of-range values clamp to Pro).

@@ -96,3 +96,17 @@ func TestLevelOfClampsAndString(t *testing.T) {
 		t.Fatal("String")
 	}
 }
+
+// TestMissChanceScalesWithDifficulty: every bot can misjudge a shot (the
+// aim assist means nobody hits the net or out, so mistimed swings are what
+// end rallies), easier bots more often.
+func TestMissChanceScalesWithDifficulty(t *testing.T) {
+	prev := 2.0
+	for d := Easy; d <= Pro; d++ {
+		m := LevelOf(d).MissChance
+		if m <= 0 || m >= prev {
+			t.Fatalf("%v MissChance=%v, want 0 < it < %v (strictly decreasing)", d, m, prev)
+		}
+		prev = m
+	}
+}
