@@ -91,6 +91,34 @@ func TestRunFrameWritesCountAndCurr(t *testing.T) {
 			t.Fatalf("curr[%d]=%v want %v", i, out[outCurr+i], w)
 		}
 	}
+	curr := out[outCurr:outEventCount]
+	if curr[sim.SnapTick] != float64(st.Tick) || curr[sim.SnapNumPlayers] != 2 {
+		t.Fatalf("tick=%v players=%v", curr[sim.SnapTick], curr[sim.SnapNumPlayers])
+	}
+	assertInactiveContactCleared(t, curr)
+	assertBinary(t, curr, sim.SnapLandingOk, sim.SnapP0ContactOk, sim.SnapP1ContactOk)
+}
+
+// assertInactiveContactCleared: in 1v1, slots 2/3 have no PredictContact
+// block; a reused (dirty) out buffer must still read Ok=0 there, never stale data.
+func assertInactiveContactCleared(t *testing.T, curr []float64) {
+	t.Helper()
+	for _, base := range []int{sim.SnapP2ContactTicks, sim.SnapP3ContactTicks} {
+		for k := 0; k < 4; k++ {
+			if curr[base+k] != 0 {
+				t.Fatalf("inactive contact slot curr[%d]=%v want 0", base+k, curr[base+k])
+			}
+		}
+	}
+}
+
+func assertBinary(t *testing.T, curr []float64, idx ...int) {
+	t.Helper()
+	for _, i := range idx {
+		if v := curr[i]; v != 0 && v != 1 {
+			t.Fatalf("flag curr[%d]=%v want 0 or 1", i, v)
+		}
+	}
 }
 
 // TestRunFrameHeldInputPersistsAcrossTicks is a regression test for the v2

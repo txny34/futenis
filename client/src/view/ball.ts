@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 
 // Ball readability (cosmetic only; the sim radius is untouched): oversized
 // neon ball, speed trail, floor shadow + marker ring and a vertical height
@@ -6,8 +7,9 @@ import * as THREE from "three";
 const BALL_PHYS_R = 0.11; // mirrors sim ball radius
 const BALL_VIS_SCALE = 1.4;
 const BALL_R = BALL_PHYS_R * BALL_VIS_SCALE;
-const BALL_COLOR = 0xe6ff1f;
-const BALL_EMISSIVE = 0x7a8a00;
+const BALL_COLOR = THEME.ball;
+const BALL_EMISSIVE = THEME.ballEmissive;
+const BALL_EMISSIVE_INTENSITY = 1.8; // pushes the ball over the bloom threshold
 const SEGMENTS = 24;
 const RINGS = 16;
 const FLOOR_Y = 0.006;
@@ -43,7 +45,7 @@ export class BallView {
   constructor(scene: THREE.Scene) {
     this.ball = new THREE.Mesh(
       new THREE.SphereGeometry(BALL_R, SEGMENTS, RINGS),
-      new THREE.MeshStandardMaterial({ color: BALL_COLOR, emissive: BALL_EMISSIVE, emissiveIntensity: 1, roughness: 0.4 }),
+      new THREE.MeshStandardMaterial({ color: BALL_COLOR, emissive: BALL_EMISSIVE, emissiveIntensity: BALL_EMISSIVE_INTENSITY, roughness: 0.4 }),
     );
     this.ball.castShadow = true;
     this.ball.renderOrder = OVERLAY_ORDER;

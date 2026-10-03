@@ -38,6 +38,7 @@ func main() {
 	api.Set("getConfig", js.FuncOf(getConfigFn))
 	api.Set("setConfig", js.FuncOf(setConfigFn))
 	api.Set("configLen", sim.CfgLen)
+	api.Set("layout", js.FuncOf(layoutFn))
 	js.Global().Set("futenis", api)
 	select {}
 }
@@ -117,6 +118,22 @@ func checkCfgArg(name string, args []js.Value) string {
 		return fmt.Sprintf("futenis.%s: buffer is %d bytes, want %d", name, got, cfgBytes)
 	}
 	return ""
+}
+
+// layoutFn() -> {snapLen, inputPerPlayer, eventStride, maxEvents, cfgLen}:
+// this build's buffer-layout constants, so the client can assert its own
+// mirrored constants (client/src/snapshot.ts, engine.ts) match this exact
+// build and refuse to run misaligned instead of silently reading garbage
+// out of a stale prev/curr snapshot slice the moment either side appends a
+// field and the other doesn't get rebuilt in step.
+func layoutFn(_ js.Value, _ []js.Value) any {
+	obj := js.Global().Get("Object").New()
+	obj.Set("snapLen", sim.SnapLen)
+	obj.Set("inputPerPlayer", inputPerPlayer)
+	obj.Set("eventStride", eventStride)
+	obj.Set("maxEvents", maxEvents)
+	obj.Set("cfgLen", sim.CfgLen)
+	return obj
 }
 
 // stepFn(n) runs n ticks and publishes the output buffer; returns null or an error string.

@@ -4,6 +4,18 @@ declare class Go {
   run(instance: WebAssembly.Instance): Promise<void>;
 }
 
+/** Buffer-layout constants this wasm build was compiled with (wasm/main.go
+ * layoutFn). The client asserts its own constants match this at load time
+ * instead of silently misaligning prev/curr snapshot slices when either
+ * side appends a field and the other doesn't rebuild (see Engine.load). */
+interface WasmLayout {
+  snapLen: number;
+  inputPerPlayer: number;
+  eventStride: number;
+  maxEvents: number;
+  cfgLen: number;
+}
+
 interface FutenisBridge {
   init(inU8: Uint8Array, outU8: Uint8Array): string | null;
   step(n: number): string | null;
@@ -14,6 +26,8 @@ interface FutenisBridge {
   /** Live tuning (contact-v2 §13). Fills dst with CfgLen LE float64s, or returns a fresh Uint8Array. */
   getConfig(dst?: Uint8Array): Uint8Array | string | null | undefined;
   setConfig(src: Uint8Array): string | null | undefined;
+  /** Optional: absent on an older wasm build predating the layout() export. */
+  layout?(): WasmLayout;
 }
 
 declare var futenis: FutenisBridge | undefined;

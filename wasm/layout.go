@@ -100,6 +100,10 @@ func writeEvent(out []float64, i int, e sim.Event) {
 // human inputs stay the ones copied in once per call.
 func runFrame(m *sim.Match, inputs [sim.MaxPlayers]sim.PlayerInput, n int, out []float64, drv *aiDriver) {
 	n = clamp(n, minSteps, maxSteps)
+	// sim.WriteSnapshot skips inactive player slots (e.g. P2/P3 contact
+	// prediction in 1v1), relying on a zeroed dst; out is reused across
+	// frames, so clear both snapshot blocks to keep those slots at zero.
+	clear(out[outPrev:outEventCount])
 	count := 0
 	for i := 0; i < n; i++ {
 		if i == n-1 {

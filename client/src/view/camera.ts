@@ -1,26 +1,30 @@
 import * as THREE from "three";
 
 // Camera behind the human (team 0, looking down +X). "Fixed" is a stable
-// broadcast-ish framing; "dynamic" follows the human's Z fully-ish and X
-// partially with exponential damping, while the look target leans toward
-// the ball so the ball and the rival back glass (X=+10, Y=3) stay framed.
-const FOV = 55;
+// broadcast-ish framing. "Dynamic" is a sports-game over-the-shoulder view:
+// shoulder height, close behind and slightly to the right of the human,
+// exponentially damped. The look target sits far down the court and leans
+// toward the ball so the ball, the rival and the rival back glass stay framed.
+const FOV = 62;
 const NEAR = 0.1;
 const FAR = 200;
 const FIXED_POS = { x: -15.5, y: 6.2, z: 0 } as const;
 const FIXED_LOOK = { x: 1.5, y: 0.6, z: 0 } as const;
-const BACK_OFFSET = 7.5; // meters behind the human
-const HEIGHT = 4.6;
-const MIN_X = -16; // never further back than this
-const MAX_X = -9.5; // never past this toward the net (keeps the rival glass in frame)
-const FOLLOW_Z = 0.7; // fraction of the human's Z the camera copies
-const LOOK_X_BASE = 2;
-const LOOK_BALL_X = 0.25;
-const LOOK_BALL_Z = 0.25;
-const LOOK_HUMAN_Z = 0.4;
-const LOOK_Y = 0.9;
-const POS_RATE = 3.5; // 1/s damping
-const LOOK_RATE = 4.5;
+const BACK_OFFSET = 5.5; // meters behind the human
+const HEIGHT = 4.0; // high enough to look down on the court (~20° pitch) like sports games
+const SHOULDER_Z = 0; // centered: the human sits in the lower third, court fills the width
+const MIN_X = -16; // may sit outside the near glass (rendered almost invisible)
+const MAX_X = -4; // never past this toward the net
+const FOLLOW_Z = 0.85; // fraction of the human's Z the camera copies
+const LOOK_AHEAD_X = 7; // look target this far ahead of the human...
+const LOOK_MIN_X = 1; // ...but always at least at the net
+const LOOK_BALL_X = 0.3;
+const LOOK_BALL_Z = 0.3;
+const LOOK_HUMAN_Z = 0.5;
+const LOOK_Y = 0;
+const LOOK_BALL_Y = 0.2; // high balls tilt the camera up a little
+const POS_RATE = 4; // 1/s damping
+const LOOK_RATE = 5;
 const SHAKE_DURATION_S = 0.25;
 const SHAKE_AMPLITUDE = 0.1;
 const SHAKE_FREQ_A = 53;
@@ -46,8 +50,12 @@ export class CameraRig {
   update(human: THREE.Vector3 | null, ball: THREE.Vector3, dt: number): void {
     this.time += dt;
     if (this.dynamic && human) {
-      this.goalPos.set(Math.min(MAX_X, Math.max(MIN_X, human.x - BACK_OFFSET)), HEIGHT, human.z * FOLLOW_Z);
-      this.goalLook.set(LOOK_X_BASE + ball.x * LOOK_BALL_X, LOOK_Y, human.z * LOOK_HUMAN_Z + ball.z * LOOK_BALL_Z);
+      this.goalPos.set(Math.min(MAX_X, Math.max(MIN_X, human.x - BACK_OFFSET)), HEIGHT, human.z * FOLLOW_Z + SHOULDER_Z);
+      this.goalLook.set(
+        Math.max(LOOK_MIN_X, human.x + LOOK_AHEAD_X) + ball.x * LOOK_BALL_X,
+        LOOK_Y + ball.y * LOOK_BALL_Y,
+        human.z * LOOK_HUMAN_Z + ball.z * LOOK_BALL_Z,
+      );
     } else {
       this.goalPos.set(FIXED_POS.x, FIXED_POS.y, FIXED_POS.z);
       this.goalLook.set(FIXED_LOOK.x, FIXED_LOOK.y, FIXED_LOOK.z);

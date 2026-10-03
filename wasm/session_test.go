@@ -113,3 +113,27 @@ func TestConfigRoundTripKeepsModeAndPoints(t *testing.T) {
 		t.Fatal("NaN must be rejected")
 	}
 }
+
+func TestConfigureSetsMatchFormatAndAlternatesServer(t *testing.T) {
+	ss := defaultSession()
+	if err := ss.configure(int(sim.Mode1v1), 0, 5, 1); err != nil {
+		t.Fatal(err)
+	}
+	c := ss.match.State().Cfg
+	if c.ScoringMode != sim.ScoringPadel || c.GamesPerSet != padelGamesPerSet || c.SetsToWin != padelSetsToWin {
+		t.Fatalf("1v1 format: %+v", c)
+	}
+	first := c.FirstServer
+	_ = ss.configure(int(sim.Mode2v2), 0, 5, 1)
+	if got := ss.match.State().Cfg; got.FirstServer == first || got.ScoringMode != sim.ScoringPadel {
+		t.Fatalf("2v2 must be padel and alternate server: first=%d got=%d", first, got.FirstServer)
+	}
+	_ = ss.configure(int(sim.ModePlayground), 0, 5, 0b11)
+	if ss.match.State().Cfg.ScoringMode != sim.ScoringSimple {
+		t.Fatal("playground must use simple scoring")
+	}
+	ss.reset()
+	if ss.match.State().Cfg.ScoringMode != sim.ScoringSimple {
+		t.Fatal("reset must keep scoring mode")
+	}
+}

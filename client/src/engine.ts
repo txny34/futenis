@@ -30,11 +30,14 @@ const INPUT_PER_PLAYER = 6; // [moveX, moveZ, targetX, targetZ, buttons, spin]
 const INPUT_LEN = MAX_PLAYERS * INPUT_PER_PLAYER; // 24
 const EVENT_COUNT_OFFSET = 2 * SNAP_LEN;
 const EVENTS_OFFSET = EVENT_COUNT_OFFSET + 1;
-export const OUT_LEN = EVENTS_OFFSET + MAX_EVENTS * EVENT_STRIDE; // 555
+// OUT_LEN/CFG_LEN derive from the same constants layout() asserts against at
+// load time, so a future append on either side fails loudly instead of
+// silently misaligning prev/curr snapshot slices (see assertLayout).
+export const OUT_LEN = EVENTS_OFFSET + MAX_EVENTS * EVENT_STRIDE;
 export const MIN_STEPS = 1;
 export const MAX_STEPS = 15; // wasm maxSteps per call
 /** Mirrors sim.CfgLen (sim/config_layout.go). */
-export const CFG_LEN = 122;
+export const CFG_LEN = 132;
 const F64 = 8;
 
 const emptyEvent = (): SimEvent => ({
@@ -68,6 +71,7 @@ export class Engine {
     void go.run(instance);
     const bridge = globalThis.futenis;
     if (!bridge) throw new Error("WASM no registró el objeto global 'futenis'");
+    assertLayout(bridge);
     check("init", bridge.init(new Uint8Array(this.input.buffer), new Uint8Array(this.out.buffer)));
     this.bridge = bridge;
   }
@@ -143,4 +147,23 @@ export class Engine {
 
 function check(fn: string, err: string | null | undefined): void {
   if (err) throw new Error(`futenis.${fn}: ${err}`);
+}
+
+/**
+ * Compares this wasm build's buffer-layout constants (futenis.layout(),
+ * wasm/main.go) against the client's own mirrored constants, and throws a
+ * descriptive error on any mismatch (surfaced as a HUD error by main.ts's
+ * load()). Without this, a client rebuilt against a newer/older sim --
+ * e.g. an appended snapshot/config field on one side but not the other --
+ * would silently read misaligned prev/curr snapshot slices (players/ball
+ * desync or disappear) instead of failing loudly at load.
+ */
+function assertLayout(bridge: FutenisBridge): void {
+  const got = bridge.layout?.();
+  if (!got) return; // older wasm build predating layout(): nothing to check against
+  const want: WasmLayout = { snapLen: SNAP_LEN, inputPerPlayer: INPUT_PER_PLAYER, eventStride: EVENT_STRIDE, maxEvents: MAX_EVENTS, cfgLen: CFG_LEN };
+  const mismatches = (Object.keys(want) as (keyof WasmLayout)[]).filter((k) => got[k] !== want[k]);
+  if (mismatches.length === 0) return;
+  const detail = mismatches.map((k) => `${k}: wasm=${got[k]} client=${want[k]}`).join(", ");
+  throw new Error(`desalineado cliente/wasm (recompilá ambos): ${detail}`);
 }

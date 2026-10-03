@@ -1,7 +1,7 @@
 /** "Ajustes" screen: tabbed panels that emit immutable settings updates. */
 import { Choice, el, segmented, slider, toggle } from "./dom";
 import {
-  FpsCap, HUD_SCALE_MAX, HUD_SCALE_MIN, Quality, SENS_MAX, SENS_MIN, Settings, VOLUME_MAX, VOLUME_MIN,
+  FpsCap, HUD_SCALE_MAX, LandingMarker, HUD_SCALE_MIN, Quality, SENS_MAX, SENS_MIN, Settings, VOLUME_MAX, VOLUME_MIN,
 } from "./settings";
 
 export type SettingsUpdate = (fn: (s: Settings) => Settings) => void;
@@ -22,6 +22,7 @@ const BINDINGS: readonly (readonly [string, string])[] = [
   ["Efecto", "Rueda"],
   ["Salto", "Espacio"],
   ["Sprint", "Shift"],
+  ["Dash", "Q"],
 ];
 
 const QUALITY_CHOICES: readonly Choice<Quality>[] = [
@@ -29,6 +30,10 @@ const QUALITY_CHOICES: readonly Choice<Quality>[] = [
 ];
 const FPS_CHOICES: readonly Choice<FpsCap>[] = [
   { value: 60, label: "60" }, { value: 144, label: "144" }, { value: 240, label: "240" }, { value: 0, label: "Sin límite" },
+];
+
+const LANDING_CHOICES: readonly Choice<LandingMarker>[] = [
+  { value: "always", label: "Siempre" }, { value: "easy", label: "Solo Fácil" }, { value: "never", label: "Nunca" },
 ];
 
 const SENS_STEP = 0.05;
@@ -77,6 +82,7 @@ function gamePanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
   const set = (patch: Partial<Settings["game"]>): void => up((p) => ({ ...p, game: { ...p.game, ...patch } }));
   return [
     toggle("Círculo de desvío de puntería", s.game.showAimCircle, (showAimCircle) => set({ showAimCircle })),
+    segmented("Marcador de pique", LANDING_CHOICES, s.game.landingMarker, (landingMarker) => set({ landingMarker })),
     toggle("Cámara dinámica (off = fija)", s.game.dynamicCamera, (dynamicCamera) => set({ dynamicCamera })),
     toggle("Vibración de cámara", s.game.cameraShake, (cameraShake) => set({ cameraShake })),
     slider({ label: "Escala del HUD", min: HUD_SCALE_MIN, max: HUD_SCALE_MAX, step: HUD_STEP,

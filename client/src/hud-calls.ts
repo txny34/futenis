@@ -3,7 +3,7 @@ import { EventKind, SimEvent } from "./snapshot";
 // Referee calls from the event stream. EvPoint carries no reason, so the
 // reason is inferred from the rally events that preceded it (client-side
 // heuristic; a sim-side reason field would make this exact).
-const TEAM_NAMES = ["Rojo", "Azul"] as const;
+const TEAM_NAMES = ["Local", "Visita"] as const;
 const REASON_OUT = "pelota afuera";
 const REASON_NET = "red";
 const REASON_WALL = "pared antes del pique";

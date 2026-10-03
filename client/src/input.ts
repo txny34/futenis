@@ -10,6 +10,7 @@ const KEY_DOWN = "KeyS";
 const KEY_LEFT = "KeyA";
 const KEY_RIGHT = "KeyD";
 const KEY_JUMP = "Space";
+const KEY_DASH = "KeyQ";
 const SPRINT_KEYS = ["ShiftLeft", "ShiftRight"] as const;
 const PREVENT_DEFAULT = new Set(["Space", "ArrowUp", "ArrowDown"]);
 const MOUSE_LEFT = 1; // PointerEvent.buttons bit
@@ -83,6 +84,7 @@ export class Controls {
     if (this.mouseButtons & MOUSE_RIGHT) b |= Btn.Lob;
     if (this.down.has(KEY_JUMP)) b |= Btn.Jump;
     if (this.down.has(SPRINT_KEYS[0]) || this.down.has(SPRINT_KEYS[1])) b |= Btn.Sprint;
+    if (this.down.has(KEY_DASH)) b |= Btn.Dash; // held level; the sim detects the press edge itself
     return b;
   }
 

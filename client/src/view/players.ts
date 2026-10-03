@@ -1,11 +1,13 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 import { Character, CharacterPose, DEFAULT_LOOK, StrikePart, createCharacter } from "../character/character";
 import { IMPACT_T } from "../character/strikes";
+import { HitFlash } from "./hit-flash";
 import {
   EventKind, Extra, MAX_PLAYERS, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, SimEvent, Snap, teamOf,
 } from "../snapshot";
 
-const TEAM_SHIRTS = [0xe5484d, 0x3e7bfa] as const;
+const TEAM_SHIRTS = THEME.team;
 const PARTNER_SHORTS = [0xf2f2f2, 0x2b2f36] as const; // slot 0 / slot 1 of a team
 const TICK_RATE = 120; // mirrors sim.TickRate
 const SPEED_REF = 7.5; // m/s mapped to pose.speed = 1 (~sprint speed)
@@ -21,6 +23,7 @@ interface Slot {
   readonly character: Character;
   readonly pose: CharacterPose;
   readonly contact: THREE.Vector3;
+  readonly flash: HitFlash;
   strikeT: number;
   strikePart: StrikePart;
   hasContact: boolean;
@@ -34,7 +37,7 @@ function makeSlot(scene: THREE.Scene): Slot {
   const pose: CharacterPose = {
     speed: 0, sprinting: false, airborne: false, verticalVel: 0, charge: 0, strike, facing: FACE_POS_X,
   };
-  return { character, pose, contact: new THREE.Vector3(), strikeT: 0, strikePart: "foot", hasContact: false };
+  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), strikeT: 0, strikePart: "foot", hasContact: false };
 }
 
 /** Up to 4 procedural characters posed from the interpolated snapshot. Allocation-free per frame. */
@@ -59,6 +62,11 @@ export class PlayersView {
     s.contact.set(e.x, e.y, e.z);
   }
 
+  /** Gold flash on player i (perfect hit). */
+  flash(i: number): void {
+    if (i >= 0 && i < MAX_PLAYERS) this.slots[i].flash.trigger();
+  }
+
   update(prev: Float64Array, curr: Float64Array, alpha: number, dt: number): void {
     const n = curr[Snap.NumPlayers] | 0;
     if (n !== this.lastNumPlayers) this.recolor(n);
@@ -66,6 +74,7 @@ export class PlayersView {
       const s = this.slots[i];
       s.character.root.visible = i < n;
       if (i < n) this.place(i, s, prev, curr, alpha, dt, n);
+      s.flash.update(dt);
     }
   }
 

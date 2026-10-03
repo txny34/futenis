@@ -2,7 +2,9 @@ import type { Engine } from "../engine";
 import { el, slider } from "../ui/dom";
 
 // ?dev=1 live-tuning panel (contact-v2 §13). Indices mirror the scalar order
-// of sim/config_layout.go (cfgGravity = 0 ... cfgMode = 44). Applied between
+// of sim/config_layout.go (cfgGravity = 0 ... cfgMode = 44, cfgServeTimeLimit
+// = 45, Dash 46..49, scoring 50..54; parts table from 55, CfgLen = 132 --
+// re-audited against config_layout.go for the scoring append). Applied between
 // frames via engine.setConfig; never touched by the frame loop.
 interface Param { readonly idx: number; readonly label: string; readonly min: number; readonly max: number; readonly step: number }
 
@@ -33,10 +35,15 @@ const PARAMS: readonly Param[] = [
   { idx: 40, label: "Alcance patada", min: 0.2, max: 3, step: 0.05 },
   { idx: 41, label: "Patada vel. mín", min: 1, max: 30, step: 0.5 },
   { idx: 42, label: "Patada vel. máx", min: 1, max: 40, step: 0.5 },
+  { idx: 46, label: "Dash vel.", min: 0, max: 25, step: 0.1 },
+  { idx: 47, label: "Dash duración (s)", min: 0.02, max: 0.6, step: 0.01 },
+  { idx: 49, label: "Dash cooldown (s)", min: 0, max: 3, step: 0.05 },
 ];
 
 const CFG_POINTS_TO_WIN = 43;
 const CFG_MODE = 44;
+/** cfgScoringMode..cfgFirstServer: match format set by configure(), kept on reset. */
+const CFG_MATCH_FORMAT: readonly number[] = [50, 51, 52, 53, 54];
 const PANEL_STYLE =
   "position:fixed;top:8px;right:8px;width:300px;max-height:90vh;overflow:auto;z-index:50;" +
   "background:rgba(13,17,23,.92);padding:8px;border-radius:8px;font:12px system-ui;color:#e6edf3";
@@ -67,6 +74,7 @@ export function mountDevPanel(engine: Engine, onError: (msg: string) => void): (
       const next = defaults.slice();
       next[CFG_POINTS_TO_WIN] = cfg[CFG_POINTS_TO_WIN]; // keep the current match setup
       next[CFG_MODE] = cfg[CFG_MODE];
+      for (const i of CFG_MATCH_FORMAT) next[i] = cfg[i];
       apply(next);
       rebuild();
     });

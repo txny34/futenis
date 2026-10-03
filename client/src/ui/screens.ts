@@ -1,6 +1,6 @@
 /** Static screens: title, main menu, pre-match setup, pause. Pure builders. */
 import { button, Choice, disabledButton, el, segmented } from "./dom";
-import { DEFAULT_POINTS, Difficulty, GameMode, MatchOptions, POINTS_CHOICES } from "./types";
+import { DEFAULT_POINTS, Difficulty, GameMode, MatchOptions } from "./types";
 
 const DIFFICULTIES: readonly Choice<Difficulty>[] = [
   { value: "easy", label: "Fácil" }, { value: "normal", label: "Normal" },
@@ -47,13 +47,12 @@ export function mainMenu(a: MainActions): HTMLElement {
 
 export function matchSetup(mode: GameMode, onGo: (o: MatchOptions) => void, onBack: () => void): HTMLElement {
   let difficulty: Difficulty = "normal";
-  let pointsToWin = DEFAULT_POINTS;
-  const pts = POINTS_CHOICES.map((p) => ({ value: p, label: String(p) }));
+  const pointsToWin = DEFAULT_POINTS; // legacy simple scoring only; 1v1/2v2 play real padel (wasm configure)
   const rows: HTMLElement[] = [];
   if (mode !== "playground") { // playground: no AI rival, no scoring
     rows.push(
       segmented("Dificultad de la IA", DIFFICULTIES, difficulty, (d) => { difficulty = d; }),
-      segmented("Puntos para ganar", pts, pointsToWin, (p) => { pointsToWin = p; }),
+      el("p", "fx-note", "Pádel: 0 · 15 · 30 · 40 · ventaja — un set a 3 juegos."),
     );
   }
   const actions = el("div", "fx-actions");

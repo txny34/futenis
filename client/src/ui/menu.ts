@@ -49,6 +49,8 @@ export class MenuUI {
     this.emitPause(true);
   }
   hide(): void { this.render("hidden"); }
+  /** Leaves the current match back to the main menu (result screen "Menú"). */
+  exitToMain(): void { this.quit(); }
 
   private resume(): void { this.hide(); this.emitPause(false); }
 

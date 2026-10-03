@@ -6,7 +6,11 @@ export type FpsCap = 60 | 144 | 240 | 0; // 0 = sin límite
 export interface ControlSettings { mouseSensitivity: number }
 export interface VideoSettings { quality: Quality; shadows: boolean; fpsCap: FpsCap; showFps: boolean }
 export interface AudioSettings { master: number; sfx: number; music: number }
-export interface GameplaySettings { showAimCircle: boolean; cameraShake: boolean; dynamicCamera: boolean; hudScale: number }
+/** "Marcador de pique": siempre / solo en Fácil / nunca. */
+export type LandingMarker = "always" | "easy" | "never";
+export interface GameplaySettings {
+  showAimCircle: boolean; cameraShake: boolean; dynamicCamera: boolean; hudScale: number; landingMarker: LandingMarker;
+}
 
 export interface Settings {
   readonly controls: ControlSettings;
@@ -27,12 +31,13 @@ export const HUD_SCALE_MAX = 1.5;
 
 export const QUALITIES: readonly Quality[] = ["low", "med", "high"];
 export const FPS_CAPS: readonly FpsCap[] = [60, 144, 240, 0];
+export const LANDING_MARKERS: readonly LandingMarker[] = ["always", "easy", "never"];
 
 export const DEFAULT_SETTINGS: Settings = {
   controls: { mouseSensitivity: 1 },
   video: { quality: "high", shadows: true, fpsCap: 0, showFps: false },
   audio: { master: 80, sfx: 80, music: 60 },
-  game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1 },
+  game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1, landingMarker: "easy" },
 };
 
 type Rec = Record<string, unknown>;
@@ -85,6 +90,7 @@ export function validateSettings(raw: unknown): Settings {
       cameraShake: bool(g.cameraShake, d.game.cameraShake),
       dynamicCamera: bool(g.dynamicCamera, d.game.dynamicCamera),
       hudScale: num(g.hudScale, HUD_SCALE_MIN, HUD_SCALE_MAX, d.game.hudScale),
+      landingMarker: oneOf(g.landingMarker, LANDING_MARKERS, d.game.landingMarker),
     },
   };
 }
