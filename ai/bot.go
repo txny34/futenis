@@ -52,6 +52,7 @@ type Bot struct {
 	aimX        float64 // latched target
 	aimZ        float64
 	spin        int8
+	serve       servePlan // this serve attempt's variety rolls
 }
 
 // New returns a bot with the preset Level for difficulty, seeded by slot.

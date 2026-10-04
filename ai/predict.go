@@ -158,7 +158,7 @@ func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax
 	ball := start
 	var fallback intercept
 	var path [horizonTicks + 1]sim.Vec3
-	bounces := 0
+	bounces, landed := 0, 0
 	for k := 1; k <= horizonTicks; k++ {
 		var b bool
 		ball, b = stepBall(ball, cfg)
@@ -166,6 +166,9 @@ func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax
 		mine := onTeamSide(ball.Pos.X, p.Team)
 		if b && mine {
 			bounces++
+			if bounces == win.min {
+				landed = k
+			}
 		}
 		if bounces > win.max {
 			break
@@ -183,6 +186,9 @@ func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax
 		}
 		if off < lateral && !clearPath(&path, k-ticksOfSec(cfg.StrikeBufferTime)+2, stand) {
 			continue
+		}
+		if win.min > 0 && !clearPath(&path, landed+1, stand) {
+			continue // a body hit before the required bounce volleys the serve
 		}
 		hit := intercept{ok: true, k: k, ball: ball, stand: stand, errMax: errMax, off: off}
 		if part <= sim.PartKnee {

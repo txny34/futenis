@@ -24,10 +24,11 @@ func (b *Bot) thinkRally(s *sim.State, slot int) sim.PlayerInput {
 	b.missed = false
 	used := s.Rally.BouncesOnSide[me.Team]
 	win := bounceWindow{min: 0, max: 1 - used}
-	if s.Rally.ServeBoxPending {
-		win.min = 1 // the serve must bounce in the box before it is returned
+	if !s.Rally.ServeBoxPending {
+		return b.chase(s, slot, win)
 	}
-	return b.chase(s, slot, win)
+	win.min = 1 // the serve must bounce in the box before it is returned
+	return b.dodgeServe(s, slot, b.chase(s, slot, win))
 }
 
 // chase plans an intercept, moves to it and handles the strike buttons.
@@ -40,16 +41,34 @@ func (b *Bot) chase(s *sim.State, slot int, win bounceWindow) sim.PlayerInput {
 	b.win = win
 	b.refreshPlan(s, me, win)
 	if !b.plan.ok || !b.isChaser(s, slot) {
+		in := b.recover(s, slot)
+		if b.shot != 0 && s.Rally.ServeBoxPending {
+			// Letting go would arm a live strike buffer onto the
+			// unbounced serve (a volley, §21.6): keep holding.
+			in.Buttons |= b.shot
+			return b.withAim(in)
+		}
 		b.resetCharge()
-		return b.recover(s, slot)
+		return in
 	}
 	// Positioning error is rolled per planned contact tick, not per tick.
-	contact := uint64(s.Tick) + uint64(b.plan.k)
-	tx := b.plan.stand.X + signed(sim.Hash64(b.Seed^contact))*b.Level.PosError
-	tz := b.plan.stand.Z + signed(sim.Hash64(b.Seed^contact^0xA5A5))*b.Level.PosError
-	b.tgt = sim.Vec3{X: tx, Z: tz}
-	in := b.moveTo(me, tx, tz, true)
+	b.tgt = b.plan.stand.Add(b.posError(uint64(s.Tick) + uint64(b.plan.k)))
+	in := b.moveTo(me, b.tgt.X, b.tgt.Z, true)
 	return b.strike(s, slot, in)
+}
+
+// posError is the Level.PosError miss at the planned contact. On a serve
+// return (b.win.min > 0) it only slides along the ball's path: a sideways
+// miss could put the body on the falling serve before it bounces (§21.6).
+func (b *Bot) posError(contact uint64) sim.Vec3 {
+	ex := signed(sim.Hash64(b.Seed^contact)) * b.Level.PosError
+	ez := signed(sim.Hash64(b.Seed^contact^0xA5A5)) * b.Level.PosError
+	v := b.plan.ball.Vel
+	l := math.Hypot(v.X, v.Z)
+	if b.win.min == 0 || l < 1e-6 {
+		return sim.Vec3{X: ex, Z: ez}
+	}
+	return sim.Vec3{X: v.X / l * ex, Z: v.Z / l * ex}
 }
 
 // refreshPlan recomputes the intercept every replanEvery ticks.
@@ -124,7 +143,10 @@ func (b *Bot) strike(s *sim.State, slot int, in sim.PlayerInput) sim.PlayerInput
 	if b.Level.TimingError > 0 {
 		early = int(unit(b.hash(s, slot, 3)) * float64(b.Level.TimingError+1))
 	}
-	if b.holdTicks > 1 && (b.releaseNow(me, cfg, early, buf) || b.holdTicks > maxHoldTicks) {
+	// Never release before the serve bounces: the sim's buffer strikes on
+	// any reachable tick, and touching the serve first loses the point.
+	canRelease := b.holdTicks > 1 && !s.Rally.ServeBoxPending
+	if canRelease && (b.releaseNow(me, cfg, early, buf) || b.holdTicks > maxHoldTicks) {
 		b.missed, b.missedShot = b.mistimed, s.Rally.ShotCount
 		b.release(cfg)
 		in.Buttons &^= sim.BtnStrike | sim.BtnLob
