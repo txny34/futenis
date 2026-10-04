@@ -9,12 +9,6 @@ import "math"
 // math.Pow (docs/design/contact-v2.md §9: "N <= 600 a 120 Hz").
 const maxSolveTicks = 600
 
-// liftStep / liftMaxSteps bound liftOverNet's search (at most 48 net checks).
-const (
-	liftStep     = 0.25
-	liftMaxSteps = 48
-)
-
 // clampLen scales v down to maxLen if it is longer, leaving it untouched
 // (including the zero vector) otherwise.
 func clampLen(v Vec3, maxLen float64) Vec3 {
@@ -156,33 +150,6 @@ func ensureNetClearance(cfg *Config, from, target Vec3, n int) int {
 		}
 	}
 	return hi
-}
-
-// liftOverNet is the last line of the aim assist, after the part's speed cap
-// shortened the shot: it raises the vertical launch speed in liftStep
-// increments (bounded) until the ball clears the net, trading horizontal
-// speed for lift so |v| never exceeds maxSpeed (a higher, shorter ball, not
-// a faster one). Own-side targets are never lifted.
-func liftOverNet(cfg *Config, from, target, v Vec3, maxSpeed float64) Vec3 {
-	if sideOf(from.X) == sideOf(target.X) {
-		return v
-	}
-	for i := 0; i < liftMaxSteps && v.Y < maxSpeed && !netClearanceOK(cfg, from, v); i++ {
-		v.Y = math.Min(v.Y+liftStep, maxSpeed)
-		v = capHorizontal(v, maxSpeed)
-	}
-	return v
-}
-
-// capHorizontal scales v's XZ part down so |v| <= maxSpeed, keeping v.Y.
-func capHorizontal(v Vec3, maxSpeed float64) Vec3 {
-	h := math.Hypot(v.X, v.Z)
-	room := math.Sqrt(math.Max(float64(maxSpeed*maxSpeed-v.Y*v.Y), 0))
-	if h <= room || h == 0 {
-		return v
-	}
-	k := room / h
-	return Vec3{X: float64(v.X * k), Y: v.Y, Z: float64(v.Z * k)}
 }
 
 // lobTicks picks N for a Lob shot from the desired apex height (linearly

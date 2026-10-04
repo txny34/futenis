@@ -14,8 +14,6 @@ const (
 	beliefTolerance = 0.15
 	// netClearance keeps the intercept search away from the net plane.
 	netClearance = 0.4
-	// floorBounceMinSpeed mirrors sim's resting threshold (m/s).
-	floorBounceMinSpeed = 0.5
 	// lateral is the side-on stand-off (m) between the player's axis and
 	// the ball at contact: inside every low part's Reach, outside the body
 	// capsule (PlayerRadius+BallRadius = 0.46), so the ball meets the foot
@@ -23,6 +21,10 @@ const (
 	lateral = 0.55
 	// maxContactErr is the worst part error the bot plans/releases for.
 	maxContactErr = 0.95
+	// idealOffset converts a Level.IdealErr into the planned side-on
+	// stand-off (m): standing at IdealErr*idealOffset keeps the reach term
+	// of the contact error (dH/Reach) well inside the target error.
+	idealOffset = 0.5
 	// arriveSlackTicks is the safety margin when judging reachability.
 	arriveSlackTicks = 3
 )
@@ -34,8 +36,8 @@ type intercept struct {
 	k      int
 	ball   sim.Ball
 	stand  sim.Vec3
-	serve  bool
 	errMax float64
+	off    float64 // planned side-on stand-off (m)
 }
 
 // ticksOfSec mirrors sim's unexported ticksOf (seconds -> ticks, >= 1).
@@ -78,99 +80,17 @@ func bestErr(cfg *sim.Config, hRel, dH float64, serveOnly bool) (sim.BodyPart, f
 	return best, bestU
 }
 
-// Mirrors of sim/physics.go's unexported bounce constants (keep in sync).
-const (
-	floorSpinFrictionMin = 0.4
-	floorSpinFrictionMax = 1.05
-	floorSpinRestMax     = 0.95
-	wallSpinRestMax      = 1.0
-	netBounceDamping     = 0.3
-)
-
-// stepBall advances b one tick: sim.PredictBall (gravity+drag; still
-// bounce-less, see the TODO in sim/trajectory.go) plus a mirror of
-// stepBall's net/floor/wall resolution with the §10 spin model. bounced
-// reports a floor bounce on this tick.
+// stepBall advances b one tick with sim.PredictBall (which resolves
+// net/floor/wall exactly like the sim) and reports whether that tick was a
+// floor bounce, read off the returned state: the ball sits on the floor and
+// either rebounded (falling before, rising after) or just came to rest
+// (edge-triggered, like the sim's EvBounceFloor).
 func stepBall(b sim.Ball, cfg *sim.Config) (sim.Ball, bool) {
-	prev := b.Pos
-	b = sim.PredictBall(b, cfg, 1)
-	b = predictNet(b, prev)
-	b, bounced := predictFloor(b, cfg)
-	inside := math.Abs(prev.X) <= sim.CourtHalfLength && math.Abs(prev.Z) <= sim.CourtHalfWidth
-	if b.Pos.Y <= sim.WallHeight && inside {
-		b = predictWalls(b, cfg)
-	}
-	return b, bounced
-}
-
-func predictNet(b sim.Ball, prev sim.Vec3) sim.Ball {
-	if (prev.X < 0) == (b.Pos.X < 0) {
-		return b
-	}
-	t := (0 - prev.X) / (b.Pos.X - prev.X)
-	if prev.Y+float64((b.Pos.Y-prev.Y)*t) >= sim.NetHeight+sim.BallRadius {
-		return b
-	}
-	sign := 1.0
-	if prev.X < 0 {
-		sign = -1
-	}
-	b.Pos.X = sign * sim.BallRadius
-	b.Vel.X = float64(-b.Vel.X * netBounceDamping)
-	return b
-}
-
-func predictFloor(b sim.Ball, cfg *sim.Config) (sim.Ball, bool) {
-	if b.Pos.Y >= sim.BallRadius {
-		b.Resting = false
-		return b, false
-	}
-	b.Pos.Y = sim.BallRadius
-	if b.Vel.Y >= 0 {
-		return b, false
-	}
-	incoming := -b.Vel.Y
-	if incoming < floorBounceMinSpeed {
-		b.Vel.Y = 0
-		was := b.Resting
-		b.Resting = true
-		return b, !was
-	}
-	b.Resting = false
-	fric := clampF(float64(cfg.FloorFriction+cfg.SpinFloorFriction*b.Spin), floorSpinFrictionMin, floorSpinFrictionMax)
-	rest := clampF(float64(cfg.FloorRestitution*(1-cfg.SpinFloorRest*b.Spin)), 0, floorSpinRestMax)
-	b.Vel.Y = incoming * rest
-	b.Vel.X *= fric
-	b.Vel.Z *= fric
-	b.Spin *= cfg.SpinDecay
-	return b, true
-}
-
-func predictWalls(b sim.Ball, cfg *sim.Config) sim.Ball {
-	restW := clampF(float64(cfg.WallRestitution*(1+cfg.SpinWallRest*math.Min(b.Spin, 0))), 0, wallSpinRestMax)
-	var hx, hz bool
-	b.Pos.X, b.Vel.X, hx = reflectAxis(b.Pos.X, b.Vel.X, sim.CourtHalfLength-sim.BallRadius, restW)
-	b.Pos.Z, b.Vel.Z, hz = reflectAxis(b.Pos.Z, b.Vel.Z, sim.CourtHalfWidth-sim.BallRadius, restW)
-	if hx || hz {
-		if b.Spin < 0 {
-			b.Vel.Y -= float64(cfg.SpinWallDrop * (-b.Spin))
-		}
-		b.Spin *= cfg.SpinDecay
-	}
-	return b
-}
-
-func clampF(v, lo, hi float64) float64 { return math.Max(lo, math.Min(hi, v)) }
-
-// reflectAxis bounces one coordinate off the +/-limit wall pair.
-func reflectAxis(p, v, limit, rest float64) (float64, float64, bool) {
-	if p > limit {
-		return limit, float64(-v * rest), true
-	}
-	if p < -limit {
-		return -limit, float64(-v * rest), true
-	}
-	return p, v, false
+	next := sim.PredictBall(b, cfg, 1)
+	onFloor := next.Pos.Y <= sim.BallRadius
+	rebound := b.Vel.Y <= 0 && next.Vel.Y > 0
+	settled := next.Resting && !b.Resting
+	return next, onFloor && (rebound || settled)
 }
 
 // onTeamSide reports whether x lies in team's half, away from the net.
@@ -181,20 +101,20 @@ func onTeamSide(x float64, team int8) bool {
 	return x > netClearance
 }
 
-// standSpot is where to stand for a side-on contact with ball: lateral
+// standSpot is where to stand for a side-on contact with ball: off
 // metres off the ball's horizontal path, on the side closer to the player
 // (falls back to "behind the ball" for a near-vertical ball).
-func standSpot(p *sim.Player, ball sim.Ball) sim.Vec3 {
+func standSpot(p *sim.Player, ball sim.Ball, off float64) sim.Vec3 {
 	vx, vz := ball.Vel.X, ball.Vel.Z
 	l := math.Sqrt(float64(vx*vx) + float64(vz*vz))
 	if l < 0.5 {
-		return sim.Vec3{X: ball.Pos.X - forward(p.Team)*lateral, Z: ball.Pos.Z}
+		return sim.Vec3{X: ball.Pos.X - forward(p.Team)*off, Z: ball.Pos.Z}
 	}
 	nx, nz := -vz/l, vx/l
 	if float64((p.Pos.X-ball.Pos.X)*nx)+float64((p.Pos.Z-ball.Pos.Z)*nz) < 0 {
 		nx, nz = -nx, -nz
 	}
-	s := sim.Vec3{X: ball.Pos.X + nx*lateral, Z: ball.Pos.Z + nz*lateral}
+	s := sim.Vec3{X: ball.Pos.X + nx*off, Z: ball.Pos.Z + nz*off}
 	minX, maxX := teamXRange(p.Team)
 	s.X = math.Max(minX, math.Min(maxX, s.X))
 	zl := sim.CourtHalfWidth - sim.PlayerRadius
@@ -232,18 +152,23 @@ type bounceWindow struct{ min, max int }
 
 // findIntercept walks the predicted trajectory and returns the first
 // reachable contact inside win whose best part error at the side-on
-// stand-off is <= errMax, preferring Foot/Knee contacts (more power and
+// stand-off off is <= errMax, preferring Foot/Knee contacts (more power and
 // accuracy than chest/shoulder).
-func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax float64, win bounceWindow) intercept {
+func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax, off float64, win bounceWindow) intercept {
 	ball := start
 	var fallback intercept
-	bounces := 0
+	var path [horizonTicks + 1]sim.Vec3
+	bounces, landed := 0, 0
 	for k := 1; k <= horizonTicks; k++ {
 		var b bool
 		ball, b = stepBall(ball, cfg)
+		path[k] = ball.Pos
 		mine := onTeamSide(ball.Pos.X, p.Team)
 		if b && mine {
 			bounces++
+			if bounces == win.min {
+				landed = k
+			}
 		}
 		if bounces > win.max {
 			break
@@ -251,15 +176,21 @@ func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax
 		if bounces < win.min || !mine {
 			continue
 		}
-		part, u := bestErr(cfg, ball.Pos.Y, lateral, false)
+		part, u := bestErr(cfg, ball.Pos.Y, off, false)
 		if u > errMax {
 			continue
 		}
-		stand := standSpot(p, ball)
+		stand := standSpot(p, ball, off)
 		if ticksToReach(p, stand, speed, cfg.PlayerAccel)+arriveSlackTicks > k {
 			continue
 		}
-		hit := intercept{ok: true, k: k, ball: ball, stand: stand, errMax: errMax}
+		if off < lateral && !clearPath(&path, k-ticksOfSec(cfg.StrikeBufferTime)+2, stand) {
+			continue
+		}
+		if win.min > 0 && !clearPath(&path, landed+1, stand) {
+			continue // a body hit before the required bounce volleys the serve
+		}
+		hit := intercept{ok: true, k: k, ball: ball, stand: stand, errMax: errMax, off: off}
 		if part <= sim.PartKnee {
 			return hit
 		}
@@ -299,3 +230,21 @@ func contactSoon(ball sim.Ball, p *sim.Player, cfg *sim.Config, window int, maxE
 	}
 	return false
 }
+
+// clearPath reports whether the ball stays off a body capsule standing at
+// stand on every path tick before upTo: an ideal (close) stand-off is only
+// worth planning if the ball does not hit the body before the strike
+// buffer can be live (the buffer makes the body immune, §7.4).
+func clearPath(path *[horizonTicks + 1]sim.Vec3, upTo int, stand sim.Vec3) bool {
+	const r = sim.PlayerRadius + sim.BallRadius + bodyMargin
+	for j := 1; j < upTo; j++ {
+		q := path[j]
+		if q.Y < sim.PlayerHeight+sim.BallRadius && math.Hypot(q.X-stand.X, q.Z-stand.Z) < r {
+			return false
+		}
+	}
+	return true
+}
+
+// bodyMargin pads the body capsule radius in clearPath (m).
+const bodyMargin = 0.05

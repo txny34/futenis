@@ -125,4 +125,3 @@
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), -260%) scale(1); }
 }
 
-.act--dash .act__ring { stroke: var(--hud-accent); }

@@ -45,6 +45,9 @@ func (d *aiDriver) fill(m *sim.Match, in *[sim.MaxPlayers]sim.PlayerInput) {
 		return
 	}
 	s := m.State()
+	if s.Cfg.Mode == sim.ModePlayground {
+		return // Entrenamiento: the ball machine is the only rival, no bot
+	}
 	for i := 0; i < int(s.NumPlayers); i++ {
 		if d.humanMask&(1<<i) == 0 {
 			in[i] = d.bots[i].Think(&s, i)
@@ -114,12 +117,14 @@ func (ss *session) reset() {
 	ss.drv = newDriver(ss.drv.bots[0].Difficulty(), ss.drv.humanMask)
 }
 
-// respawnBall is Playground-only.
+// respawnBall is Playground-only: it asks the ball machine for a feed now
+// (sim.Match.Feed, docs/design/training.md §4). JS exposes it as both
+// respawnBall() and feed().
 func (ss *session) respawnBall() error {
 	if ss.cfg.Mode != sim.ModePlayground {
 		return fmt.Errorf("futenis.respawnBall: only available in playground mode (2)")
 	}
-	ss.match.RespawnBall()
+	ss.match.Feed()
 	return nil
 }
 

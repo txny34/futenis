@@ -19,7 +19,8 @@ func servedState(server int8) State {
 
 func TestJudgeServeReturn_LegalBoxBounceClosesPendingAndCountsAsReceiverBounce(t *testing.T) {
 	s := servedState(0)
-	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: 2}}
+	// box 0 is the receiver's right: -Z for server 0 (diagonal-serve fix; was +Z).
+	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: -2}}
 
 	handled, ev := judgeServeReturn(&s, bounce, nil)
 
@@ -43,7 +44,7 @@ func TestJudgeServeReturn_BounceOutsideBoxIsFault(t *testing.T) {
 	s := servedState(0)
 	// Lands on the receiving side, but past the service line: outside the
 	// diagonal box.
-	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: s.Cfg.ServiceLineDist + 1, Z: 2}}
+	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: s.Cfg.ServiceLineDist + 1, Z: -2}}
 
 	handled, ev := judgeServeReturn(&s, bounce, nil)
 
@@ -159,7 +160,7 @@ func TestJudgeServeReturn_LetOnNetTouchThenLegalBoxBounce(t *testing.T) {
 	s := servedState(0)
 	_, ev := judgeServeReturn(&s, Event{Kind: EvHitNet, Side: 0}, nil)
 
-	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: 2}}
+	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: -2}}
 	handled, ev2 := judgeServeReturn(&s, bounce, ev)
 
 	if !handled {
@@ -193,7 +194,7 @@ func TestLetServe_PreservesTheSecondServeAttemptNumber(t *testing.T) {
 	s.Rally.ServeAttempt = 2
 	s.Rally.ServeNetTouch = true
 
-	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: 2}}
+	bounce := Event{Kind: EvBounceFloor, Side: 1, Pos: Vec3{X: 3, Z: -2}}
 	_, ev := judgeServeReturn(&s, bounce, nil)
 
 	foundLet := false

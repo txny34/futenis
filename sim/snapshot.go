@@ -131,6 +131,15 @@ const (
 	SnapP3ContactQuality
 	SnapP3ContactOk
 
+	// --- Entrenamiento additions (docs/design/training.md §3), appended
+	// after the prediction block: nothing above this line ever moves. ---
+	SnapStreak
+	SnapBestStreak
+	SnapFeedCount
+	SnapFeedIn   // seconds until the next feed; -1 = waiting for demand or ball live
+	SnapMachineX // last machine mouth position
+	SnapMachineZ
+
 	SnapLen
 )
 
@@ -159,6 +168,25 @@ func WriteSnapshot(s *State, dst []float64) {
 	writeDashFlags(s, dst)
 	writeScoring(s, dst)
 	writePrediction(s, dst)
+	writeFeed(s, dst)
+}
+
+// writeFeed fills the Entrenamiento block (docs/design/training.md §3).
+func writeFeed(s *State, dst []float64) {
+	f := &s.Feed
+	dst[SnapStreak] = float64(f.Streak)
+	dst[SnapBestStreak] = float64(f.Best)
+	dst[SnapFeedCount] = float64(f.Count)
+	dst[SnapFeedIn] = -1
+	if !f.Live && f.NextTick != 0 {
+		left := 0.0
+		if f.NextTick > s.Tick {
+			left = float64(f.NextTick - s.Tick)
+		}
+		dst[SnapFeedIn] = left / TickRate
+	}
+	dst[SnapMachineX] = f.MouthX
+	dst[SnapMachineZ] = f.MouthZ
 }
 
 // writePrediction fills the "Predicción" snapshot block (docs/design/

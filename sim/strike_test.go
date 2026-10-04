@@ -211,10 +211,8 @@ func TestLobDowngradesToDriveOnShoulder(t *testing.T) {
 
 	h := strikeHash(s.Tick, s.Players[0].Team, s.Ball.Pos)
 	tgt := deviateTarget(&s.Cfg, s.Players[0].BufTarget, s.Ball.Pos, ps, 0, h)
-	speed := shotSpeed(ps, 1, 0, h, &s.Cfg)
-	speed += momentumBonus(s.Players[0].Vel, s.Ball.Pos, tgt, &s.Cfg)
-	want := solveLaunch(&s.Cfg, s.Ball.Pos, tgt, ShotDrive, speed, 1)
-	want = clampLen(want, ps.SpeedMax+s.Cfg.MomentumMax)
+	// Same launch pipeline as strike (perfect boost included), forced to Drive.
+	want := launch(&s, &s.Players[0], ps, tgt, ShotDrive, perfectBoost(&s, QualPerfect), 0, h)
 
 	ev := applyStrikes(&s, fullInputs(PlayerInput{}, PlayerInput{}), nil)
 
@@ -353,5 +351,28 @@ func TestApplyStrikes_ZeroAllocs(t *testing.T) {
 	})
 	if allocs != 0 {
 		t.Errorf("applyStrikes allocated %v times per run, want 0", allocs)
+	}
+}
+
+// TestApplyStrikes_BufferReleasedWhileUnableToKickIsDiscarded: a strike
+// released when the player may not kick (point pause, or the rival's serve)
+// must not stay frozen and fire later with a stale target -- a "ghost"
+// strike for a human who clicked during the pause.
+func TestApplyStrikes_BufferReleasedWhileUnableToKickIsDiscarded(t *testing.T) {
+	s := newStrikeTestState()
+	s.Tick = 500
+	s.Phase = PhasePoint
+	s.Players[0].Buffer = 5
+	s.Players[0].BufTarget = Vec3{X: 9, Y: BallRadius}
+
+	applyStrikes(&s, fullInputs(PlayerInput{}, PlayerInput{}), nil)
+	if s.Players[0].Buffer != 0 {
+		t.Fatalf("Buffer=%d after a tick where the player cannot kick, want 0 (discarded)", s.Players[0].Buffer)
+	}
+
+	s.Phase = PhaseRally
+	s.Ball.Pos = Vec3{X: s.Players[0].Pos.X, Y: s.Cfg.Parts[PartFoot].HIdeal}
+	if ev := applyStrikes(&s, fullInputs(PlayerInput{}, PlayerInput{}), nil); len(ev) != 0 {
+		t.Fatalf("got %+v, want no strike from the discarded intention", ev)
 	}
 }

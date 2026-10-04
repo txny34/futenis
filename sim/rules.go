@@ -28,11 +28,11 @@ const servePlayerZOffset = CourtHalfWidth / 2
 // Score, and appends EvPoint / EvGameOver when a point is decided. Events
 // are only judged while Phase == PhaseRally; during PhasePoint the ball may
 // still be flying but no event changes the score. ModePlayground never
-// scores (docs/design/contact-v2.md "Modos y 2v2"): the ball just keeps
-// bouncing and RespawnBall is the only way to reset it.
+// scores: it runs the ball-machine judge instead (applyPlayground,
+// docs/design/training.md).
 func applyRules(s *State, ev []Event) []Event {
 	if s.Cfg.Mode == ModePlayground {
-		return ev
+		return applyPlayground(s, ev)
 	}
 	switch s.Phase {
 	case PhaseRally:
@@ -147,6 +147,7 @@ func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
 		r.LastPlayer = e.Player
 		r.BouncesOnSide = [2]int{}
 		r.ShotCount++
+		markBodyGraze(r, e)
 		// wave1-C: LastTeam is only ever -1 right after resetForServe/
 		// replayServe, so this first touch is always the serve's opening
 		// strike -- open the serve-return box judge (docs/design/
@@ -163,6 +164,10 @@ func judgeFirstKick(r *RallyState, e Event) (int8, bool) {
 // from here on the receiving team has touched the serve at least once.
 func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	if e.Side == k {
+		if mergesWithBodyGraze(r, e) {
+			r.BodyGraze = false // the strike takes over the graze: still one touch
+			return 0, false
+		}
 		return faultOnKickerSide(r, k)
 	}
 	r.LastTeam = e.Side
@@ -170,7 +175,26 @@ func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	r.BouncesOnSide = [2]int{}
 	r.ShotCount++
 	r.ServeUntouched = false
+	markBodyGraze(r, e)
 	return 0, false
+}
+
+// bodyMergeTicks is how long after a body graze the same player's strike
+// still counts as that same touch (0.1 s): the capsule meets the ball a few
+// ticks before the foot does, which the player sees as a single touch.
+const bodyMergeTicks = TickRate / 10
+
+// mergesWithBodyGraze reports whether strike e is the same player finishing
+// the touch their body just started (graze then strike inside the window).
+func mergesWithBodyGraze(r *RallyState, e Event) bool {
+	return e.Kind == EvKick && r.BodyGraze && e.Player == r.LastPlayer && e.Tick-r.BodyGrazeTick <= bodyMergeTicks
+}
+
+// markBodyGraze records whether the touch that just became LastTeam's was
+// a body graze (EvBodyHit), for mergesWithBodyGraze.
+func markBodyGraze(r *RallyState, e Event) {
+	r.BodyGraze = e.Kind == EvBodyHit
+	r.BodyGrazeTick = e.Tick
 }
 
 // judgeBounceEvent handles an EvBounceFloor: a bounce on the kicker's own
@@ -276,23 +300,33 @@ func resetForServe(s *State, server int8) {
 }
 
 // setupDoublesPositions places all 4 players for a 2v2 serve: each team's
-// two partners start on either side of the center line (Slot 0 = right, 1 =
-// left), per the teamPlayers index convention (team 0 = {0,1}, team 1 =
-// {2,3}).
+// two partners start on either side of the center line, Slot 0 on that
+// team's OWN right (rightSign: +Z for team 0, -Z for team 1), Slot 1 on its
+// left, per the teamPlayers index convention (team 0 = {0,1}, team 1 =
+// {2,3}). placeServe then moves the server onto its serve side.
 func setupDoublesPositions(s *State) {
-	s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset, Z: servePlayerZOffset}, Team: 0, Slot: 0, OnGround: true, Stamina: 1}
-	s.Players[1] = Player{Pos: Vec3{X: -servePlayerOffset, Z: -servePlayerZOffset}, Team: 0, Slot: 1, OnGround: true, Stamina: 1}
-	s.Players[2] = Player{Pos: Vec3{X: servePlayerOffset, Z: servePlayerZOffset}, Team: 1, Slot: 0, OnGround: true, Stamina: 1}
-	s.Players[3] = Player{Pos: Vec3{X: servePlayerOffset, Z: -servePlayerZOffset}, Team: 1, Slot: 1, OnGround: true, Stamina: 1}
+	for i := int8(0); i < 4; i++ {
+		team, slot := i/2, i%2
+		z := rightSign(team) * servePlayerZOffset
+		if slot == 1 {
+			z = -z
+		}
+		x := -forwardSign(team) * servePlayerOffset
+		s.Players[i] = Player{Pos: Vec3{X: x, Z: z}, Team: team, Slot: slot, OnGround: true, Stamina: 1}
+	}
 }
 
-// setupPlayground places a minimal 1v1-shaped pair straight into PhaseRally
-// with no serve/scoring state: ModePlayground is a free sandbox
-// (docs/design/contact-v2.md "Modos y 2v2").
+// setupPlayground places the lone human straight into PhaseRally with no
+// serve/scoring state (Entrenamiento, docs/design/training.md §2): slot 1
+// stays zero/inactive, and the first continuous feed is scheduled one
+// FeedInterval in (on demand waits for Match.Feed).
 func setupPlayground(s *State) {
 	s.Phase = PhaseRally
 	s.Rally = RallyState{LastTeam: -1, LastPlayer: -1}
 	s.Players[0] = Player{Pos: Vec3{X: -servePlayerOffset}, Team: 0, OnGround: true, Stamina: 1}
-	s.Players[1] = Player{Pos: Vec3{X: servePlayerOffset}, Team: 1, OnGround: true, Stamina: 1}
 	s.Ball = Ball{Pos: Vec3{Y: serveBallHeight}}
+	s.Feed = FeedState{}
+	if !s.Cfg.FeedOnDemand {
+		s.Feed.NextTick = s.Tick + uint32(s.Cfg.feedIntervalTicks)
+	}
 }

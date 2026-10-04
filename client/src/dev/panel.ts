@@ -1,10 +1,11 @@
 import type { Engine } from "../engine";
+import { CFG_TRAIN_FIRST, CFG_TRAIN_LAST } from "../train-config";
 import { el, slider } from "../ui/dom";
 
 // ?dev=1 live-tuning panel (contact-v2 §13). Indices mirror the scalar order
 // of sim/config_layout.go (cfgGravity = 0 ... cfgMode = 44, cfgServeTimeLimit
-// = 45, Dash 46..49, scoring 50..54; parts table from 55, CfgLen = 132 --
-// re-audited against config_layout.go for the scoring append). Applied between
+// = 45, Dash 46..49, scoring 50..54, Entrenamiento 55..71 (train-config.ts);
+// parts table from 72, CfgLen = 149 -- re-audited for the training append). Applied between
 // frames via engine.setConfig; never touched by the frame loop.
 interface Param { readonly idx: number; readonly label: string; readonly min: number; readonly max: number; readonly step: number }
 
@@ -75,6 +76,7 @@ export function mountDevPanel(engine: Engine, onError: (msg: string) => void): (
       next[CFG_POINTS_TO_WIN] = cfg[CFG_POINTS_TO_WIN]; // keep the current match setup
       next[CFG_MODE] = cfg[CFG_MODE];
       for (const i of CFG_MATCH_FORMAT) next[i] = cfg[i];
+      for (let i = CFG_TRAIN_FIRST; i <= CFG_TRAIN_LAST; i++) next[i] = cfg[i]; // menu-owned ball machine
       apply(next);
       rebuild();
     });

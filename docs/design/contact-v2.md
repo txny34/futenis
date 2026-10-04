@@ -90,7 +90,7 @@ La carga deja de vivir en el cliente (`CHARGE_TIME_S` en `input.ts` desaparece).
 |---|---|
 | MoveX/MoveZ | NaN/Inf → 0; clamp −1..1 |
 | Spin | clamp a {−1, 0, +1} |
-| TargetX | NaN/Inf → centro de la cancha rival (`±CourtHalfLength/2`); magnitud clampeada a `[TargetMinFromNet, CourtHalfLength−TargetWallMargin]` conservando el lado; 0 → lado rival. Un objetivo en el **propio** campo se respeta: es el tiro "apuntado muy bajo", sin ayuda de red (termina en la red). Todo objetivo en campo rival pasa la red siempre (ayuda de tiro: `ensureNetClearance` + `liftOverNet`) |
+| TargetX | NaN/Inf → centro de la cancha rival (`±CourtHalfLength/2`); magnitud clampeada a `[TargetMinFromNet, CourtHalfLength−TargetWallMargin]` conservando el lado; 0 → lado rival. Un objetivo en el **propio** campo se respeta: es el tiro "apuntado muy bajo", sin ayuda de red (termina en la red). Todo objetivo en campo rival pasa la red y pica primero dentro del campo rival, nunca directo al vidrio, aun con golpe forzado (ayuda de tiro: `ensureNetClearance`, desvío acotado antes del fondo, `reachWithinCap` bajo el tope de velocidad) |
 | TargetZ | NaN/Inf → 0; clamp `±(CourtHalfWidth−TargetWallMargin)` |
 | Buttons | `& btnMask` (bits desconocidos → 0) |
 | Strike+Lob simultáneos | gana el que se presionó primero (latcheado en `Player.ShotType` al press) |
@@ -424,11 +424,20 @@ gracia) → falta, punto para el rival. Un body hit tras el toque rival es un "t
   Golpearla sin que haya picado, o después de un segundo pique, es falta.
 - El sacador debe golpear con **pie o rodilla** (altura de contacto baja: `hRel` restringe la parte a
   `{Foot, Knee}` por la tabla de §6 — un saque no se puede cabecear ni pechar).
+- **Convención de lados** (congelada): la "derecha" de cada jugador es la suya, mirando la red desde su
+  fondo. Equipo 0 mira a +X → su derecha es +Z; equipo 1 mira a −X → su derecha es −Z
+  (`rightSign(team)` = +1 / −1, `sim/serve.go`).
 - El saque va **en diagonal**: debe caer primero en el **cajón de saque diagonal** del receptor (entre
-  la red y la línea de saque, del lado contrario de la línea central en Z respecto de la posición del
-  sacador). El sacador alterna cajón derecho/izquierdo **cada punto** (regla real de pádel/tenis):
-  `serveBoxForScore(Score) = (Score[0]+Score[1]) % 2` (0 = derecha, 1 = izquierda, visto desde el
-  fondo de ese sacador). Pura, en `sim`; wave1 la llama desde `resetForServe` y desde el juez de saque.
+  la red y la línea de saque). `serveBoxForScore(Score) = (Score[0]+Score[1]) % 2`: total **par** →
+  `ServeBox = 0` = cajón **derecho del receptor**, y el sacador saca parado a **su** derecha; total
+  **impar** → `ServeBox = 1` = cajón izquierdo del receptor, sacador a su izquierda. Como las derechas
+  de ambos equipos están en Z opuestos, eso siempre cruza la cancha. El signo Z físico del cajón es
+  `ServeBoxZSign(server, box)` (exportado para el bot); el sacador se ubica en
+  `serveStandZ = -ServeBoxZSign * servePlayerZOffset` (`placeServe`, también en 1v1; el receptor 1v1
+  queda en diagonal). En tie-break el cajón sigue alternando por la paridad del total de puntos del
+  tie-break.
+- **Saque que pega en el compañero del sacador** (2v2) antes de picar: **falta de saque** (cuenta para la
+  doble falta), no punto perdido (`judgeServeVolley`).
 - **Falta** (`EvServeFault`): la pelota cae fuera del cajón diagonal correcto, toca la red y no cruza,
   toca una pared antes de picar, o el sacador no llega a golpearla (whiff, o la pelota pica dos veces
   antes del golpe).
@@ -446,7 +455,7 @@ type RallyState struct {
     // ... LastTeam, LastPlayer, BouncesOnSide, PauseTicks (sin cambios) ...
     ServerPlayer int8  // qué jugador (no equipo) saca este punto (serverPlayerIndex)
     ServeAttempt uint8 // 1 = primer saque, 2 = segundo saque (tras una falta)
-    ServeBox     int8  // 0 = cajón derecho, 1 = cajón izquierdo (alterna por punto)
+    ServeBox     int8  // 0 = cajón derecho DEL RECEPTOR, 1 = izquierdo (alterna por punto)
 }
 ```
 
@@ -874,25 +883,33 @@ cápsula-cápsula entre compañeros es responsabilidad de `player.go` (wave1, ju
 
 ### 19.5 Orden de saque en 2v2
 
-**Decisión del coordinador: documentar la elección.** Pádel/tenis "real" rota el saque entre los 4
-jugadores juego a juego (A1, B1, A2, B2, ...), lo cual requiere un modelo de *games* que este código
-no tiene (hoy se juega a puntos directos, `PointsToWin`). La regla elegida para wave 0, más simple y
-sin ese modelo:
+**Rotación real de dobles** (reemplaza la alternancia por punto de wave 0). Un mismo jugador saca **todo
+su turno de saque** (un juego entero; en tie-break, su bloque de puntos). Cada vez que un equipo empieza
+un turno nuevo, saca el compañero de quien sacó el turno anterior de ese equipo; con los juegos
+alternando equipos, el orden queda A1, B1, A2, B2, A1, ...
 
 ```go
-// serverPlayerIndex: alterna compañero cada vez que el EQUIPO vuelve a sacar.
 func serverPlayerIndex(s *State, team int8) int8 {
-    if s.NumPlayers < 4 { return team } // 1v1: un jugador por equipo
+    if s.NumPlayers < 4 { return team }
     a, b := teamPlayers(team)
-    if s.LastServerPlayer[team] == a { return b }
+    last := s.LastServerPlayer[team]
+    switch {
+    case last < 0: return a                       // primer turno del equipo
+    case !newServiceTurn(s, team): return last    // mismo turno: mismo sacador
+    case last == a: return b
+    }
     return a
 }
 ```
 
-`State.LastServerPlayer [2]int8` recuerda, por equipo, qué jugador sacó la última vez que ese equipo
-sacó. **Nota para wave1/2**: si se quiere la rotación real de dobles (round-robin de los 4 jugadores
-a través de *games*), hace falta modelar *games*/*sets* explícitamente; hasta entonces esta alternancia
-simple es la que corre.
+`newServiceTurn` (`serve.go`): en `ScoringPadel`, primer punto del juego (total 0) o, en tie-break, cada
+punto donde el saque cambia de manos (total 0, 1, 3, 5, ...). En `ScoringSimple` (sin juegos) el turno
+cambia cuando el equipo recupera el saque. `State.LastServerPlayer [2]int8` guarda quién sacó el último
+turno de cada equipo.
+
+**Posiciones**: `setupDoublesPositions` pone el Slot 0 de cada equipo en **su propia** derecha
+(`rightSign(team) * servePlayerZOffset`) y el Slot 1 a su izquierda; `placeServe` luego intercambia a los
+compañeros del equipo sacador si hace falta para que el sacador quede del lado de saque (§7.5).
 
 ### 19.6 Playground
 
@@ -1138,6 +1155,14 @@ hacen falta para cerrar un set **con ventaja de 2**. Si ambos equipos llegan emp
 en `GamesPerSet` (`setNeedsTiebreak`), en vez de seguir indefinidamente se juega un **único juego
 de tie-break** a `tiebreakTarget = 7` puntos (ventaja de 2, fijo, no tunable): quien lo gana se
 lleva el set entero, sin importar la diferencia de juegos acumulada antes del tie-break.
+`hasWonGamePadel(w, l, target, golden)` recibe el objetivo del juego (`gamePoints = 4` o
+`tiebreakTarget`), y las advertencias de game/break point usan el mismo objetivo (en tie-break saltan
+a 6 puntos, no a 3).
+
+**Saque en tie-break**: el equipo al que le tocaba sacar saca el **primer** punto; después el saque
+cambia de manos cada 2 puntos (tras los puntos 1, 3, 5, ...; `rotateTiebreakServe`). Al terminar el
+tie-break, el primer juego del set siguiente lo saca el equipo que **recibió** el primer punto del
+tie-break (`nextServerAfterGame`, derivado sin estado nuevo: `F = Server ^ ((T/2)&1)`).
 
 `State.Games [2]int` / `State.Sets [2]int` son estado de partido nuevo (no viven en `Config`: no
 son tuneables, son el marcador). `Config.SetsToWin` (default 1) es cuántos sets, primero a,
@@ -1148,8 +1173,8 @@ ganan el partido.
 Pádel real alterna el saque entre equipos **juego a juego**, nunca según quién ganó el último
 punto (eso es `ScoringSimple`, que sigue haciendo "gana el punto, saca el ganador" -- su
 comportamiento de siempre). `awardGamePadel` hace `s.Server = 1 - s.Server` **incondicionalmente**
-en cuanto el juego se cierra, sin mirar quién lo ganó; el orden de saque entre compañeros dentro
-de ese equipo sigue siendo `serverPlayerIndex` (§19.5, sin cambios).
+en cuanto el juego se cierra, sin mirar quién lo ganó (salvo tras un tie-break, §21.2); el orden de
+saque entre compañeros es la rotación real de dobles de `serverPlayerIndex` (§19.5).
 
 `Config.FirstServer` (0 o 1, default 0) decide qué equipo abre el saque del partido
 (`NewMatch`/`resetForServe`). La alternancia por juego **dentro** de un partido ya reparte el saque
@@ -1190,9 +1215,10 @@ devolverlo de volea es falta del receptor, no del sacador. `judgeServeVolley` (`
 intercepta cualquier `EvKick`/`EvBodyHit` del equipo receptor mientras `RallyState.ServeBoxPending`
 sigue activo y le **otorga el punto al sacador de inmediato**, sin pasar por
 `serveFault`/`replayServe` (no es falta del sacador: no se gasta un intento de saque, no hay doble
-falta). Un toque del propio equipo sacador en esa misma ventana (p.ej. un body hit contra su propio
-saque) no se intercepta: cae al juez genérico de un-toque-por-equipo, que lo trata como doble
-toque normal.
+falta). Un toque del propio equipo sacador en esa misma ventana: si es el **compañero** del sacador
+(2v2), es **falta de saque** (`serveFault`, cuenta para la doble falta, como en pádel real); si es el
+propio sacador (p.ej. un body hit contra su propio saque) no se intercepta: cae al juez genérico de
+un-toque-por-equipo, que lo trata como doble toque normal.
 
 **Invariante reforzado**: `State.Players[Rally.ServerPlayer].Team == State.Server` debe cumplirse
 siempre que `Phase` sea `PhaseServe` o `PhaseRally` (se relaja durante `PhasePoint`: `Server` ya

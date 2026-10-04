@@ -11,8 +11,7 @@ type candidate struct {
 }
 
 // applyStrikes is Step's single entry point for contact resolution
-// (docs/design/contact-v2.md §7.2), replacing the wave-0 applyKicks/
-// performKick compat shim: it advances every active player's charge/buffer
+// (docs/design/contact-v2.md §7.2): it advances every active player's charge/buffer
 // state, resolves at most one body-part contact for the whole tick (even in
 // 2v2, where up to 4 players may have a live buffer at once), and appends
 // EvWhiff/EvToss/EvKick as appropriate.
@@ -22,7 +21,11 @@ func applyStrikes(s *State, inputs [MaxPlayers]PlayerInput, ev []Event) []Event 
 		ev = updateCharge(s, i, inputs[i], ev)
 
 		p := &s.Players[i]
-		if p.Buffer == 0 || !canKick(s, i) {
+		if p.Buffer == 0 {
+			continue
+		}
+		if !canKick(s, i) {
+			p.Buffer = 0 // released while unable to kick: discard it, never fire later with a stale target
 			continue
 		}
 		p.Buffer--
@@ -190,12 +193,7 @@ func strike(s *State, i int8, part BodyPart, u float64, ev []Event) []Event {
 	}
 
 	tgt := deviateTarget(cfg, p.BufTarget, s.Ball.Pos, ps, u, h)
-	speed := shotSpeed(ps, p.BufCharge, u, h, cfg)
-	speed += momentumBonus(p.Vel, s.Ball.Pos, tgt, cfg)
-
-	v := solveLaunch(cfg, s.Ball.Pos, tgt, shot, speed, p.BufCharge)
-	maxSpeed := ps.SpeedMax + cfg.MomentumMax
-	s.Ball.Vel = liftOverNet(cfg, s.Ball.Pos, tgt, clampLen(v, maxSpeed), maxSpeed)
+	s.Ball.Vel = launch(s, p, ps, tgt, shot, perfectBoost(s, q), u, h)
 	s.Ball.Spin = clamp(float64(p.BufSpin), ps.SpinMin, ps.SpinMax)
 	s.Ball.Resting = false
 	s.Ball.Out = false
@@ -205,6 +203,36 @@ func strike(s *State, i int8, part BodyPart, u float64, ev []Event) []Event {
 		s.Phase = PhaseRally
 	}
 	return append(ev, kickEvent(s, i, part, q))
+}
+
+// perfectSpeedBonus scales a PERFECT rally contact's speed and its speed cap:
+// with the aim assist nobody hits the net or out, so the perfect shot is the
+// winner (Rocket League style: skill, not luck, ends the point).
+const perfectSpeedBonus = 1.35
+
+// perfectBoost is perfectSpeedBonus for a PERFECT contact in the rally (a
+// serve keeps its normal speed: it must still land in the box), else 1.
+func perfectBoost(s *State, q Quality) float64 {
+	if q == QualPerfect && s.Phase == PhaseRally {
+		return perfectSpeedBonus
+	}
+	return 1
+}
+
+// launch resolves the post-contact velocity toward tgt: shot speed (charge,
+// power deviation, momentum) times boost, solved against the real
+// integrator, kept under the part's speed cap (also scaled by boost) by
+// reachWithinCap so the ball still lands in the rival court.
+func launch(s *State, p *Player, ps *PartSpec, tgt Vec3, shot ShotType, boost, u float64, h uint64) Vec3 {
+	cfg := &s.Cfg
+	speed := shotSpeed(ps, p.BufCharge, u, h, cfg)
+	speed += momentumBonus(p.Vel, s.Ball.Pos, tgt, cfg)
+	speed = float64(speed * boost)
+	v := solveLaunch(cfg, s.Ball.Pos, tgt, shot, speed, p.BufCharge)
+	if maxSpeed := float64((ps.SpeedMax + cfg.MomentumMax) * boost); v.Len() > maxSpeed {
+		v = reachWithinCap(cfg, s.Ball.Pos, tgt, maxSpeed)
+	}
+	return v
 }
 
 // kickEvent builds the EvKick carrying everything the network/feedback

@@ -33,6 +33,8 @@ export interface Theme {
   readonly ledText: string;
   readonly ledAccent: string;
   readonly team: readonly [number, number];
+  /** Entrenamiento ball machine (view/machine.ts). */
+  readonly machine: { readonly body: number; readonly barrel: number; readonly trim: number; readonly flash: number };
   readonly hud: HudTheme;
 }
 
@@ -46,6 +48,11 @@ export interface HudTheme {
   readonly ring: string;
   readonly team0: string;
   readonly team1: string;
+  /** Entrenamiento minimap: machine zone (pink), bounce zone (cyan), court. */
+  readonly trainMachine: string;
+  readonly trainBounce: string;
+  readonly trainCourt: string;
+  readonly trainLine: string;
 }
 
 export const THEME: Theme = {
@@ -79,6 +86,7 @@ export const THEME: Theme = {
   ledText: "#19e3ff",
   ledAccent: "#ff5a4e",
   team: [0xff5a4e, 0x19e3ff],
+  machine: { body: 0x1b2340, barrel: 0x0b0f1c, trim: 0xff4fa3, flash: 0xff4fa3 },
   hud: {
     card: "rgba(8, 16, 38, 0.62)",
     cardBorder: "rgba(25, 227, 255, 0.35)",
@@ -89,6 +97,10 @@ export const THEME: Theme = {
     ring: "#e6ff1f",
     team0: "#ff5a4e",
     team1: "#19e3ff",
+    trainMachine: "#ff4fa3",
+    trainBounce: "#19e3ff",
+    trainCourt: "#2c3354",
+    trainLine: "rgba(244, 251, 255, 0.75)",
   },
 };
 
@@ -98,6 +110,8 @@ export function applyThemeCss(root: HTMLElement, t: HudTheme = THEME.hud): void 
     ["--hud-card", t.card], ["--hud-border", t.cardBorder], ["--hud-text", t.text],
     ["--hud-muted", t.muted], ["--hud-accent", t.accent], ["--hud-warn", t.warn],
     ["--hud-ring", t.ring], ["--hud-team0", t.team0], ["--hud-team1", t.team1],
+    ["--train-machine", t.trainMachine], ["--train-bounce", t.trainBounce],
+    ["--train-court", t.trainCourt], ["--train-line", t.trainLine],
   ];
   for (const [k, v] of vars) root.style.setProperty(k, v);
 }

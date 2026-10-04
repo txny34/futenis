@@ -69,7 +69,7 @@ export class Controls {
     canvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
   }
 
-  /** Non-repeating key press callback (B respawn, R reset...). */
+  /** Non-repeating key press callback (B feed, R reset...). */
   onKeyPress(fn: (code: string) => void): void { this.pressHandler = fn; }
 
   get isLocked(): boolean { return this.locked; }

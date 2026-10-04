@@ -19,9 +19,12 @@ export const Snap = {
   LandingX: 65, LandingZ: 66, LandingTicks: 67, LandingOk: 68,
   // ...and per-player predicted contact blocks (see Contact offsets).
   P0Contact: 69, P1Contact: 73, P2Contact: 77, P3Contact: 81,
+  // Entrenamiento (docs/design/training.md §3), appended before SnapLen.
+  // FeedIn = seconds to the next machine feed, -1 = waiting for demand / ball live.
+  Streak: 85, BestStreak: 86, FeedCount: 87, FeedIn: 88, MachineX: 89, MachineZ: 90,
 } as const;
 
-export const SNAP_LEN = 85;
+export const SNAP_LEN = 91;
 export const MAX_PLAYERS = 4;
 
 /** Offsets inside a player's extras block (starts at P{i}VelX). */
@@ -64,11 +67,12 @@ export const EventKind = {
   Dash: 14,
   // Padel scoring (contact-v2 §20.8), only with ScoringPadel.
   GamePoint: 15, BreakPoint: 16, GameWon: 17, SetWon: 18, Ace: 19, MatchWon: 20,
+  // Entrenamiento (training.md §2), only in Mode.Playground.
+  Feed: 21, ReturnOK: 22, ReturnFail: 23,
 } as const;
 
 // Mirrors sim.BodyPart. Index 0 = PartNone.
 export const PART_NAMES = ["none", "foot", "knee", "chest", "shoulder", "head", "bicycle"] as const;
-export type PartName = (typeof PART_NAMES)[number];
 
 // Mirrors sim.Quality.
 export const Quality = { Perfect: 0, Good: 1, Forced: 2 } as const;

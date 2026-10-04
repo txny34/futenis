@@ -5,11 +5,13 @@ import { Controls } from "./input";
 import { GameLoop, LoopState, MatchResult } from "./loop";
 import { CourtView } from "./render";
 import { Snap } from "./snapshot";
+import { applyTraining } from "./train-config";
 import { MatchScreens, VS_INTRO_MS } from "./ui/match-screens";
 import { Difficulty, GameMode, MatchOptions, MenuUI, Settings } from "./ui/menu";
+import { DEFAULT_TRAINING } from "./ui/training-settings";
 
 const RESET_KEY = "KeyR";
-const RESPAWN_KEY = "KeyB";
+const FEED_KEY = "KeyB";
 const LOADING_TEXT = "Cargando…";
 const MODE_ID: Readonly<Record<GameMode, MatchSetup["mode"]>> = { "1v1": 0, "2v2": 1, playground: 2 };
 const DIFFICULTY_ID: Readonly<Record<Difficulty, number>> = { easy: 0, normal: 1, hard: 2, pro: 3 };
@@ -62,6 +64,8 @@ function startMatch(app: App, o: MatchOptions): void {
   app.hud.error("");
   app.engine.clearInputs();
   app.engine.configure(toSetup(o));
+  const training = o.training ?? DEFAULT_TRAINING; // ball machine: live Config, kept by reset()
+  if (o.mode === "playground") applyTraining(app.engine, training);
   app.engine.reset();
   app.mode = o.mode;
   app.last = o;
@@ -73,6 +77,7 @@ function startMatch(app: App, o: MatchOptions): void {
   app.controls.lock();
   app.loop?.rearm();
   app.hud.resetMatch();
+  app.hud.setTrainingOnDemand(o.mode === "playground" && training.onDemand);
   app.hud.setDashCooldown(app.engine.getConfig()[CFG_DASH_COOLDOWN]);
   app.screens.hide();
   if (o.mode !== "playground") {
@@ -135,7 +140,7 @@ function wire(app: App, menu: MenuUI): void {
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {
     if (!app.state.running || app.state.paused) return;
-    if (code === RESPAWN_KEY && app.mode === "playground") app.engine.respawnBall();
+    if (code === FEED_KEY && app.mode === "playground") app.engine.respawnBall();
     if (code === RESET_KEY) {
       app.engine.reset();
       app.loop?.rearm();

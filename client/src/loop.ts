@@ -133,6 +133,7 @@ export class GameLoop {
     const shot = this.shots.onEvent(e);
     this.view.players.onEvent(e);
     this.hud.onEvent(e, shot, now);
+    if (e.kind === EventKind.Feed) this.view.machine.flash();
     if (e.kind === EventKind.Kick) this.onKick(e, now);
     else this.tally(e);
   }

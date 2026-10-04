@@ -36,8 +36,9 @@ const EVENTS_OFFSET = EVENT_COUNT_OFFSET + 1;
 export const OUT_LEN = EVENTS_OFFSET + MAX_EVENTS * EVENT_STRIDE;
 export const MIN_STEPS = 1;
 export const MAX_STEPS = 15; // wasm maxSteps per call
-/** Mirrors sim.CfgLen (sim/config_layout.go). */
-export const CFG_LEN = 132;
+/** Mirrors sim.CfgLen (sim/config_layout.go): 72 scalars (training.md appended
+ * 17 at 55..71) + the 77-float parts table. */
+export const CFG_LEN = 149;
 const F64 = 8;
 
 const emptyEvent = (): SimEvent => ({
@@ -109,9 +110,14 @@ export class Engine {
     check("configure", this.requireBridge().configure(s.mode, s.difficulty, s.pointsToWin, s.humanMask));
   }
 
-  respawnBall(): void { this.requireBridge().respawnBall(); }
+  /** Playground: asks the ball machine for a feed now (wasm feed(), training.md §4). */
+  respawnBall(): void {
+    const b = this.requireBridge();
+    if (b.feed) b.feed();
+    else b.respawnBall();
+  }
 
-  /** Reads the live Config into an engine-owned buffer (dev panel only, not per frame). */
+  /** Reads the live Config into an engine-owned buffer (dev panel and match setup, never per frame). */
   getConfig(): Float64Array {
     const u8 = new Uint8Array(this.cfg.buffer);
     const r = this.requireBridge().getConfig(u8);

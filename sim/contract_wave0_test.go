@@ -250,7 +250,7 @@ func TestNumPlayersForMode(t *testing.T) {
 	}{
 		{Mode1v1, 2},
 		{Mode2v2, 4},
-		{ModePlayground, 2},
+		{ModePlayground, 1},
 	}
 	for _, c := range cases {
 		if got := numPlayersForMode(c.mode); got != c.want {
@@ -268,8 +268,8 @@ func TestNewMatch_PlaygroundStartsInRallyWithNoServe(t *testing.T) {
 	if s.Phase != PhaseRally {
 		t.Fatalf("Phase: got %v, want PhaseRally", s.Phase)
 	}
-	if s.NumPlayers != 2 {
-		t.Fatalf("NumPlayers: got %d, want 2", s.NumPlayers)
+	if s.NumPlayers != 1 {
+		t.Fatalf("NumPlayers: got %d, want 1 (Entrenamiento)", s.NumPlayers)
 	}
 }
 
@@ -290,22 +290,6 @@ func TestNewMatch_2v2StartsAllFourPlayers(t *testing.T) {
 			t.Errorf("player %d not positioned for the 2v2 serve: %+v", i, p)
 		}
 	}
-}
-
-func TestRespawnBall(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Mode = ModePlayground
-	m := NewMatch(cfg)
-	s := m.State()
-	s.Ball.Pos = Vec3{X: 50, Y: 50, Z: 50}
-	m.Restore(s)
-
-	m.RespawnBall()
-
-	got := m.State().Ball
-	assertFloat(t, "ball.Pos.X", got.Pos.X, 0)
-	assertFloat(t, "ball.Pos.Y", got.Pos.Y, serveBallHeight)
-	assertFloat(t, "ball.Pos.Z", got.Pos.Z, 0)
 }
 
 func TestTeamPlayers(t *testing.T) {

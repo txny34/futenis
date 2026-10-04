@@ -28,16 +28,19 @@ const (
 const tiebreakTarget = 7
 
 // hasWonGamePadel reports whether pointsW (the team that just scored) has
-// won the current game against pointsL: either the classic "first to 4,
-// win by 2" advantage rule, or -- with Config.GoldenPoint -- sudden death
-// the instant either team leads at 40-40 (3-3) or later, no 2-point margin
-// required ("punto de oro").
-func hasWonGamePadel(pointsW, pointsL int, golden bool) bool {
-	if golden && pointsL >= 3 && pointsW > pointsL {
+// won the current game against pointsL: either the classic "first to
+// target (4, or tiebreakTarget in a tiebreak), win by 2" rule, or, with
+// Config.GoldenPoint, sudden death the instant either team leads at 40-40
+// (3-3) or later, no 2-point margin required ("punto de oro").
+func hasWonGamePadel(pointsW, pointsL, target int, golden bool) bool {
+	if golden && pointsL >= target-1 && pointsW > pointsL {
 		return true
 	}
-	return pointsW >= 4 && pointsW-pointsL >= 2
+	return pointsW >= target && pointsW-pointsL >= 2
 }
+
+// gamePoints is the point target of a normal (non-tiebreak) game.
+const gamePoints = 4
 
 // hasWonSetGames reports whether gamesW (the team that just won a game) has
 // won the set outright: first to target games, ahead by 2. Does not itself
@@ -62,7 +65,7 @@ func setNeedsTiebreak(g0, g1, target int) bool {
 // either direction -- a lingering/stale read before the game actually
 // resets) clamps to the 40-40 display instead of a nonsensical code.
 func pointDisplayCode(mine, other int, golden bool) int {
-	if hasWonGamePadel(mine, other, golden) || hasWonGamePadel(other, mine, golden) {
+	if hasWonGamePadel(mine, other, gamePoints, golden) || hasWonGamePadel(other, mine, gamePoints, golden) {
 		return 3
 	}
 	if mine <= 2 {
@@ -93,7 +96,7 @@ func gamePointTarget(s *State) (target int, golden bool) {
 	if isTiebreak(s) {
 		return tiebreakTarget, false
 	}
-	return 4, s.Cfg.GoldenPoint
+	return gamePoints, s.Cfg.GoldenPoint
 }
 
 // awardPointPadel is awardPoint's ScoringPadel branch (docs/design/
@@ -112,9 +115,10 @@ func awardPointPadel(s *State, winner int8, ev []Event) []Event {
 	ev = append(ev, Event{Kind: EvPoint, Tick: s.Tick, Side: winner, Player: -1})
 
 	target, golden := gamePointTarget(s)
-	if hasWonGamePadel(s.Score[winner], s.Score[1-winner], golden) {
+	if hasWonGamePadel(s.Score[winner], s.Score[1-winner], target, golden) {
 		return awardGamePadel(s, winner, ev)
 	}
+	rotateTiebreakServe(s)
 	ev = appendGamePointWarnings(s, target, golden, ev)
 	return startNextPoint(s, winner, ev)
 }
@@ -125,7 +129,7 @@ func awardPointPadel(s *State, winner int8, ev []Event) []Event {
 // edge, but before the game itself is decided.
 func appendGamePointWarnings(s *State, target int, golden bool, ev []Event) []Event {
 	for t := int8(0); t < 2; t++ {
-		if !hasWonGamePadel(s.Score[t]+1, s.Score[1-t], golden) {
+		if !hasWonGamePadel(s.Score[t]+1, s.Score[1-t], target, golden) {
 			continue
 		}
 		if t == s.Server {
@@ -134,8 +138,32 @@ func appendGamePointWarnings(s *State, target int, golden bool, ev []Event) []Ev
 			ev = append(ev, Event{Kind: EvBreakPoint, Tick: s.Tick, Side: t, Player: -1})
 		}
 	}
-	_ = target
 	return ev
+}
+
+// rotateTiebreakServe applies the tiebreak serve order after a point that
+// did not end it: the first point is served by the team due to serve, then
+// the serve changes hands every 2 points (after points 1, 3, 5, ...). The
+// box keeps alternating every point (serveBoxForScore on the tiebreak
+// score). No-op outside a tiebreak.
+func rotateTiebreakServe(s *State) {
+	if isTiebreak(s) && (s.Score[0]+s.Score[1])%2 == 1 {
+		s.Server = 1 - s.Server
+	}
+}
+
+// nextServerAfterGame returns who serves the game after the one just won
+// (called before Score resets): normally the other team; after a tiebreak,
+// the team that RECEIVED its first point. s.Server is the server of the
+// tiebreak's last point (index T-1), which is the first server F flipped
+// once per completed 2-point block: F = Server xor ((T/2)&1).
+func nextServerAfterGame(s *State, wasTiebreak bool) int8 {
+	if !wasTiebreak {
+		return 1 - s.Server
+	}
+	t := s.Score[0] + s.Score[1]
+	first := s.Server ^ int8((t/2)&1)
+	return 1 - first
 }
 
 // awardGamePadel resolves a finished game: emits EvGameWon, increments
@@ -146,8 +174,8 @@ func awardGamePadel(s *State, winner int8, ev []Event) []Event {
 	ev = append(ev, Event{Kind: EvGameWon, Tick: s.Tick, Side: winner, Player: -1})
 	wasTiebreak := isTiebreak(s)
 	s.Games[winner]++
+	s.Server = nextServerAfterGame(s, wasTiebreak)
 	s.Score = [2]int{}
-	s.Server = 1 - s.Server
 
 	if wasTiebreak || hasWonSetGames(s.Games[winner], s.Games[1-winner], s.Cfg.GamesPerSet) {
 		return awardSetPadel(s, winner, ev)

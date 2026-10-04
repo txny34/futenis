@@ -59,6 +59,7 @@ func (c *Config) Sanitize() {
 	c.sanitizeShotShaping()
 	c.sanitizeSpinAndMisc()
 	c.sanitizeParts()
+	c.sanitizeFeed()
 	c.recomputeTickCaches()
 }
 
@@ -236,6 +237,7 @@ func (c *Config) recomputeTickCaches() {
 	c.serveTimeLimitTicks = clampTickCount(ticksOf(c.ServeTimeLimit), math.MaxInt32)
 	c.dashTicks = clampTickCount(ticksOf(c.DashTime), math.MaxUint16)
 	c.dashCooldownTicks = clampTickCount(ticksOf(c.DashCooldownTime), math.MaxUint16)
+	c.feedIntervalTicks = clampTickCount(ticksOf(c.FeedInterval), math.MaxInt32)
 }
 
 // defaultParts returns the §6 contact table. PartNone is left zero-valued

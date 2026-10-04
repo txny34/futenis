@@ -8,7 +8,7 @@ const DIFFICULTIES: readonly Choice<Difficulty>[] = [
 ];
 
 const MODE_TITLES: Record<GameMode, string> = {
-  "1v1": "1v1 vs IA", "2v2": "2v2 · vos + IA vs IA", playground: "Playground",
+  "1v1": "1v1 vs IA", "2v2": "2v2 · vos + IA vs IA", playground: "Entrenamiento",
 };
 
 export function panel(title: string, ...children: HTMLElement[]): HTMLElement {
@@ -38,7 +38,7 @@ export function mainMenu(a: MainActions): HTMLElement {
   nav.append(
     button("1v1 vs IA", () => a.pick("1v1")),
     button("2v2 (vos + IA vs IA)", () => a.pick("2v2")),
-    button("Playground — práctica libre", () => a.pick("playground")),
+    button("Entrenamiento — máquina lanzapelotas", () => a.pick("playground")),
     button("Ajustes", a.settings, "fx-btn fx-btn--ghost"),
     disabledButton("Online", "pronto"),
   );

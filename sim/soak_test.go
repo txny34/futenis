@@ -14,8 +14,8 @@ import (
 //   - no NaN/Inf anywhere in Ball/Player Pos/Vel.
 //   - every active player stays within the court (clampPlayerToCourt's own
 //     contract); the ball stays within a generous bound unless Ball.Out is
-//     already true (ModePlayground intentionally lets an out ball keep
-//     flying away until RespawnBall -- see rules.go/match.go docs).
+//     already true (ModePlayground lets an out ball keep flying until
+//     the ball machine's next feed -- see feed.go).
 //   - every point (1v1/2v2 only) resolves -- an EvPoint/EvGameOver -- within
 //     maxPointTicks (60s of simulated play) of the previous one.
 //   - the match never sits in PhaseServe or PhasePoint past a generous

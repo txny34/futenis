@@ -5,13 +5,15 @@ import { Callouts } from "./hud-callouts";
 import { CallTracker } from "./hud-calls";
 import { Popups, POPUP_GOOD, POPUP_MISS, POPUP_PERFECT } from "./hud-popups";
 import { Scoreboard } from "./hud-score";
+import { TrainingHud } from "./hud-training";
 import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
 
 const NAMES = ["Local", "Visita"] as const; // team colors come from the theme, so no color names
 const HELP_TEXT =
   "WASD mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · Espacio salto · " +
   "Q dash · Ctrl mouse libre · Esc pausa";
-const PLAYGROUND_HELP = " · B nueva pelota";
+const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
+const PLAYGROUND_HELP = ` · ${LAUNCH_KEY} lanzar bola`;
 const CALL_MS = 1800;
 const SERVE_HINT = "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado";
 const HUMAN_TEAM = 0;
@@ -33,6 +35,7 @@ export class Hud {
   private readonly board = new Scoreboard();
   private readonly banner = new Callouts();
   private readonly popups = new Popups();
+  private readonly training = new TrainingHud(LAUNCH_KEY);
   private readonly actions: ActionBar;
   private callUntil = 0;
   private lastPhase = UNSET;
@@ -53,7 +56,7 @@ export class Hud {
     this.actions = new ActionBar();
     root.append(
       this.board.score, this.board.shots, this.msg, this.banner.root, this.call, this.hint,
-      this.popups.root, this.crosshair, this.actions.root, this.fps, this.help, this.err,
+      this.popups.root, this.training.root, this.training.pop, this.crosshair, this.actions.root, this.fps, this.help, this.err,
     );
   }
 
@@ -72,9 +75,13 @@ export class Hud {
   /** Center crosshair, shown while the pointer is locked. */
   setCrosshair(visible: boolean): void { this.crosshair.hidden = !visible; }
 
+  /** Entrenamiento: FeedOnDemand of the session (shows the launch hint, hides the countdown). */
+  setTrainingOnDemand(v: boolean): void { this.training.setOnDemand(v); }
+
   /** New match: drop transient banners/cooldowns. */
   resetMatch(): void {
     this.banner.clear();
+    this.training.reset();
     this.dashAt = -Infinity;
     this.call.hidden = true;
   }
@@ -86,7 +93,9 @@ export class Hud {
       this.call.hidden = false;
       this.callUntil = nowMs + CALL_MS;
     }
-    this.banner.onEvent(e, shot, HUMAN_TEAM, nowMs);
+    // Entrenamiento has no rival: no "PUNTO RIVAL" banner for the sim's internal point ends.
+    if (this.lastMode !== Mode.Playground || e.kind !== EventKind.Point) this.banner.onEvent(e, shot, HUMAN_TEAM, nowMs);
+    this.training.onEvent(e, nowMs);
     if (e.kind === EventKind.Dash && e.player === HUMAN_SLOT) this.dashAt = nowMs;
   }
 
@@ -103,6 +112,7 @@ export class Hud {
     this.board.update(snap);
     this.banner.update(nowMs);
     this.popups.update(nowMs);
+    this.training.update(snap, nowMs);
     if (!this.call.hidden && nowMs > this.callUntil) this.call.hidden = true;
     const phase = snap[Snap.Phase];
     const server = snap[Snap.Server];
@@ -112,7 +122,7 @@ export class Hud {
     this.lastServer = server;
     this.lastMode = mode;
     const playground = mode === Mode.Playground;
-    this.msg.textContent = playground ? "Playground" : message(phase, server);
+    this.msg.textContent = playground ? "" : message(phase, server); // RACHA owns the top in Entrenamiento
     this.hint.hidden = playground || phase !== Phase.Serve || server !== HUMAN_TEAM;
     this.help.textContent = playground ? HELP_TEXT + PLAYGROUND_HELP : HELP_TEXT;
   }

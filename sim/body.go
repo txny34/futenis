@@ -25,12 +25,15 @@ func applyBodyCollisions(s *State, ev []Event) []Event {
 // depenetrates, decays spin and emits EvBodyHit. The player who struck the
 // ball within the last graceTicks is immune to colliding with their own
 // body (so a shot can leave the kicker's own hitbox without immediately
-// bouncing off it again).
+// bouncing off it again). A player with a strike still buffered is skipped
+// too: the strike is waiting for its best contact tick and owns the ball,
+// so the capsule must not touch it first (that touch plus the strike one
+// tick later would be judged a double touch).
 func resolveBodyHit(s *State, i int8, ev []Event) []Event {
 	p := &s.Players[i]
 	cfg := &s.Cfg
 	grace := uint32(clampTickCount(cfg.graceTicks, math.MaxInt32))
-	if p.StruckAt != 0 && s.Tick-p.StruckAt < grace {
+	if p.Buffer > 0 || (p.StruckAt != 0 && s.Tick-p.StruckAt < grace) {
 		return ev
 	}
 
