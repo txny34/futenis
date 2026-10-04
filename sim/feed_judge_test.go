@@ -226,3 +226,33 @@ func TestJudgeFeed_GrazeKickThenSecondKickFails(t *testing.T) {
 		t.Fatalf("out=%+v, want fail on the third touch", out)
 	}
 }
+
+// TestTraining_ClickBetweenFeedsDoesNotFailNextBall: in Training a strike
+// released while no machine ball is live (the gap between feeds) must be
+// discarded, not carried onto the next ball where it whiffs and breaks the
+// streak.
+func TestTraining_ClickBetweenFeedsDoesNotFailNextBall(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Mode = ModePlayground
+	m := NewMatch(cfg)
+	press := [MaxPlayers]PlayerInput{{Buttons: BtnStrike}}
+	idle := [MaxPlayers]PlayerInput{}
+	next := m.State().Feed.NextTick
+	for m.State().Tick+5 < next {
+		m.Step(idle)
+	}
+	m.Step(press) // click...
+	m.Step(press)
+	// ...released just before the feed, then nothing: the idle player later
+	// fails the ball by not touching it (legit), but never by a whiff.
+	for i := 0; i < TickRate*2; i++ {
+		for _, e := range m.Step(idle) {
+			if e.Kind == EvWhiff && e.Player == 0 {
+				t.Fatalf("tick %d: whiff after a click between feeds, want the click discarded", e.Tick)
+			}
+		}
+		if m.State().Feed.Live && m.State().Players[0].Buffer != 0 {
+			t.Fatalf("a strike buffer carried over onto the new ball")
+		}
+	}
+}

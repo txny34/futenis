@@ -61,13 +61,16 @@ func forwardSign(team int8) float64 {
 
 // canKick reports whether player index i is allowed to attempt a strike
 // this tick: only the designated server (Rally.ServerPlayer) may strike
-// during PhaseServe, anyone may strike during PhaseRally.
+// during PhaseServe, anyone may strike during PhaseRally (in Training only
+// while a machine ball is live).
 func canKick(s *State, i int8) bool {
 	switch s.Phase {
 	case PhaseServe:
 		return i == s.Rally.ServerPlayer
 	case PhaseRally:
-		return true
+		// Training: no machine ball live (the gap between feeds) means nothing
+		// to kick, so a strike released then is discarded (applyStrikes).
+		return s.Cfg.Mode != ModePlayground || s.Feed.Live
 	default:
 		return false
 	}
