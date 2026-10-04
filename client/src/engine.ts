@@ -117,7 +117,7 @@ export class Engine {
     else b.respawnBall();
   }
 
-  /** Reads the live Config into an engine-owned buffer (dev panel only, not per frame). */
+  /** Reads the live Config into an engine-owned buffer (dev panel and match setup, never per frame). */
   getConfig(): Float64Array {
     const u8 = new Uint8Array(this.cfg.buffer);
     const r = this.requireBridge().getConfig(u8);

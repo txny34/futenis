@@ -50,16 +50,24 @@ function chips(label: string, choices: readonly Choice<number>[], mask: number, 
   return r;
 }
 
+const SAVE_DEBOUNCE_MS = 250;
+
 /** onStart receives the final settings (already persisted). */
 export function trainingView(onStart: (t: TrainingSettings) => void, onBack: () => void): HTMLElement {
   let t = loadTraining();
   const map = minimap();
   const interval = el("div", "fx-tinterval");
+  let saveTimer = 0;
+  const flush = (): void => {
+    window.clearTimeout(saveTimer);
+    saveTraining(t);
+  };
   const set = (p: Patch): void => {
     t = { ...t, ...p };
-    saveTraining(t);
     map.update(t);
     interval.hidden = t.onDemand;
+    window.clearTimeout(saveTimer); // sliders fire per drag tick: persist once they settle
+    saveTimer = window.setTimeout(flush, SAVE_DEBOUNCE_MS);
   };
 
   const pista = card("Pista",
@@ -96,8 +104,8 @@ export function trainingView(onStart: (t: TrainingSettings) => void, onBack: () 
   grid.append(pista, golpe, sesion);
   const actions = el("div", "fx-actions");
   actions.append(
-    button("Volver", onBack, "fx-btn fx-btn--ghost"),
-    button("Empezar", () => onStart(t), "fx-btn fx-btn--hero"),
+    button("Volver", () => { flush(); onBack(); }, "fx-btn fx-btn--ghost"),
+    button("Empezar", () => { flush(); onStart(t); }, "fx-btn fx-btn--hero"),
   );
   root.append(
     el("h2", "fx-card__title", "Entrenamiento"),
