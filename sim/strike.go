@@ -21,7 +21,11 @@ func applyStrikes(s *State, inputs [MaxPlayers]PlayerInput, ev []Event) []Event 
 		ev = updateCharge(s, i, inputs[i], ev)
 
 		p := &s.Players[i]
-		if p.Buffer == 0 || !canKick(s, i) {
+		if p.Buffer == 0 {
+			continue
+		}
+		if !canKick(s, i) {
+			p.Buffer = 0 // released while unable to kick: discard it, never fire later with a stale target
 			continue
 		}
 		p.Buffer--
