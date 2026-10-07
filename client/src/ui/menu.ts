@@ -25,7 +25,7 @@ export class MenuUI {
   private inGame = false;
   private lobbyModel: (() => LobbyMenuModel) | null = null;
   private settingsBack: Screen = "hidden";
-  private lobbyOpenedAt = -Infinity;
+  private openedAt = -Infinity; // last pause/lobby-menu open, for the Esc debounce
   private readonly openCbs: Listener<boolean>[] = [];
   private readonly settingsCbs: Listener<Settings>[] = [];
   private readonly pauseCbs: Listener<boolean>[] = [];
@@ -57,7 +57,7 @@ export class MenuUI {
   /** Lobby menu: opens from Esc (keydown or lost pointer lock) while no match is live. */
   openLobbyMenu(): void {
     if (this.inGame || !this.lobbyModel || this.isOpen) return;
-    this.lobbyOpenedAt = performance.now();
+    this.openedAt = performance.now();
     this.render("lobby");
   }
   /** Lobby menu "Ajustes": "Volver" returns to the lobby menu. */
@@ -72,6 +72,7 @@ export class MenuUI {
   }
   showPause(): void {
     if (!this.inGame) return;
+    this.openedAt = performance.now();
     this.render("pause");
     this.emitPause(true);
   }
@@ -132,7 +133,7 @@ export class MenuUI {
   private onKey(e: KeyboardEvent): void {
     if (e.code === "Escape") {
       e.preventDefault();
-      if (this.screen === "lobby" && performance.now() - this.lobbyOpenedAt < ESC_DEBOUNCE_MS) return;
+      if ((this.screen === "lobby" || this.screen === "pause") && performance.now() - this.openedAt < ESC_DEBOUNCE_MS) return;
       if (this.isOpen) this.back();
       else if (this.inGame) this.showPause();
       else this.openLobbyMenu();
