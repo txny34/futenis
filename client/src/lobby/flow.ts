@@ -1,5 +1,6 @@
 import type { Engine, MatchSetup } from "../engine";
 import { recorder } from "../profile/recorder";
+import { profileStore } from "../profile/store";
 import type { Hud } from "../hud";
 import type { Controls } from "../input";
 import type { GameLoop, LoopState, MatchResult } from "../loop";
@@ -11,8 +12,9 @@ import type { Difficulty, GameMode, MatchOptions, MenuUI, Settings } from "../ui
 import { DEFAULT_TRAINING, loadTraining } from "../ui/training-settings";
 import { DEFAULT_POINTS } from "../ui/types";
 import type { BottomBar } from "./bottom-bar";
-import { getDifficulty, setDifficulty } from "./difficulty";
+import { botLevelFor } from "./bot-level";
 import type { ProfileCard } from "./profile-card";
+import type { PlayModal } from "../ui/play-modal/play-modal";
 import { PAD_MODES } from "./pads";
 
 // Lobby <-> match flow (docs/design/lobby.md §6): the sim detects pads, the
@@ -20,6 +22,7 @@ import { PAD_MODES } from "./pads";
 const LOADING_TEXT = "Cargando…";
 const MODE_ID: Readonly<Record<GameMode, MatchSetup["mode"]>> = { "1v1": 0, "2v2": 1, playground: 2 };
 const LOBBY_MODE_ID: MatchSetup["mode"] = Mode.Lobby;
+const LOBBY_BOT: Difficulty = "normal"; // the lobby has no bot; any valid id
 const DIFFICULTY_ID: Readonly<Record<Difficulty, number>> = { easy: 0, normal: 1, hard: 2, pro: 3 };
 // Single local human on slot 0 in every mode: rivals/partner are AI (filled inside wasm).
 const HUMAN_MASK = 1;
@@ -42,6 +45,8 @@ export interface App {
   profile: ProfileCard;
   screens: MatchScreens;
   menu: MenuUI;
+  /** JUGAR / 1v1-2v2 pads: the "Elegí un modo" modal. */
+  play: PlayModal;
   /** null while in the lobby. */
   mode: GameMode | null;
   inLobby: boolean;
@@ -89,7 +94,7 @@ export function enterLobby(app: App): void {
   app.hud.error("");
   recorder().end();
   app.engine.clearInputs();
-  app.engine.configure(setup(LOBBY_MODE_ID, getDifficulty(), DEFAULT_POINTS));
+  app.engine.configure(setup(LOBBY_MODE_ID, LOBBY_BOT, DEFAULT_POINTS));
   app.mode = null;
   app.state.holdUntil = 0;
   app.state.showLanding = false;
@@ -111,8 +116,7 @@ export function startMatch(app: App, o: MatchOptions): void {
   app.mode = o.mode;
   app.last = o;
   recorder().end();
-  recorder().begin(o.mode === "playground" ? "training" : o.mode, o.difficulty);
-  app.bar.remember(o.mode);
+  recorder().begin(o.mode === "playground" ? "training" : o.mode, o.difficulty, o.ranked);
   app.state.showLanding = landingAllowed(app.menu.settings, o);
   app.hud.setTrainingOnDemand(o.mode === "playground" && training.onDemand);
   app.hud.setDashCooldown(app.engine.getConfig()[CFG_DASH_COOLDOWN]);
@@ -126,9 +130,10 @@ export function startMatch(app: App, o: MatchOptions): void {
   }
 }
 
-/** Options for a mode picked from the lobby (pad or JUGAR) with the lobby difficulty. */
-export function lobbyOptions(mode: GameMode, training = loadTraining()): MatchOptions {
-  return { mode, difficulty: getDifficulty(), pointsToWin: DEFAULT_POINTS, training: mode === "playground" ? training : undefined };
+/** Options for a mode picked in the lobby; the bot level follows the queue's ELO. */
+export function lobbyOptions(mode: GameMode, ranked = false, training = loadTraining()): MatchOptions {
+  const difficulty = mode === "playground" ? LOBBY_BOT : botLevelFor(profileStore().get().elo[mode]);
+  return { mode, difficulty, ranked: ranked && mode !== "playground", pointsToWin: DEFAULT_POINTS, training: mode === "playground" ? training : undefined };
 }
 
 export function safeStart(app: App, o: MatchOptions): void {
@@ -148,26 +153,20 @@ export function onPadEvent(app: App, kind: number, pad: number): void {
   }
 }
 
-/** A pad opens its mode's setup (menu overlay: controls off, pointer free). The sim
- * re-fires EvPadStart only after leaving and re-entering the pad, so "Volver" is safe. */
+/** A pad opens its overlay (controls off, pointer free): Entrenamiento -> training panel,
+ * 1v1/2v2 -> "Elegí un modo" with that casual card preselected. The sim re-fires
+ * EvPadStart only after leaving and re-entering the pad, so closing is safe. */
 function openPadSetup(app: App, mode: GameMode): void {
-  if (app.menu.isOpen) return;
-  if (mode === "playground") {
-    app.menu.openTraining((t) => safeStart(app, lobbyOptions("playground", t)));
-    return;
-  }
-  app.menu.openMatchSetup(mode, getDifficulty(), {
-    go: (o) => safeStart(app, { ...o, pointsToWin: DEFAULT_POINTS }),
-    back: () => undefined,
-    difficulty: setDifficulty,
-  });
+  if (app.menu.isOpen || app.play.isOpen) return;
+  if (mode === "playground") app.menu.openTraining((t) => safeStart(app, lobbyOptions("playground", false, t)));
+  else app.play.open({ mode, ranked: false });
 }
 
 export function showResult(app: App, r: Readonly<MatchResult>, snap: Float64Array): void {
   app.controls.enabled = false;
   app.controls.releaseAll();
   const winner = r.winner >= 0 ? r.winner : snap[Snap.Sets0] >= snap[Snap.Sets1] ? 0 : 1;
-  recorder().matchOver(winner === HUMAN_TEAM);
+  recorder().matchOver(winner === HUMAN_TEAM, r.games0, r.games1);
   app.screens.showResult({ won: winner === HUMAN_TEAM, games0: r.games0, games1: r.games1 }, {
     rematch: () => { if (app.last) safeStart(app, app.last); },
     lobby: () => {

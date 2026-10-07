@@ -1,4 +1,5 @@
 import { EventKind, Quality, SimEvent } from "../snapshot";
+import { pushHistory } from "./history";
 import { missions } from "./missions";
 import { applyMatch, applyPerfect, applyTraining, BotDifficulty } from "./progress";
 import { profileWriter, Queue } from "./store";
@@ -16,14 +17,16 @@ export const TRAINING_MIN_RETURNS = 5;
 class Recorder {
   private activity: Activity = null;
   private bot: BotDifficulty = "normal";
+  private ranked = false;
   private returns = 0;
   private run = 0;
   private bestRun = 0;
 
   /** Arranca un partido (cola 1v1/2v2) o un entrenamiento. */
-  begin(activity: Queue | "training", bot: BotDifficulty): void {
+  begin(activity: Queue | "training", bot: BotDifficulty, ranked: boolean): void {
     this.activity = activity;
     this.bot = bot;
+    this.ranked = activity !== "training" && ranked;
     this.returns = 0;
     this.run = 0;
     this.bestRun = 0;
@@ -45,12 +48,15 @@ class Recorder {
     }
   }
 
-  /** Fin de un partido con puntuación (GameLoop.onMatchOver). */
-  matchOver(won: boolean): void {
+  /** Fin de un partido con puntuación (GameLoop.onMatchOver); games = juegos local/visita. */
+  matchOver(won: boolean, games0: number, games1: number): void {
     const a = this.activity;
     if (a !== "1v1" && a !== "2v2") return;
     this.activity = null;
-    profileWriter().update((s) => applyMatch(s, a, this.bot, won));
+    const w = profileWriter();
+    const before = w.get().elo[a];
+    w.update((s) => applyMatch(s, a, this.bot, won, this.ranked));
+    pushHistory({ at: Date.now(), queue: a, ranked: this.ranked, won, games0, games1, eloDelta: w.get().elo[a] - before });
     missions().record("match", 1);
     if (won) missions().record("win", 1);
   }

@@ -121,23 +121,25 @@ el cliente ya hace hoy para arrancar un partido.
 
 - Arranque: el cliente carga wasm y llama `configure(3, difficulty, pointsToWin, 1)` + `reset()` → lobby.
 - `EvPadStart(Side = p)` → el cliente mapea `p` → `GameMode` (`0 → playground`, `1 → 1v1`, `2 → 2v2`), hace el flash
-  del pad y **abre la pantalla de setup de ese modo** (no arranca solo): 1v1/2v2 → `matchSetup` (dificultad
-  preseleccionada desde el menú del lobby, "¡A la cancha!" / "Volver"); Entrenamiento → panel de entrenamiento ("Empezar").
-  Mientras está abierta, controles deshabilitados y puntero liberado; Esc o "Volver" la cierran y devuelven el control
+  del pad y **abre el overlay de ese modo** (no arranca solo): 1v1/2v2 → modal **"Elegí un modo"** con la card casual de
+  ese modo preseleccionada (§"Elegí un modo"); Entrenamiento → panel de entrenamiento ("Empezar").
+  Mientras está abierto, controles deshabilitados y puntero liberado; Esc, ✕ o "Volver" lo cierran y devuelven el control
   en el lobby. Al confirmar se llama a `startMatch(opts)` (`configure(mode,...)`, `applyTraining` si playground,
   `reset()`), con VS intro como hoy. El sim solo re-emite `EvPadStart` tras salir y volver a entrar al pad
   (`LobbyState.Started` se limpia al cambiar de pad), así que cancelar parado sobre el pad no re-abre la pantalla.
-- **JUGAR** (barra inferior) arranca directo el último modo, sin pantalla de setup.
+- **JUGAR** (barra inferior) abre el modal "Elegí un modo" sin selección.
   No hace falta re-instanciar el wasm: `configure` + `reset` ya reconstruyen `Match` con la Config nueva.
 - **Volver al lobby**: al cerrar la pantalla VICTORIA/DERROTA (botón "Volver al lobby"), y desde la pausa (Esc) con un
   botón **Volver al lobby**, el cliente llama `configure(3, …)` + `reset()`. El jugador reaparece en el spawn.
   En Entrenamiento no hay fin: solo Esc → Volver al lobby.
-- La dificultad elegida y la config de entrenamiento siguen en `localStorage` (try/catch) como hoy.
+- **Sin dificultad en la UI.** El nivel del bot es automático según el ELO del invitado en esa cola
+  (`lobby/bot-level.ts`, función pura): `elo < 900 → easy`, `< 1100 → normal`, `< 1300 → hard`, si no `pro`.
+  La clave vieja `futenis.difficulty` se ignora. La config de entrenamiento sigue en `localStorage` (try/catch).
 
 ## 7. Cliente (UI del lobby)
 
 - **Sin título/menú inicial**: `main.ts` arranca en el lobby (se eliminaron `titleScreen`/`mainMenu`). El menú se
-  conserva como overlay: el **menú del lobby** (Esc) con Dificultad, Entrenamiento y Ajustes, y el setup de modo al pisar un pad.
+  conserva como overlay: el **menú del lobby** (Esc) con Entrenamiento y Ajustes, y el modal "Elegí un modo" (JUGAR / pads 1v1-2v2).
 - **Escena**: piso grande del lobby (`2·LobbyHalfX × 2·LobbyHalfZ`) con borde neón; la cancha de pádel NO se dibuja en
   `ModeLobby` (se oculta/muestra el grupo de la cancha). Misma cámara (seguimiento detrás del jugador) e input.
 - **Pads**: disco emisivo de radio 1.5 m + **cartel 3D** (plano con textura de canvas generada una vez al cargar,
@@ -145,17 +147,15 @@ el cliente ya hace hoy para arrancar un partido.
   **Anillo de llenado** alrededor del pad que muestra `SnapLobbyHold` (0→1); pulso al `EvPadEnter`, flash al
   `EvPadStart`. Geometrías/materiales creados una vez; por frame solo se actualizan uniforms/escalas (cero allocations).
 - **Menú del lobby (Esc)**: modal estilo juego (`ui/lobby-menu.ts`, mismo `panel`/`fx-stack` que la pausa). Contiene
-  **Dificultad** (`Fácil · Normal · Difícil · Pro`, segmented con la actual marcada; `localStorage` `futenis.difficulty`,
-  `lobby/difficulty.ts`), **Entrenamiento** (panel existente `training-view.ts`; "Volver" regresa al menú),
+  **Entrenamiento** (panel existente `training-view.ts`; "Volver" regresa al menú),
   **Ajustes** ("Volver" regresa al menú) y **Volver** (cierra). Los ítems son una lista simple en `main.ts`
-  (`setLobbyMenu`): agregar uno es sumar `{ label, run }`. La dificultad se aplica a JUGAR y es el default de las
-  pantallas de setup de los pads 1v1/2v2 (si se cambia ahí, se persiste la misma clave).
+  (`setLobbyMenu`): agregar uno es sumar `{ label, run }`.
   Abrir/cerrar: con el puntero bloqueado el navegador consume el primer Esc para soltar el pointer lock, así que
   `onLockLost` en el lobby (sin otro menú abierto) abre el menú — igual que la pausa en partido; con el puntero libre,
   `keydown Escape` lo alterna (debounce de 150 ms por si el mismo Esc llega por ambos caminos). Mientras está abierto,
   controles deshabilitados y mouse libre; al cerrar vuelve el control. En partido, Esc sigue abriendo la pausa.
-- **Barra inferior**: solo el dock `[Equipo · Estilos · Misiones]  JUGAR  [Regalo · Tienda · Mercancía]`. JUGAR arranca
-  el último modo jugado (`localStorage` `futenis.lastMode`; default `1v1`).
+- **Barra inferior**: solo el dock `[Equipo · Estilos · Misiones]  JUGAR  [Regalo · Tienda · Mercancía]`. JUGAR abre
+  "Elegí un modo" (ya no hay `futenis.lastMode`).
 - **HUD del lobby**: oculto el marcador/racha; la línea de ayuda abajo a la izquierda muestra "Esc menú". Sin hint de pads.
 - Colores **solo** en `client/src/env/theme.ts` (tokens nuevos `lobbyFloor`, `lobbyEdge`, `padTraining`, `pad1v1`,
   `pad2v2`, `padFill`). Archivos TS < 200 líneas, strict, sin `any`.
@@ -230,9 +230,9 @@ El contrato de esta doc (índices §3/§5, eventos §4, nombres en `layout()`) e
 1. Abrir `http://localhost:8090` muestra el lobby directamente con el personaje controlable (WASD, Espacio, Shift, Q),
    sin pantalla de título.
 2. Los 3 pads tienen cartel legible y anillo que se llena según `SnapLobbyHold`; se vacía al salir.
-3. A 1.5 s sobre cada pad arranca el modo correcto con la dificultad de la barra inferior (playground usa la config de
+3. A 1.5 s sobre cada pad arranca el modo correcto (1v1/2v2 vía "Elegí un modo"; playground usa la config de
    entrenamiento guardada).
-4. JUGAR arranca el último modo jugado (default 1v1) sin pisar pads.
+4. JUGAR abre "Elegí un modo" sin pisar pads.
 5. Al terminar un partido, "Volver al lobby" reaparece en el spawn; Esc en partida/entrenamiento ofrece "Volver al lobby".
 6. `assertLayout` pasa con el wasm nuevo; `?dev=1` muestra los 3 sliders del lobby.
 7. No hay tienda, monedas, login ni elementos placeholder.
@@ -259,15 +259,17 @@ JSON roto o storage bloqueado → perfil por defecto en memoria). La escritura (
 
 | Fuente | Qué registra |
 |---|---|
-| `flow.startMatch` → `recorder().begin(cola \| "training", dificultad)` | Abre la actividad actual |
+| `flow.startMatch` → `recorder().begin(cola \| "training", nivelBot, ranked)` | Abre la actividad actual |
 | `GameLoop.onGameEvent` (todo evento no-lobby) | `EvKick` del slot 0 con `quality === Quality.Perfect` → `perfects++` (+5 XP); en entrenamiento `EvReturnOK`/`EvReturnFail` llevan la racha |
-| `GameLoop.onMatchOver` → `flow.showResult` → `recorder().matchOver(won)` | Victoria/derrota, racha, ELO, XP |
+| `GameLoop.onMatchOver` → `flow.showResult` → `recorder().matchOver(won, games0, games1)` | Victoria/derrota, racha, XP; ELO solo en Clasificación; agrega una fila al historial |
 | `flow.enterLobby` / nuevo `startMatch` → `recorder().end()` | Cierra el entrenamiento: cuenta como completado con ≥ 5 devoluciones válidas (+30 XP, `bestTrainingStreak`) |
 
 Abandonar un partido (Esc → Volver al lobby) no cuenta como derrota ni gana XP.
 
-- **XP**: victoria 100, derrota 40, perfecto 5, entrenamiento 30. `xpToNext = 100 + 40·nivel` (sube varias veces si alcanza).
-- **ELO** vs bots (solo partidos; el entrenamiento no toca ELO): rating del bot por dificultad — Fácil 800, Normal 1000,
+- **Casual vs Clasificación** (`MatchOptions.ranked`): casual cuenta victorias/derrotas/racha/XP y deja el ELO igual;
+  clasificación además mueve el ELO y multiplica la XP del partido ×1.5. Las misiones cuentan ambos.
+- **XP**: victoria 100, derrota 40 (×1.5 en Clasificación), perfecto 5, entrenamiento 30. `xpToNext = 100 + 40·nivel` (sube varias veces si alcanza).
+- **ELO** vs bots (solo partidos; el entrenamiento no toca ELO): solo Clasificación; rating del bot por el nivel auto-elegido — Fácil 800, Normal 1000,
   Difícil 1200, Pro 1400 — `K = 32`, `E = 1 / (1 + 10^((bot − yo)/400))`, por cola.
 
 ### Misiones (`profile/missions.ts`, clave `futenis.missions.v1`)
@@ -285,7 +287,7 @@ Reclamar suma la XP de la misión al perfil.
 
 ### UI del lobby
 
-- **Barra inferior**: dock principal (dificultad, Entrenamiento y Ajustes están en el menú Esc)
+- **Barra inferior**: dock principal (Entrenamiento y Ajustes están en el menú Esc; JUGAR abre "Elegí un modo")
   `[Equipo · Estilos · Misiones]  JUGAR  [Regalo · Tienda · Mercancía]`. JUGAR es verde (tokens `--fx-go`,
   `--fx-go-deep`, `--fx-go-ink` en `menu.css`), sin animación. Íconos SVG en línea (`lobby/icons.ts`, `currentColor`).
   Misiones pliega/despliega el panel y muestra un badge con la cantidad reclamable; los otros cinco muestran un aviso
@@ -294,3 +296,18 @@ Reclamar suma la XP de la misión al perfil.
   y botón de reclamar.
 - **Tarjeta de perfil** (`lobby/profile-card.ts`): arriba a la derecha, avatar con nivel, nombre, barra "x / y XP", chips ELO.
 - Todo visible solo en el lobby; el DOM se toca únicamente en `onChange` del perfil/misiones o en clicks.
+
+### "Elegí un modo" (`ui/play-modal/*`)
+
+Modal a pantalla completa (estilo propio, tokens `--fx-*`, sin flashes) que abren JUGAR y los pads 1v1/2v2.
+- **Centro**: "Partidas casuales" (`1v1 · Casual`, `2v2 · Casual`) y "Clasificatorias" (`1v1 · Clasificación`,
+  `2v2 · Clasificación`, subtítulo "Suma ELO · 1.5x XP"). Arte procedural (`art.ts`: SVG en línea de cancha, vidrio, red,
+  jugadores sin paleta y la pelota; gradientes CSS). Selección única (click marca); el botón grande abajo a la derecha
+  dice "ELEGÍ UN MODO" (deshabilitado) hasta elegir y luego "JUGAR", que arranca `lobbyOptions(modo, ranked)`.
+- **Izquierda**: "Tu perfil" (nombre, nivel, G/P, ELO 1v1 y 2v2), leído en cada apertura.
+- **Derecha**: **Historial** (últimos 20 partidos reales: fecha, modo, casual/clasificación, resultado, juegos, ΔELO;
+  `localStorage` `futenis.history.v1`, `profile/history.ts`, lo escribe `recorder.matchOver`), **Información** (reglas
+  cortas + controles) y **Recompensas** (aviso "Próximamente"). Sin datos falsos (ni jugadores activos, ni regiones, ni grupos).
+- ✕ arriba a la derecha y Esc cierran (Esc cierra primero una sub-hoja abierta; listener en captura para que no abra el
+  menú Esc). Mientras está abierto: controles deshabilitados y mouse libre; al cerrar se restauran (mismo patrón que los
+  demás overlays del lobby, `main.ts lobbyOverlay`).

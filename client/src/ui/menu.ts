@@ -1,13 +1,12 @@
 /** MenuUI: settings, Entrenamiento setup and pause overlays over the lobby/match. Owns Esc + arrow navigation.
  * No title or main menu: the game boots straight into the lobby (docs/design/lobby.md §7). */
 import { button, el } from "./dom";
-import { matchSetup, panel, pauseMenu, SetupActions } from "./screens";
+import { panel, pauseMenu } from "./screens";
 import { lobbyMenu, LobbyMenuModel } from "./lobby-menu";
 import { loadSettings, saveSettings, Settings } from "./settings";
 import { settingsView } from "./settings-view";
 import { trainingView } from "./training-view";
 import type { TrainingSettings } from "./training-settings";
-import type { Difficulty, GameMode } from "./types";
 
 export type { Difficulty, GameMode, MatchOptions } from "./types";
 export type { Settings } from "./settings";
@@ -70,12 +69,6 @@ export class MenuUI {
   openTraining(onStart: (t: TrainingSettings) => void): void {
     const back: Screen = this.screen === "lobby" ? "lobby" : "hidden";
     this.mount("setup", trainingView((t) => { this.hide(); onStart(t); }, () => this.render(back)));
-  }
-  /** Lobby 1v1/2v2 pad: the pre-match setup; "¡A la cancha!" hands the options back. */
-  openMatchSetup(mode: GameMode, difficulty: Difficulty, a: SetupActions): void {
-    this.mount("setup", matchSetup(mode, difficulty, {
-      ...a, go: (o) => { this.hide(); a.go(o); }, back: () => { this.hide(); a.back(); },
-    }));
   }
   showPause(): void {
     if (!this.inGame) return;

@@ -6,6 +6,8 @@ export const XP_LOSS = 40;
 export const XP_PERFECT = 5;
 export const XP_TRAINING = 30;
 export const ELO_K = 32;
+/** Clasificación multiplies match XP. */
+export const RANKED_XP_MULT = 1.5;
 const ELO_SCALE = 400;
 
 export type BotDifficulty = "easy" | "normal" | "hard" | "pro";
@@ -30,17 +32,20 @@ export function eloAfter(rating: number, opponent: number, won: boolean): number
   return Math.round(rating + ELO_K * ((won ? 1 : 0) - expected));
 }
 
-export function applyMatch(s: ProfileStats, queue: Queue, bot: BotDifficulty, won: boolean): ProfileStats {
+/** Casual: wins/streak/XP only. Clasificación: ELO vs the bot rating and XP x1.5. */
+export function applyMatch(s: ProfileStats, queue: Queue, bot: BotDifficulty, won: boolean, ranked: boolean): ProfileStats {
   const streak = won ? s.streak + 1 : 0;
+  const elo = ranked ? eloAfter(s.elo[queue], BOT_RATING[bot], won) : s.elo[queue];
   const next: ProfileStats = {
     ...s,
-    elo: { ...s.elo, [queue]: eloAfter(s.elo[queue], BOT_RATING[bot], won) },
+    elo: { ...s.elo, [queue]: elo },
     wins: s.wins + (won ? 1 : 0),
     losses: s.losses + (won ? 0 : 1),
     streak,
     bestStreak: Math.max(s.bestStreak, streak),
   };
-  return addXp(next, won ? XP_WIN : XP_LOSS);
+  const xp = won ? XP_WIN : XP_LOSS;
+  return addXp(next, ranked ? Math.round(xp * RANKED_XP_MULT) : xp);
 }
 
 export function applyPerfect(s: ProfileStats): ProfileStats {

@@ -4,13 +4,13 @@ import { Hud } from "./hud";
 import { Controls } from "./input";
 import { GameLoop, LoopState } from "./loop";
 import { BottomBar } from "./lobby/bottom-bar";
-import { getDifficulty, setDifficulty } from "./lobby/difficulty";
 import { ProfileCard } from "./lobby/profile-card";
 import { recorder } from "./profile/recorder";
 import { App, enterLobby, errText, landingAllowed, lobbyOptions, onPadEvent, safeStart, showResult } from "./lobby/flow";
 import { CourtView } from "./render";
 import { MatchScreens } from "./ui/match-screens";
 import { MenuUI, Settings } from "./ui/menu";
+import { PlayModal } from "./ui/play-modal/play-modal";
 
 // Boot straight into the lobby (docs/design/lobby.md §7): no title, no main menu.
 const RESET_KEY = "KeyR";
@@ -33,12 +33,16 @@ function applySettings(app: App, s: Settings): void {
   app.hud.setScale(s.game.hudScale);
 }
 
+/** Lobby overlays (Esc menu, "Elegí un modo"): controls off + mouse free while any is up. */
+function lobbyOverlay(app: App): void {
+  if (!app.inLobby) return; // in a match the pause callback owns the controls
+  app.controls.enabled = !app.menu.isOpen && !app.play.isOpen;
+  app.controls.releaseAll();
+}
+
 function wire(app: App, menu: MenuUI): void {
-  menu.onOpenChange((open) => {
-    if (!app.inLobby) return; // in a match the pause callback owns the controls
-    app.controls.enabled = !open;
-    app.controls.releaseAll();
-  });
+  menu.onOpenChange(() => lobbyOverlay(app));
+  app.play.onOpenChange(() => lobbyOverlay(app));
   menu.onPauseChange((paused) => {
     app.state.paused = paused;
     app.controls.enabled = !paused && app.state.running;
@@ -51,7 +55,7 @@ function wire(app: App, menu: MenuUI): void {
   app.controls.onZoom = (d) => app.view.rig.zoom(d);
   app.controls.onLockChange = (locked) => app.hud.setCrosshair(locked);
   app.controls.onLockLost = () => { // native Esc: the browser eats the keydown that drops pointer lock
-    if (!app.state.running || menu.isOpen) return;
+    if (!app.state.running || menu.isOpen || app.play.isOpen) return;
     if (app.inLobby) menu.openLobbyMenu();
     else menu.showPause();
   };
@@ -87,16 +91,18 @@ async function load(app: App): Promise<void> {
 }
 
 function lobbyBar(app: () => App): BottomBar {
-  return new BottomBar(document.body, { play: (mode) => safeStart(app(), lobbyOptions(mode)) });
+  return new BottomBar(document.body, { play: () => { if (!app().menu.isOpen) app().play.open(); } });
+}
+
+function playModal(app: () => App): PlayModal {
+  return new PlayModal(document.body, (p) => safeStart(app(), lobbyOptions(p.mode, p.ranked)));
 }
 
 /** Esc in the lobby (lobby.md "Menú del lobby"): add future entries to `items`. */
 function lobbyMenu(app: () => App, menu: MenuUI): void {
   menu.setLobbyMenu(() => ({
-    difficulty: getDifficulty(),
-    onDifficulty: setDifficulty,
     items: [
-      { label: "Entrenamiento", run: () => menu.openTraining((t) => safeStart(app(), lobbyOptions("playground", t))) },
+      { label: "Entrenamiento", run: () => menu.openTraining((t) => safeStart(app(), lobbyOptions("playground", false, t))) },
       { label: "Ajustes", run: () => menu.openSettings() },
     ],
   }));
@@ -113,7 +119,7 @@ function boot(): void {
   let ref: App | null = null;
   const get = (): App => { if (!ref) throw new Error("app no inicializada"); return ref; };
   const app: App = {
-    engine, view, hud, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu,
+    engine, view, hud, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
   };
   ref = app;
