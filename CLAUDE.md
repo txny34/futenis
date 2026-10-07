@@ -68,6 +68,16 @@ docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), charac
 - Funciones < 50 líneas, archivos Go < 400, archivos TS < 200. TS strict, sin `any`.
 - Review independiente (go-reviewer) por etapa: cero CRITICAL/HIGH antes de mergear.
 - Commits convencionales (`feat:`, `fix:`, ...). Sin atribución de IA. Nunca push directo a `main`.
+- Commit chico por cada cambio verificado (revisión rápida commit a commit).
+- CI (`.github/workflows/ci.yml`) tiene que estar verde: fmt, vet, `-race`, coverage `sim`, build (`go run ./cmd/dev -check`),
+  staticcheck, govulncheck, `tsc` strict, límites de tamaño (`scripts/ci/size-check.sh`).
+
+## Al abrir un PR (obligatorio)
+
+1. Correr un code review completo del diff contra `main` (go-reviewer + typescript-reviewer, y security-reviewer si toca
+   red, wasm bridge, storage o input) contra las reglas de este archivo.
+2. Corregir en la misma rama todo CRITICAL/HIGH y los MEDIUM claros, en commits chicos; re-verificar y pushear.
+3. Esperar el CI verde y dejar un comentario en el PR con: qué se revisó, hallazgos, commits de arreglo y qué queda para humano.
 
 ## Correr
 

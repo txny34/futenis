@@ -120,6 +120,11 @@ const (
 	cfgFeedVolleyOnly
 	cfgFeedValidBounce
 
+	// Lobby additions (docs/design/lobby.md §3), appended after cfgFeedValidBounce.
+	cfgLobbyHoldTime
+	cfgLobbyHalfX
+	cfgLobbyHalfZ
+
 	// CfgScalarLen is the number of scalar (non-Parts) tunable floats.
 	CfgScalarLen
 )
@@ -206,6 +211,7 @@ func WriteConfig(c *Config, dst []float64) {
 	dst[cfgFirstServer] = float64(c.FirstServer)
 
 	writeFeedBlock(c, dst)
+	writeLobbyBlock(c, dst)
 	writePartsBlock(c, dst[CfgPartsStart:])
 }
 
@@ -302,6 +308,7 @@ func ReadConfig(src []float64) Config {
 	c.FirstServer = int8(src[cfgFirstServer])
 
 	readFeedBlock(&c, src)
+	readLobbyBlock(&c, src)
 	c.Parts = readPartsBlock(src[CfgPartsStart:])
 	c.Sanitize()
 	return c

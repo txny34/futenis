@@ -13,6 +13,9 @@ import type { Quality } from "../ui/settings";
 const BLOOM_THRESHOLD = 0.85;
 const BLOOM_RADIUS = 0.45;
 const BLOOM_STRENGTH: Readonly<Record<Quality, number>> = { low: 0, med: 0.7, high: 0.85 };
+// Lobby (calm night arena, photosensitivity): ~22% of the match bloom, higher threshold.
+const LOBBY_BLOOM_SCALE = 0.22;
+const LOBBY_BLOOM_THRESHOLD = 1.0;
 const MSAA_SAMPLES = 4; // composer targets lose the canvas MSAA; restore it here
 // Bloom mips are blurred anyway: render them at a fraction of the canvas.
 const BLOOM_RES_SCALE: Readonly<Record<Quality, number>> = { low: 0, med: 0.5, high: 0.75 };
@@ -22,6 +25,8 @@ export class PostFx {
   private readonly bloom: UnrealBloomPass;
   private enabled = true;
   private resScale = BLOOM_RES_SCALE.high;
+  private quality: Quality = "high";
+  private lobby = false;
 
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
@@ -39,9 +44,22 @@ export class PostFx {
   }
 
   setQuality(q: Quality): void {
+    this.quality = q;
     this.enabled = BLOOM_STRENGTH[q] > 0;
-    this.bloom.strength = BLOOM_STRENGTH[q];
     this.resScale = BLOOM_RES_SCALE[q];
+    this.applyBloom();
+  }
+
+  /** Lobby gets a softer bloom; matches restore the normal one. Not per frame. */
+  setLobby(on: boolean): void {
+    this.lobby = on;
+    this.applyBloom();
+  }
+
+  private applyBloom(): void {
+    const s = BLOOM_STRENGTH[this.quality];
+    this.bloom.strength = this.lobby ? s * LOBBY_BLOOM_SCALE : s;
+    this.bloom.threshold = this.lobby ? LOBBY_BLOOM_THRESHOLD : BLOOM_THRESHOLD;
   }
 
   /** Call after renderer.setSize / setPixelRatio. */

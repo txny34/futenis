@@ -121,7 +121,8 @@ func checkCfgArg(name string, args []js.Value) string {
 	return ""
 }
 
-// layoutFn() -> {snapLen, inputPerPlayer, eventStride, maxEvents, cfgLen}:
+// layoutFn() -> {snapLen, inputPerPlayer, eventStride, maxEvents, cfgLen,
+// lobby keys (layoutEntries), lobbyPads}:
 // this build's buffer-layout constants, so the client can assert its own
 // mirrored constants (client/src/snapshot.ts, engine.ts) match this exact
 // build and refuse to run misaligned instead of silently reading garbage
@@ -129,11 +130,10 @@ func checkCfgArg(name string, args []js.Value) string {
 // field and the other doesn't get rebuilt in step.
 func layoutFn(_ js.Value, _ []js.Value) any {
 	obj := js.Global().Get("Object").New()
-	obj.Set("snapLen", sim.SnapLen)
-	obj.Set("inputPerPlayer", inputPerPlayer)
-	obj.Set("eventStride", eventStride)
-	obj.Set("maxEvents", maxEvents)
-	obj.Set("cfgLen", sim.CfgLen)
+	for _, e := range layoutEntries() {
+		obj.Set(e.key, e.val)
+	}
+	obj.Set("lobbyPads", lobbyPadsFlat())
 	return obj
 }
 

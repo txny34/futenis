@@ -15,9 +15,12 @@ func NewMatch(cfg Config) *Match {
 	m.state.Cfg = cfg
 	m.state.NumPlayers = numPlayersForMode(cfg.Mode)
 	m.state.LastServerPlayer = [2]int8{-1, -1}
-	if cfg.Mode == ModePlayground {
+	switch cfg.Mode {
+	case ModePlayground:
 		setupPlayground(&m.state)
-	} else {
+	case ModeLobby:
+		setupLobby(&m.state)
+	default:
 		resetForServe(&m.state, cfg.FirstServer)
 	}
 	return m
@@ -47,6 +50,11 @@ func (m *Match) Step(inputs [MaxPlayers]PlayerInput) []Event {
 	}
 
 	m.events = movePlayers(s, sanitized, m.events)
+	if s.Cfg.Mode == ModeLobby {
+		s.Players[0].Held = sanitized[0].Buttons // no strikes in the lobby; keep edge detection
+		m.events = stepLobby(s, m.events)
+		return m.events
+	}
 	m.events = applyStrikes(s, sanitized, m.events)
 	// The ball keeps flying visually during the point pause; rules.go only
 	// judges events while Phase == PhaseRally. wave1-C: once the serve has

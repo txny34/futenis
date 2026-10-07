@@ -21,23 +21,18 @@ const (
 	// serveFaultMin..serveFaultMin+serveFaultSpan metres.
 	serveFaultMin  = 0.4
 	serveFaultSpan = 0.8
-	// serveLobCharge is the max lob charge fraction (apex variety).
-	serveLobCharge = 0.35
 )
 
 // servePlan holds one serve attempt's rolls (deterministic per attempt).
 type servePlan struct {
-	drive bool // a drive serve (fast) instead of a lob
-	delay int  // extra settled ticks before the toss
-	lobAt int  // hold tick at which Lob is pressed (charge = ticks after it)
+	delay int // extra settled ticks before the toss
 }
 
 // thinkServe runs the real padel serve (docs/design/contact-v2.md §7.5):
 // the server walks behind the service line, settles, presses Strike (the
 // sim drops the ball), keeps charging while it falls, and releases after
-// the mandatory bounce so the buffer strikes it low (foot/knee). A lob
-// serve presses Lob during the drop (re-latching the shot; its charge, the
-// ticks after that press, sets the apex). Everyone else takes position.
+// the mandatory bounce so the buffer strikes it low (foot/knee). Padel has
+// no lob serve: the server never presses Lob. Everyone else takes position.
 func (b *Bot) thinkServe(s *sim.State, slot int) sim.PlayerInput {
 	me := &s.Players[slot]
 	if int8(slot) != s.Rally.ServerPlayer {
@@ -53,11 +48,6 @@ func (b *Bot) thinkServe(s *sim.State, slot int) sim.PlayerInput {
 	}
 	b.holdTicks++
 	bounced := s.Rally.ServeTossBounced || b.holdTicks > maxHoldTicks
-	if !b.serve.drive && b.shot == sim.BtnStrike && (bounced || b.holdTicks >= b.serve.lobAt) {
-		b.shot = sim.BtnStrike | sim.BtnLob // press Lob: re-latches ShotLob
-		in.Buttons = b.shot
-		return b.withAim(in)
-	}
 	if !bounced {
 		in.Buttons = b.shot // releasing now would strike before the bounce
 		return b.withAim(in)
@@ -105,7 +95,7 @@ func boxZ(s *sim.State) float64 { return sim.ServeBoxZSign(s.Server, s.Rally.Ser
 // aimServe rolls this attempt's serve (stable for the whole attempt): a
 // target inside the diagonal box, Level.ServeLine from its lines around
 // Level.ServeDepth -- or, Level.ServeFault of the time, just outside it --
-// plus the pace (drive or lob charge) and the toss delay.
+// plus the toss delay.
 func (b *Bot) aimServe(s *sim.State, slot int) {
 	lv, cfg := &b.Level, &s.Cfg
 	played := s.Score[0] + s.Score[1] + 8*(s.Games[0]+s.Games[1]+s.Sets[0]+s.Sets[1])
@@ -123,16 +113,7 @@ func (b *Bot) aimServe(s *sim.State, slot int) {
 		}
 	}
 	b.aimX, b.aimZ, b.spin = forward(s.Players[slot].Team)*x, boxZ(s)*z, 0
-	b.serve.drive = unit(sim.Hash64(h^6)) < lv.ServeDrive
 	b.serve.delay = int(unit(sim.Hash64(h^7)) * float64(lv.ServeTossJitter+1))
-	charge := int(unit(sim.Hash64(h^8)) * serveLobCharge * float64(ticksOfSec(cfg.ChargeMaxTime)))
-	b.serve.lobAt = tossFallTicks(cfg) - charge
-}
-
-// tossFallTicks is how long the dropped ball takes to reach the floor.
-func tossFallTicks(cfg *sim.Config) int {
-	h := math.Max(cfg.ServeTossHeight-sim.BallRadius, 0)
-	return int(math.Sqrt(2*h/cfg.Gravity) * sim.TickRate)
 }
 
 // serveWait positions non-servers: the 1v1 receiver in the target box, the

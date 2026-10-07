@@ -12,7 +12,7 @@ export interface ResultInfo {
   readonly games1: number;
 }
 
-export interface ResultActions { rematch: () => void; menu: () => void }
+export interface ResultActions { rematch: () => void; lobby: () => void }
 
 function team(i: 0 | 1, members: number): HTMLElement {
   const t = el("div", `fx-vs__team fx-vs__team--${i}`);
@@ -43,7 +43,7 @@ export class MatchScreens {
   showResult(r: ResultInfo, a: ResultActions): void {
     const card = el("section", `fx-result fx-result--${r.won ? "win" : "lose"}`, "", { role: "dialog", "aria-modal": "true" });
     const actions = el("div", "fx-actions");
-    actions.append(button("Revancha", a.rematch, "fx-btn fx-btn--hero"), button("Menú", a.menu, "fx-btn fx-btn--ghost"));
+    actions.append(button("Revancha", a.rematch, "fx-btn fx-btn--hero"), button("Volver al lobby", a.lobby, "fx-btn fx-btn--ghost"));
     card.append(
       el("h2", "fx-result__title", r.won ? "VICTORIA" : "DERROTA"),
       el("p", "fx-result__score", `${TEAM_NAMES[0]} ${r.games0} – ${r.games1} ${TEAM_NAMES[1]}`),

@@ -37,6 +37,7 @@ const (
 	Mode1v1        Mode = iota // 2 players, 1 per team (today's default)
 	Mode2v2                    // 4 players, 2 per team (real padel)
 	ModePlayground             // Entrenamiento: 1 human vs the ball machine (feed.go), no scoring
+	ModeLobby                  // open-world hub: 1 human, no ball, match pads (lobby.go, docs/design/lobby.md)
 )
 
 // numPlayersForMode returns how many of State.Players are active for mode.
@@ -44,8 +45,8 @@ func numPlayersForMode(mode Mode) int8 {
 	switch mode {
 	case Mode2v2:
 		return 4
-	case ModePlayground:
-		return 1 // Entrenamiento: only the human vs the ball machine (docs/design/training.md §2)
+	case ModePlayground, ModeLobby:
+		return 1 // Entrenamiento / lobby: only the human (training.md §2, lobby.md §1)
 	default:
 		return 2
 	}
@@ -237,6 +238,11 @@ const (
 	EvFeed       // the ball machine launched (Pos = mouth)
 	EvReturnOK   // legal return of a machine ball (Player = 0)
 	EvReturnFail // the streak broke
+
+	// Lobby additions (docs/design/lobby.md §4), ModeLobby only. Side = pad index.
+	EvPadEnter // the grounded player stepped onto pad Side
+	EvPadLeave // the player left (or jumped off) pad Side before starting
+	EvPadStart // the player held pad Side for LobbyHoldTime: start that mode
 )
 
 // Event is emitted by Step. Side meaning depends on Kind:
@@ -377,4 +383,7 @@ type State struct {
 
 	// Feed is the ball machine (ModePlayground only, docs/design/training.md).
 	Feed FeedState
+
+	// Lobby is the pad-hold bookkeeping (ModeLobby only, lobby.go).
+	Lobby LobbyState
 }

@@ -20,12 +20,12 @@ func movePlayers(s *State, inputs [MaxPlayers]PlayerInput, ev []Event) []Event {
 		ev = stepPlayerDash(s, i, in, ev)
 		stepPlayerHorizontal(p, in, &s.Cfg)
 		stepPlayerStamina(p, in, &s.Cfg)
-		clampPlayerToCourt(p)
+		clampPlayer(s, p)
 	}
 
 	separateTeammates(s)
 	for i := int8(0); i < s.NumPlayers; i++ {
-		clampPlayerToCourt(&s.Players[i])
+		clampPlayer(s, &s.Players[i])
 	}
 	return ev
 }
@@ -199,6 +199,16 @@ func stepPlayerStamina(p *Player, in PlayerInput, cfg *Config) {
 			p.Stamina = 1
 		}
 	}
+}
+
+// clampPlayer confines p to the walkable area of the current mode: the
+// open lobby rectangle in ModeLobby, the player's court half otherwise.
+func clampPlayer(s *State, p *Player) {
+	if s.Cfg.Mode == ModeLobby {
+		clampPlayerToLobby(p, &s.Cfg)
+		return
+	}
+	clampPlayerToCourt(p)
 }
 
 // clampPlayerToCourt confines p to their own team's half of the court and

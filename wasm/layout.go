@@ -132,3 +132,40 @@ func clamp(v, lo, hi int) int {
 	}
 	return v
 }
+
+// layoutEntry is one numeric key of futenis.layout().
+type layoutEntry struct {
+	key string
+	val float64
+}
+
+// layoutEntries lists every numeric futenis.layout() key, in a fixed order
+// (docs/design/lobby.md §5). lobbyPads (an array) is lobbyPadsFlat.
+func layoutEntries() []layoutEntry {
+	return []layoutEntry{
+		{"snapLen", float64(sim.SnapLen)},
+		{"inputPerPlayer", inputPerPlayer},
+		{"eventStride", eventStride},
+		{"maxEvents", maxEvents},
+		{"cfgLen", float64(sim.CfgLen)},
+		{"modeLobby", float64(sim.ModeLobby)},
+		{"snapLobbyPad", float64(sim.SnapLobbyPad)},
+		{"snapLobbyHold", float64(sim.SnapLobbyHold)},
+		{"evPadEnter", float64(sim.EvPadEnter)},
+		{"evPadLeave", float64(sim.EvPadLeave)},
+		{"evPadStart", float64(sim.EvPadStart)},
+		{"cfgLobbyHoldTime", float64(sim.CfgLobbyHoldTime)},
+		{"cfgLobbyHalfX", float64(sim.CfgLobbyHalfX)},
+		{"cfgLobbyHalfZ", float64(sim.CfgLobbyHalfZ)},
+		{"lobbyPadRadius", sim.LobbyPadRadius},
+	}
+}
+
+// lobbyPadsFlat is futenis.layout().lobbyPads: [x0, z0, x1, z1, x2, z2].
+func lobbyPadsFlat() []any {
+	out := make([]any, 0, 2*sim.LobbyPadCount)
+	for _, p := range sim.LobbyPads {
+		out = append(out, p.X, p.Z)
+	}
+	return out
+}

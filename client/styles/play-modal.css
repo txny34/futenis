@@ -1,0 +1,69 @@
+/* "Elegí un modo" (docs/design/lobby.md): full-screen, calm, no flashing.
+   Colors only from the --fx-* tokens (menu.css :root); alpha overlays of --fx-line. */
+.fx-play {
+  position: fixed; inset: 0; z-index: 20; overflow-y: auto;
+  display: grid; grid-template-rows: auto 1fr auto; gap: 16px; padding: 24px 32px;
+  font-family: var(--fx-body); color: var(--fx-line);
+  background: rgba(3, 10, 26, .8); backdrop-filter: blur(8px);
+}
+.fx-play[hidden], .fx-play__sheet[hidden], .fx-play__toast[hidden] { display: none; }
+.fx-play__title { margin: 0; font: 400 26px var(--fx-display); color: var(--fx-ball); }
+.fx-play__close {
+  position: absolute; top: 18px; right: 22px; width: 44px; height: 44px; border-radius: 12px; cursor: pointer;
+  background: var(--fx-card); color: var(--fx-line); border: 2px solid rgba(233, 241, 255, .18); font-size: 20px;
+}
+.fx-play__close:hover, .fx-play__close:focus-visible { border-color: var(--fx-hot); color: var(--fx-hot); }
+.fx-play__grid { display: grid; grid-template-columns: 240px minmax(0, 1fr) 200px; gap: 24px; align-items: start; }
+.fx-play__profile { padding: 14px; border-radius: var(--fx-radius); background: var(--fx-card); border: 2px solid rgba(233, 241, 255, .12); }
+.fx-play__head { display: flex; gap: 12px; align-items: center; }
+.fx-play__who { display: grid; gap: 2px; min-width: 0; }
+.fx-play__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-play__record { font-size: 12px; color: var(--fx-muted); }
+.fx-play__elos { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; margin: 14px 0 0; }
+.fx-play__elos dt { color: var(--fx-muted); font-size: 13px; }
+.fx-play__elos dd { margin: 0; font-family: var(--fx-display); }
+
+.fx-play__right { display: grid; gap: 12px; padding-top: 38px; }
+.fx-play__side {
+  padding: 16px; border-radius: 14px; cursor: pointer; text-align: left; font: 600 15px var(--fx-body);
+  background: var(--fx-card); color: var(--fx-line); border: 2px solid rgba(233, 241, 255, .12);
+}
+.fx-play__side:hover, .fx-play__side:focus-visible { border-color: rgba(233, 241, 255, .45); }
+
+.fx-play__foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+.fx-play__go {
+  min-width: 300px; padding: 18px 48px; border: 0; border-radius: 16px; cursor: pointer;
+  font: 400 30px var(--fx-display); letter-spacing: .06em; color: var(--fx-go-ink);
+  background: linear-gradient(180deg, var(--fx-go), var(--fx-go-deep));
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .22), 0 10px 24px rgba(0, 0, 0, .35);
+  transition: transform .18s ease, filter .18s ease;
+}
+.fx-play__go:not(:disabled):hover, .fx-play__go:not(:disabled):focus-visible { transform: translateY(-2px); filter: brightness(1.07); }
+.fx-play__go:disabled {
+  cursor: default; color: rgba(233, 241, 255, .55); font-size: 24px;
+  background: linear-gradient(180deg, var(--fx-idle), var(--fx-idle-deep)); box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .25);
+}
+
+.fx-play__sheet {
+  position: fixed; inset: 0; margin: auto; width: min(720px, calc(100% - 32px)); height: fit-content; max-height: 86vh; overflow-y: auto;
+  padding: 24px; border-radius: var(--fx-radius); background: var(--fx-court-deep); border: 2px solid rgba(233, 241, 255, .18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+.fx-play__sheet-body { margin-bottom: 18px; }
+.fx-hist { width: 100%; border-collapse: collapse; font-size: 14px; }
+.fx-hist th { text-align: left; color: var(--fx-muted); font-weight: 600; padding: 6px 8px; }
+.fx-hist td { padding: 6px 8px; border-top: 1px solid rgba(233, 241, 255, .08); }
+.fx-hist .is-win .fx-hist__result { color: var(--fx-go); }
+.fx-hist .is-loss .fx-hist__result { color: var(--fx-hot); }
+.fx-info__h { margin: 12px 0 6px; color: var(--fx-ball); font-weight: 600; }
+.fx-info__rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.fx-info__keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin: 0; }
+.fx-info__keys dd { margin: 0; color: var(--fx-muted); }
+
+@media (max-width: 900px) {
+  .fx-play { padding: 16px; }
+  .fx-play__grid { grid-template-columns: 1fr; }
+  .fx-play__right { grid-auto-flow: column; padding-top: 0; }
+  .fx-play__go { min-width: 0; width: 100%; }
+}
+@media (max-width: 560px) { .fx-play__cards { grid-template-columns: 1fr; } }

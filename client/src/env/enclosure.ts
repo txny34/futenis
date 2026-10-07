@@ -26,6 +26,15 @@ const EDGE_OPACITY = 0.9;
 const NEAR_EDGE_OPACITY = 0.08;
 const METAL_ROUGHNESS = 0.45;
 const METAL_METALNESS = 0.7;
+const SPARSE_MESH_OPACITY = 0.22;
+
+/** Match court: defaults. Lobby showcase: both back walls solid, see-through mesh on one side. */
+export interface EnclosureOpts {
+  /** Both back walls get full glass + top mesh (no faded near wall behind the camera). */
+  readonly symmetric?: boolean;
+  /** Side (sign of Z) whose wire mesh is faint so the court reads through it. */
+  readonly sparseSideZ?: -1 | 1;
+}
 
 function wireTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
@@ -92,23 +101,27 @@ function glassPanel(m: Mats, w: number, h: number, x: number, z: number, alongZ:
   return out;
 }
 
-function meshPanel(m: Mats, w: number, h: number, x: number, y0: number, z: number, alongZ: boolean): THREE.Mesh {
+function meshPanel(m: Mats, w: number, h: number, x: number, y0: number, z: number, alongZ: boolean, sparse = false): THREE.Mesh {
   const tex = m.wire.clone();
   tex.repeat.set(w / MESH_CELL_M, h / MESH_CELL_M);
   tex.needsUpdate = true;
   const mat = new THREE.MeshBasicMaterial({ color: THEME.mesh, alphaMap: tex, alphaTest: MESH_ALPHA_TEST, side: THREE.DoubleSide });
+  if (sparse) { mat.transparent = true; mat.opacity = SPARSE_MESH_OPACITY; mat.depthWrite = false; }
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
   place(panel, h, x, y0, z, alongZ);
   return panel;
 }
 
-function posts(m: Mats): THREE.InstancedMesh {
+function posts(m: Mats, symmetric: boolean): THREE.InstancedMesh {
   const spots: Array<readonly [number, number, number]> = [];
   for (let x = -HALF_L; x <= HALF_L + 1e-6; x += POST_SPACING) {
     const h = Math.abs(x) >= HALF_L - SIDE_GLASS_LEN ? FENCE_TOP : MID_MESH_H;
     spots.push([x, -HALF_W, h], [x, HALF_W, h]);
   }
-  for (let z = -HALF_W + POST_SPACING; z < HALF_W; z += POST_SPACING) spots.push([HALF_L, z, FENCE_TOP]);
+  for (let z = -HALF_W + POST_SPACING; z < HALF_W; z += POST_SPACING) {
+    spots.push([HALF_L, z, FENCE_TOP]);
+    if (symmetric) spots.push([-HALF_L, z, FENCE_TOP]);
+  }
   const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(POST_W, 1, POST_W), m.metal, spots.length);
   const mtx = new THREE.Matrix4();
   spots.forEach(([x, z, h], i) => {
@@ -119,26 +132,28 @@ function posts(m: Mats): THREE.InstancedMesh {
   return inst;
 }
 
-export function buildEnclosure(): THREE.Group {
+export function buildEnclosure(opts: EnclosureOpts = {}): THREE.Group {
   const m = makeMats();
   const g = new THREE.Group();
   const backW = 2 * HALF_W;
   const midHalf = HALF_L - 2 * SIDE_GLASS_LEN;
-  g.add(...glassPanel(m, backW, GLASS_H, -HALF_L, 0, true, true));
+  g.add(...glassPanel(m, backW, GLASS_H, -HALF_L, 0, true, !opts.symmetric));
+  if (opts.symmetric) g.add(meshPanel(m, backW, FENCE_TOP - GLASS_H, -HALF_L, GLASS_H, 0, true));
   g.add(...glassPanel(m, backW, GLASS_H, HALF_L, 0, true, false));
   g.add(meshPanel(m, backW, FENCE_TOP - GLASS_H, HALF_L, GLASS_H, 0, true));
   for (const z of [-HALF_W, HALF_W]) {
     for (const sx of [-1, 1]) {
-      const near = sx < 0; // near-side glass fades so it never frames the view
+      const near = sx < 0 && !opts.symmetric; // near-side glass fades so it never frames the view
+      const sparse = Math.sign(z) === opts.sparseSideZ;
       const cx = sx * (HALF_L - SIDE_GLASS_LEN / 2);
       const stepX = sx * (HALF_L - SIDE_GLASS_LEN * 1.5);
       g.add(...glassPanel(m, SIDE_GLASS_LEN, GLASS_H, cx, z, false, near));
-      g.add(meshPanel(m, SIDE_GLASS_LEN, FENCE_TOP - GLASS_H, cx, GLASS_H, z, false));
+      g.add(meshPanel(m, SIDE_GLASS_LEN, FENCE_TOP - GLASS_H, cx, GLASS_H, z, false, sparse));
       g.add(...glassPanel(m, SIDE_GLASS_LEN, STEP_GLASS_H, stepX, z, false, near));
-      g.add(meshPanel(m, SIDE_GLASS_LEN, MID_MESH_H - STEP_GLASS_H, stepX, STEP_GLASS_H, z, false));
+      g.add(meshPanel(m, SIDE_GLASS_LEN, MID_MESH_H - STEP_GLASS_H, stepX, STEP_GLASS_H, z, false, sparse));
     }
-    g.add(meshPanel(m, 2 * midHalf, MID_MESH_H, 0, 0, z, false));
+    g.add(meshPanel(m, 2 * midHalf, MID_MESH_H, 0, 0, z, false, Math.sign(z) === opts.sparseSideZ));
   }
-  g.add(posts(m));
+  g.add(posts(m, opts.symmetric === true));
   return g;
 }

@@ -1,11 +1,12 @@
 import type { Engine } from "../engine";
+import { LobbyCfg } from "../lobby/pads";
 import { CFG_TRAIN_FIRST, CFG_TRAIN_LAST } from "../train-config";
 import { el, slider } from "../ui/dom";
 
 // ?dev=1 live-tuning panel (contact-v2 §13). Indices mirror the scalar order
 // of sim/config_layout.go (cfgGravity = 0 ... cfgMode = 44, cfgServeTimeLimit
-// = 45, Dash 46..49, scoring 50..54, Entrenamiento 55..71 (train-config.ts);
-// parts table from 72, CfgLen = 149 -- re-audited for the training append). Applied between
+// = 45, Dash 46..49, scoring 50..54, Entrenamiento 55..71 (train-config.ts),
+// Lobby 72..74 (lobby/pads.ts); parts table from 75, CfgLen = 152). Applied between
 // frames via engine.setConfig; never touched by the frame loop.
 interface Param { readonly idx: number; readonly label: string; readonly min: number; readonly max: number; readonly step: number }
 
@@ -39,6 +40,10 @@ const PARAMS: readonly Param[] = [
   { idx: 46, label: "Dash vel.", min: 0, max: 25, step: 0.1 },
   { idx: 47, label: "Dash duración (s)", min: 0.02, max: 0.6, step: 0.01 },
   { idx: 49, label: "Dash cooldown (s)", min: 0, max: 3, step: 0.05 },
+  // Lobby (docs/design/lobby.md §3), ranges = Sanitize clamps.
+  { idx: LobbyCfg.HoldTime, label: "Lobby: espera pad (s)", min: 0.3, max: 5, step: 0.05 },
+  { idx: LobbyCfg.HalfX, label: "Lobby: medio largo (m)", min: 10, max: 30, step: 0.5 },
+  { idx: LobbyCfg.HalfZ, label: "Lobby: medio ancho (m)", min: 8, max: 25, step: 0.5 },
 ];
 
 const CFG_POINTS_TO_WIN = 43;

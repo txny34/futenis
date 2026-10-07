@@ -236,7 +236,7 @@ func TestSnapshot_FeedFields(t *testing.T) {
 	if dst[SnapFeedIn] != 0 {
 		t.Fatalf("overdue: SnapFeedIn got %v, want 0", dst[SnapFeedIn])
 	}
-	if SnapStreak != SnapP3ContactOk+1 || SnapMachineZ != SnapLen-1 {
+	if SnapStreak != SnapP3ContactOk+1 || SnapMachineZ != SnapLobbyPad-1 {
 		t.Fatal("feed snapshot fields must be appended at the end")
 	}
 }

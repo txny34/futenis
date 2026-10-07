@@ -22,9 +22,11 @@ export const Snap = {
   // Entrenamiento (docs/design/training.md §3), appended before SnapLen.
   // FeedIn = seconds to the next machine feed, -1 = waiting for demand / ball live.
   Streak: 85, BestStreak: 86, FeedCount: 87, FeedIn: 88, MachineX: 89, MachineZ: 90,
+  // Lobby (docs/design/lobby.md §5): active pad (-1 none, 0..2) and hold progress 0..1.
+  LobbyPad: 91, LobbyHold: 92,
 } as const;
 
-export const SNAP_LEN = 91;
+export const SNAP_LEN = 93;
 export const MAX_PLAYERS = 4;
 
 /** Offsets inside a player's extras block (starts at P{i}VelX). */
@@ -57,7 +59,7 @@ export function teamOf(i: number, numPlayers: number): number {
 export const Phase = { Serve: 0, Rally: 1, Point: 2, GameOver: 3 } as const;
 
 // Mirrors sim.Mode.
-export const Mode = { OneVsOne: 0, TwoVsTwo: 1, Playground: 2 } as const;
+export const Mode = { OneVsOne: 0, TwoVsTwo: 1, Playground: 2, Lobby: 3 } as const;
 
 // Mirrors sim.EventKind (§20.2). Old values never change; new ones only appended.
 export const EventKind = {
@@ -69,6 +71,8 @@ export const EventKind = {
   GamePoint: 15, BreakPoint: 16, GameWon: 17, SetWon: 18, Ace: 19, MatchWon: 20,
   // Entrenamiento (training.md §2), only in Mode.Playground.
   Feed: 21, ReturnOK: 22, ReturnFail: 23,
+  // Lobby (lobby.md §4), only in Mode.Lobby: side = pad index, pos = pad center.
+  PadEnter: 24, PadLeave: 25, PadStart: 26,
 } as const;
 
 // Mirrors sim.BodyPart. Index 0 = PartNone.

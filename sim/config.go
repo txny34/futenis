@@ -145,6 +145,11 @@ type Config struct {
 	FeedVolleyOnly                 bool    // true = must strike before it bounces on side 0
 	FeedValidBounce                uint8   // 1 or 2 bounces allowed on side 0 before striking
 
+	// --- Lobby (docs/design/lobby.md §3), appended after FeedValidBounce ---
+	LobbyHoldTime float64 // s, time standing on a pad to start its mode
+	LobbyHalfX    float64 // m, half length of the walkable lobby
+	LobbyHalfZ    float64 // m, half width of the walkable lobby
+
 	// Derived, cached by Sanitize() so Step never recomputes a ticksOf
 	// conversion on the hot path. Unexported: not part of the live-tuning
 	// wire format (config_layout.go flattens the tunable fields only).
@@ -156,6 +161,7 @@ type Config struct {
 	dashTicks           int
 	dashCooldownTicks   int
 	feedIntervalTicks   int
+	lobbyHoldTicks      int
 }
 
 // DefaultConfig returns the baseline tuned Config used by a fresh Match.
@@ -240,6 +246,8 @@ func DefaultConfig() Config {
 		FeedQualityMin: 0.7, FeedQualityMax: 1,
 		FeedInterval:    1.5,
 		FeedValidBounce: 1,
+
+		LobbyHoldTime: 1.5, LobbyHalfX: 16, LobbyHalfZ: 18,
 	}
 	c.Sanitize()
 	return c
