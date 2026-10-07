@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { buildCourt } from "./court";
 import { Arena } from "./env/arena";
+import { LobbyView } from "./lobby/lobby-view";
 import { Contact, Extra, PLAYER_CONTACT, PLAYER_EXTRA, PLAYER_POS, Phase, Snap, teamOf } from "./snapshot";
 import type { Quality } from "./ui/settings";
 import { BallView } from "./view/ball";
@@ -39,6 +40,9 @@ export class CourtView {
   readonly rig = new CameraRig();
   readonly fx: ImpactFx;
   readonly machine: MachineView;
+  readonly lobby: LobbyView;
+  private readonly court: THREE.Group;
+  private inLobby = false;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly sun: THREE.DirectionalLight;
@@ -59,7 +63,9 @@ export class CourtView {
     container.appendChild(this.renderer.domElement);
     this.sun = addLights(this.scene);
     this.arena = new Arena(this.scene);
-    this.scene.add(buildCourt());
+    this.court = buildCourt();
+    this.scene.add(this.court);
+    this.lobby = new LobbyView(this.scene);
     this.serveBox = new ServeBox(this.scene);
     this.ball = new BallView(this.scene);
     this.players = new PlayersView(this.scene);
@@ -90,9 +96,19 @@ export class CourtView {
     this.resize();
   }
 
+  /** Lobby decor vs padel court (lobby.md §7). Not per frame: called on mode change. */
+  setLobby(on: boolean): void {
+    this.inLobby = on;
+    this.court.visible = !on;
+    this.lobby.visible = on;
+    this.arena.setLobby(on);
+    this.ball.setVisible(!on);
+  }
+
   /** Draws interpolated state between prev and curr snapshots. Allocation-free. */
   render(prev: Float64Array, curr: Float64Array, alpha: number, dt: number, human: HumanView): void {
-    this.ball.update(
+    if (this.inLobby) human.showOverlays = false; // no aim, timing ring or landing marker without a ball
+    else this.ball.update(
       lerp(prev[Snap.BallX], curr[Snap.BallX], alpha),
       lerp(prev[Snap.BallY], curr[Snap.BallY], alpha),
       lerp(prev[Snap.BallZ], curr[Snap.BallZ], alpha),
@@ -105,6 +121,7 @@ export class CourtView {
     this.updatePrediction(prev, curr, alpha, human, hasHuman);
     this.fx.update(dt);
     this.machine.update(curr, dt);
+    if (this.inLobby) this.lobby.update(curr, dt);
     const serving = human.showOverlays && hasHuman && curr[Snap.Phase] === Phase.Serve && curr[Snap.Server] === HUMAN_TEAM;
     this.serveBox.update(serving, curr[PLAYER_POS[human.slot] + 2], dt);
     this.rig.update(hasHuman ? this.humanFeet : null, this.ball.position, dt);

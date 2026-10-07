@@ -35,6 +35,16 @@ export interface Theme {
   readonly team: readonly [number, number];
   /** Entrenamiento ball machine (view/machine.ts). */
   readonly machine: { readonly body: number; readonly barrel: number; readonly trim: number; readonly flash: number };
+  /** Lobby (docs/design/lobby.md §7): floor, neon border, pad colors (training/1v1/2v2), hold ring. */
+  readonly lobbyFloor: number;
+  readonly lobbyEdge: number;
+  readonly padTraining: number;
+  readonly pad1v1: number;
+  readonly pad2v2: number;
+  readonly padFill: number;
+  /** Pad sign canvas (CSS colors): background and text. */
+  readonly lobbySignBg: string;
+  readonly lobbySignText: string;
   readonly hud: HudTheme;
 }
 
@@ -87,6 +97,14 @@ export const THEME: Theme = {
   ledAccent: "#ff5a4e",
   team: [0xff5a4e, 0x19e3ff],
   machine: { body: 0x1b2340, barrel: 0x0b0f1c, trim: 0xff4fa3, flash: 0xff4fa3 },
+  lobbyFloor: 0x141a33,
+  lobbyEdge: 0x19e3ff,
+  padTraining: 0xff4fa3,
+  pad1v1: 0xff5a4e,
+  pad2v2: 0x19e3ff,
+  padFill: 0xe6ff1f,
+  lobbySignBg: "rgba(5, 9, 20, 0.82)",
+  lobbySignText: "#eef6ff",
   hud: {
     card: "rgba(8, 16, 38, 0.62)",
     cardBorder: "rgba(25, 227, 255, 0.35)",

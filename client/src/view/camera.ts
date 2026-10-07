@@ -54,6 +54,13 @@ export class CameraRig {
     this.pitch = clamp(this.pitch + dy * k, PITCH_MIN, PITCH_MAX);
   }
 
+  /** Snaps the orbit to look along yaw (0 = +X, -PI/2 = -Z) with the default pitch. */
+  face(yaw: number): void {
+    this.yaw = yaw;
+    this.pitch = DEFAULT_PITCH;
+    this.hasTarget = false;
+  }
+
   /** Wheel deltaY: positive = zoom out. */
   zoom(deltaY: number): void {
     this.goalDist = clamp(this.goalDist + deltaY * ZOOM_PER_DELTA, DIST_MIN, DIST_MAX);

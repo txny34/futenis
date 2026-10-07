@@ -66,6 +66,14 @@ export class BallView {
 
   get position(): THREE.Vector3 { return this.ball.position; }
 
+  /** Lobby: no ball at all (lobby.md §4). update() re-shows cue/trail per frame only when visible. */
+  setVisible(v: boolean): void {
+    this.ball.visible = v;
+    this.shadow.visible = v;
+    this.marker.visible = v;
+    if (!v) { this.cue.visible = false; this.trail.visible = false; this.hasLast = false; }
+  }
+
   update(x: number, y: number, z: number, dt: number): void {
     this.ball.position.set(x, y, z);
     this.shadow.position.set(x, FLOOR_Y, z);

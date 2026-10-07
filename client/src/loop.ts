@@ -37,6 +37,8 @@ export interface MatchResult { winner: number; games0: number; games1: number }
 export class GameLoop {
   /** Fires once when a scored match reaches Phase.GameOver; call rearm() on a new match. */
   onMatchOver: ((r: Readonly<MatchResult>, snap: Float64Array) => void) | null = null;
+  /** Lobby pad events (EvPadEnter/Leave/Start, lobby.md §4). Fired after the step's other events. */
+  onPadEvent: ((kind: number, pad: number) => void) | null = null;
   private frame: StepResult;
   private acc = 0;
   private last = 0;
@@ -129,6 +131,10 @@ export class GameLoop {
   }
 
   private onEvent(e: SimEvent, now: number): void {
+    if (e.kind >= EventKind.PadEnter && e.kind <= EventKind.PadStart) {
+      this.onPadEvent?.(e.kind, e.side);
+      return;
+    }
     if (e.kind === EventKind.BounceFloor && this.shots.rematePending) this.view.fx.splat(e.x, e.z);
     const shot = this.shots.onEvent(e);
     this.view.players.onEvent(e);

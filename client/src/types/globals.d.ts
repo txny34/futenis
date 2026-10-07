@@ -14,13 +14,25 @@ interface WasmLayout {
   eventStride: number;
   maxEvents: number;
   cfgLen: number;
+  // Lobby (docs/design/lobby.md §5).
+  modeLobby: number;
+  snapLobbyPad: number;
+  snapLobbyHold: number;
+  evPadEnter: number;
+  evPadLeave: number;
+  evPadStart: number;
+  cfgLobbyHoldTime: number;
+  cfgLobbyHalfX: number;
+  cfgLobbyHalfZ: number;
+  lobbyPads: readonly number[];
+  lobbyPadRadius: number;
 }
 
 interface FutenisBridge {
   init(inU8: Uint8Array, outU8: Uint8Array): string | null;
   step(n: number): string | null;
   reset(): void;
-  /** mode 0=1v1 1=2v2 2=playground; difficulty 0..3; humanMask bit i = slot i driven by the client. */
+  /** mode 0=1v1 1=2v2 2=playground 3=lobby; difficulty 0..3; humanMask bit i = slot i driven by the client. */
   configure(mode: number, difficulty: number, pointsToWin: number, humanMask: number): string | null;
   respawnBall(): void;
   /** Entrenamiento: Match.Feed() alias of respawnBall (training.md §4). Optional on older builds. */

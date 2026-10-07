@@ -18,6 +18,12 @@ export class Arena {
     scene.add(buildSky(), this.stands.group, buildStructure(), this.neon.group, this.led.group);
   }
 
+  /** Lobby (lobby.md §7): the walkable area reaches the tribunes, so the crowd and LED strip hide. */
+  setLobby(on: boolean): void {
+    this.stands.group.visible = !on;
+    this.led.group.visible = !on;
+  }
+
   /** Allocation-free: scalar uniform, two material colors, three texture offsets. */
   update(dt: number): void {
     this.stands.time.value += dt;

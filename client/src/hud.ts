@@ -122,6 +122,7 @@ export class Hud {
     this.lastServer = server;
     this.lastMode = mode;
     const playground = mode === Mode.Playground;
+    this.root.classList.toggle("is-lobby", mode === Mode.Lobby); // lobby.md §7: no scoreboard/streak
     this.msg.textContent = playground ? "" : message(phase, server); // RACHA owns the top in Entrenamiento
     this.hint.hidden = playground || phase !== Phase.Serve || server !== HUMAN_TEAM;
     this.help.textContent = playground ? HELP_TEXT + PLAYGROUND_HELP : HELP_TEXT;
