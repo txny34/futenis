@@ -9,7 +9,8 @@ const PX_PER_M = 40;
 const TILE_M = 2;
 const SEAM_PX = 3;
 const BEVEL_PX = 6;
-const LOGO_PX = 230;
+const LOGO_W_M = 9; // whole word reads from spawn
+const LOGO_MAX_PX = 200;
 const LOGO_Z = 1.5; // logo center (m), between spawn and pads
 const ROUGHNESS = 0.55;
 const METALNESS = 0.25;
@@ -33,10 +34,13 @@ function drawTiles(ctx: CanvasRenderingContext2D, w: number, h: number, emissive
         ctx.fillRect(x + BEVEL_PX, y + BEVEL_PX, t - BEVEL_PX * 2, t - BEVEL_PX * 2);
       }
       ctx.fillStyle = D.floorSeam;
-      ctx.globalAlpha = emissive ? 0.35 : 0.6;
+      ctx.globalAlpha = emissive ? 0.3 : 0.45;
+      ctx.shadowColor = D.floorSeam;
+      ctx.shadowBlur = emissive ? 8 : 0;
       ctx.fillRect(x, y, t, SEAM_PX);
       ctx.fillRect(x, y, SEAM_PX, t);
       ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
     }
   }
 }
@@ -45,7 +49,11 @@ function drawLogo(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const cy = h / 2 + LOGO_Z * PX_PER_M; // canvas down = world +Z
   ctx.save();
   ctx.translate(w / 2, cy);
-  ctx.font = `${LOGO_PX}px ${FONT_STACK}`;
+  let px = LOGO_MAX_PX;
+  ctx.font = `${px}px ${FONT_STACK}`;
+  const target = LOGO_W_M * PX_PER_M;
+  const measured = ctx.measureText("FUTENIS").width;
+  if (measured > target) { px = Math.floor((px * target) / measured); ctx.font = `${px}px ${FONT_STACK}`; }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineWidth = 6;
@@ -54,7 +62,7 @@ function drawLogo(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   ctx.shadowBlur = 30;
   ctx.strokeText("FUTENIS", 0, 0);
   ctx.beginPath();
-  ctx.ellipse(0, 0, LOGO_PX * 3, LOGO_PX * 0.95, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, target * 0.62, px * 0.95, 0, 0, Math.PI * 2);
   ctx.lineWidth = 6;
   ctx.stroke();
   ctx.restore();

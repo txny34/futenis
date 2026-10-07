@@ -8,7 +8,7 @@ import { NEON_BOOST } from "./util";
 const ARCH_Z = -13.5;
 const ARCH_XS: readonly number[] = [-11, 0, 11];
 const ARCH_HALF_W = 4.6;
-const ARCH_H = 8.5;
+const ARCH_H = 7;
 const ARCH_INNER = 0.82; // inner tube scale
 const TUBE_R = 0.16;
 const TUBE_SEG = 80;

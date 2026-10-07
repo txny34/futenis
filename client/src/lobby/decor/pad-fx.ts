@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { THEME } from "../../env/theme";
 import { LOBBY_PAD_COUNT, LOBBY_PAD_RADIUS, padX, padZ } from "../pads";
+import { padLabel } from "./pad-label";
 import { NEON_BOOST, rand } from "./util";
 
 // Pad dressing: a low plinth ring, an animated dashed rim (shader), a light
@@ -9,13 +10,18 @@ import { NEON_BOOST, rand } from "./util";
 // per-pad "heat" (pulse/flash) uniforms change.
 const PLINTH_IN = LOBBY_PAD_RADIUS + 0.05;
 const PLINTH_OUT = LOBBY_PAD_RADIUS + 0.55;
-const PLINTH_H = 0.08;
+const PLINTH_H = 0.16;
 const RIM_R = PLINTH_OUT - 0.04;
 const RIM_W = 0.07;
 const BEAM_H = 7;
 const MOTES_PER_PAD = 90;
 const MOTE_RISE = 1.4; // m/s
 const SEG = 64;
+const LABEL_Y = 4.0;
+const LABEL_BOB = 0.15;
+const LABEL_HZ = 0.4;
+const LABEL_HEAT_SCALE = 0.25;
+const LABELS: ReadonlyArray<readonly [string, string]> = [["ENTRENÁ", "LANZAPELOTAS"], ["1v1", "CONTRA EL BOT"], ["2v2", "CONTRA BOTS"]];
 
 const RIM_VERT = "varying vec2 vP; void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const RIM_FRAG = `uniform float uTime; uniform float uHeat; uniform vec3 uColor; varying vec2 vP;
@@ -51,10 +57,13 @@ export class PadFx {
   readonly group = new THREE.Group();
   private readonly time = { value: 0 };
   private readonly heat: Array<{ value: number }> = [];
+  private readonly labels: THREE.Sprite[] = [];
+  private readonly labelBase: number[] = [];
 
   constructor() {
     const plinthGeo = new THREE.CylinderGeometry(PLINTH_OUT, PLINTH_OUT, PLINTH_H, SEG, 1, true);
     const plinthMat = new THREE.MeshStandardMaterial({ color: THEME.lobbyDecor.plinth, roughness: 0.35, metalness: 0.7, side: THREE.DoubleSide });
+    const bandMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(THEME.lobbyDecor.padRim).multiplyScalar(NEON_BOOST), side: THREE.DoubleSide });
     const topGeo = new THREE.RingGeometry(PLINTH_IN, PLINTH_OUT, SEG);
     const rimGeo = new THREE.RingGeometry(RIM_R - RIM_W, RIM_R, SEG, 1);
     const beamGeo = new THREE.CylinderGeometry(LOBBY_PAD_RADIUS, LOBBY_PAD_RADIUS * 1.15, BEAM_H, SEG, 1, true);
@@ -64,7 +73,7 @@ export class PadFx {
       const heat = { value: 0 };
       this.heat.push(heat);
       const color = { value: new THREE.Color(PAD_COLORS[i]) };
-      const side = new THREE.Mesh(plinthGeo, plinthMat);
+      const side = new THREE.Mesh(plinthGeo, bandMat);
       side.position.set(x, PLINTH_H / 2, z);
       const top = new THREE.Mesh(topGeo, plinthMat);
       top.rotation.x = -Math.PI / 2;
@@ -78,7 +87,12 @@ export class PadFx {
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
       }));
       beam.position.set(x, BEAM_H / 2, z);
-      this.group.add(side, top, rim, beam);
+      const [title, sub] = LABELS[i] ?? ["", ""];
+      const label = padLabel(title, sub, PAD_COLORS[i]);
+      label.position.set(x, LABEL_Y, z);
+      this.labels.push(label);
+      this.labelBase.push(label.scale.x);
+      this.group.add(side, top, rim, beam, label);
     }
     this.group.add(this.buildMotes());
   }
@@ -86,7 +100,16 @@ export class PadFx {
   /** heat 0..1 per pad (pulse/flash/hold): brightens rim and beam. */
   setHeat(pad: number, h: number): void { const u = this.heat[pad]; if (u) u.value = h; }
 
-  update(time: number): void { this.time.value = time; }
+  update(time: number): void {
+    this.time.value = time;
+    for (let i = 0; i < this.labels.length; i++) {
+      const l = this.labels[i];
+      l.position.y = LABEL_Y + Math.sin(time * Math.PI * 2 * LABEL_HZ + i * 2.1) * LABEL_BOB;
+      const k = 1 + this.heat[i].value * LABEL_HEAT_SCALE;
+      const w = this.labelBase[i] * k;
+      l.scale.set(w, w * (l.scale.y / l.scale.x), 1);
+    }
+  }
 
   private buildMotes(): THREE.Points {
     const n = MOTES_PER_PAD * LOBBY_PAD_COUNT;

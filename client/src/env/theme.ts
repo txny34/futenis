@@ -61,6 +61,12 @@ export interface LobbyDecorTheme {
   readonly wallPanel: number;
   readonly wallTrim: number;
   readonly plinth: number;
+  /** Glowing teal band around each pad platform. */
+  readonly padRim: number;
+  /** Big floating pad label (CSS glow under the text). */
+  readonly padLabelText: string;
+  /** Showcase court lighting. */
+  readonly showcaseLight: number;
   /** Giant screen + posters (CSS). */
   readonly screenBg: string;
   readonly screenText: string;
@@ -136,12 +142,15 @@ export const THEME: Theme = {
   lobbyDecor: {
     floorTile: "#161c3a",
     floorTileHi: "#1f2752",
-    floorSeam: "#7a4dff",
+    floorSeam: "#4b2fa3",
     floorLogo: "#19e3ff",
     neon: [0xb04dff, 0x19e3ff, 0xff4fa3],
     wallPanel: 0x120f2e,
     wallTrim: 0x7a4dff,
     plinth: 0x1a1d3d,
+    padRim: 0x2bffb0,
+    padLabelText: "#ffffff",
+    showcaseLight: 0xdfe9ff,
     screenBg: "#07051a",
     screenText: "#eef6ff",
     screenAccentA: "#b04dff",

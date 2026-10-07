@@ -11,7 +11,7 @@ import { LOBBY_HALF_X, LOBBY_HALF_Z, LOBBY_PAD_COUNT, LOBBY_PAD_RADIUS, PAD_LABE
 // Built once; update() only writes uniforms, scales and positions (allocation-free).
 const PAD_Y = 0.01;
 const RING_Y = 0.02;
-const FILL_Y = 0.09; // above the decor plinth (decor/pad-fx.ts)
+const FILL_Y = 0.17; // above the decor plinth (decor/pad-fx.ts)
 const EDGE_W = 0.12;
 const EDGE_H = 0.08;
 const EDGE_BOOST = 2.2; // > 1 so the border crosses the bloom threshold
@@ -124,6 +124,7 @@ export class LobbyView {
     const fill = flatMesh(new THREE.RingGeometry(LOBBY_PAD_RADIUS + FILL_IN, LOBBY_PAD_RADIUS + FILL_OUT, SEGMENTS), fillMat, x, FILL_Y, z);
     const sign = padSign(PAD_LABELS[i] ?? "", color);
     sign.position.set(x, SIGN_Y, z);
+    sign.visible = false; // the big decor label (decor/pad-label.ts) is the pad marker now
     this.group.add(disc, outline, fill, sign);
     return { disc, progress, sign, pulse: 0, flash: 0 };
   }

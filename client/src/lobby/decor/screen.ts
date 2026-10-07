@@ -7,8 +7,10 @@ import { FONT_STACK, NEON_BOOST } from "./util";
 // objects. Shows the showcase court score + a scrolling ticker.
 const W = 1024;
 const H = 400;
-const WORLD_W = 11;
-const POS = { x: 0, y: 11.6, z: -14.2 } as const;
+const WORLD_W = 7;
+// Behind the showcase court's far end, framed by the center arch from spawn
+// (camera ≈ (0, 3.1, 9.4), pitch -0.34, vFOV 70: top edge of view ≈ +15° up).
+const POS = { x: 0, y: 6.0, z: -27.5 } as const;
 const REDRAW_HZ = 12;
 const TICKER_SPEED = 140; // px/s
 const FRAME_W = 0.25;

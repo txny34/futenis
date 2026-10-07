@@ -8,7 +8,12 @@ import { rand } from "./util";
 // Showcase court behind the arches (outside the walkable bounds): the real
 // court builder + two toy athletes in an endless decorative rally. Purely
 // visual and client-side; the sim knows nothing of it. Allocation-free update.
-const COURT_Z = -25;
+const COURT_Z = -21;
+const STAGE_Y = 0.6; // raised stage: reads over the lobby edge strip
+const ATHLETE_SCALE = 1.25;
+const LIGHT_Y = 9;
+const LIGHT_INTENSITY = 60;
+const LIGHT_ANGLE = Math.PI / 5;
 const PLAYER_X = 7.4;
 const HIT_X = 6.9;
 const LANE_Z = 3.2; // ball lane spread around the court center
@@ -22,7 +27,8 @@ const CROSSINGS_PER_POINT = 7;
 const BALL_R = 0.11;
 const BALL_BOOST = 1.6;
 const STEP_SPEED = 0.45;
-const FLOOR_PAD = { w: 44, d: 30 } as const;
+const STAGE = { w: 24, d: 13 } as const;
+const FLOOR_PAD = { w: 44, d: 24, z: -3 } as const; // starts just past the lobby edge (no z-fight)
 
 interface Athlete { readonly ch: Character; readonly pose: CharacterPose; readonly strike: StrikePose; readonly side: 1 | -1; z: number }
 
@@ -34,6 +40,8 @@ function athlete(shirt: number, side: 1 | -1): Athlete {
 
 export class Showcase {
   readonly group = new THREE.Group();
+  /** Unraised ground under the stage (sibling of group, same visibility via LobbyDecor). */
+  readonly stage = new THREE.Group();
   private readonly ball: THREE.Mesh;
   private readonly players: readonly [Athlete, Athlete];
   private time = 0;
@@ -42,16 +50,28 @@ export class Showcase {
 
   constructor(private readonly onScore: (a: number, b: number) => void) {
     const court = buildCourt();
-    court.remove(court.children[0]); // apron: the lobby has its own floor
+    court.remove(court.children[3], court.children[0]); // enclosure (its mesh hid the rally) + apron
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_PAD.w, FLOOR_PAD.d), new THREE.MeshStandardMaterial({ color: THEME.apron, roughness: 0.8 }));
     ground.rotation.x = -Math.PI / 2;
-    ground.position.set(0, -0.005, 0);
-    this.group.add(ground, court);
+    ground.position.set(0, -0.005, FLOOR_PAD.z);
+    const stage = new THREE.Mesh(new THREE.BoxGeometry(STAGE.w, STAGE_Y, STAGE.d), new THREE.MeshStandardMaterial({ color: THEME.lobbyDecor.plinth, roughness: 0.4, metalness: 0.6 }));
+    stage.position.y = -STAGE_Y / 2;
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(STAGE.w + 0.1, 0.08, STAGE.d + 0.1), new THREE.MeshBasicMaterial({ color: new THREE.Color(THEME.lobbyDecor.padRim).multiplyScalar(2) }));
+    trim.position.y = -0.04;
+    this.group.add(stage, trim, court);
+    this.stage.add(ground);
+    for (const x of [-6, 6]) { // own court lights (no shadows): the rally reads from spawn
+      const l = new THREE.SpotLight(THEME.lobbyDecor.showcaseLight, LIGHT_INTENSITY, 30, LIGHT_ANGLE, 0.5, 1);
+      l.position.set(x, LIGHT_Y, 6);
+      l.target.position.set(x * 0.6, 0, 0);
+      this.group.add(l, l.target);
+    }
     this.ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(THEME.ball).multiplyScalar(BALL_BOOST) }));
     this.players = [athlete(THEME.team[0], 1), athlete(THEME.team[1], -1)];
-    for (const p of this.players) this.group.add(p.ch.root);
+    for (const p of this.players) { p.ch.root.scale.setScalar(ATHLETE_SCALE); this.group.add(p.ch.root); }
     this.group.add(this.ball);
-    this.group.position.z = COURT_Z;
+    this.group.position.set(0, STAGE_Y, COURT_Z);
+    this.stage.position.z = COURT_Z;
   }
 
   update(dt: number): void {

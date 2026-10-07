@@ -32,7 +32,7 @@ export class LobbyDecor {
     this.floor = buildFloor(halfX, halfZ);
     this.showcase = new Showcase((a, b) => this.screen.setScore(a, b));
     this.group.add(this.floor.mesh, this.arches.group, this.screen.group, buildPosters(), this.pads.group,
-      this.ambient.group, this.confetti.points, this.npcs.group, this.showcase.group);
+      this.ambient.group, this.confetti.points, this.npcs.group, this.showcase.group, this.showcase.stage);
   }
 
   /** Pad i heat 0..1 (hold progress, pulse, flash). */
