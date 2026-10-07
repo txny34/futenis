@@ -67,8 +67,6 @@ type Level struct {
 	// ServeLine is how far (m) inside the box lines the serve may land:
 	// lower = closer to the lines.
 	ServeLine float64
-	// ServeDrive is 0..1, how often the serve is a fast drive instead of a lob.
-	ServeDrive float64
 	// ServeTossJitter is the max extra ticks the server waits before tossing.
 	ServeTossJitter int
 }
@@ -76,13 +74,13 @@ type Level struct {
 // levels are the presets indexed by Difficulty.
 var levels = [difficultyCount]Level{
 	Easy: {ReactionTicks: 30, AimNoise: 2.0, Decision: 0.3, PosError: 0.5, TimingError: 6, ChargeError: 0.35, MinSprintStamina: 0.0, NetMargin: 0.6, LineMargin: 1.5, DropChance: 0.05, MissChance: 0.22, IdealErr: 0.3,
-		ServeFault: 0.095, ServeDepth: 0.55, ServeLine: 1.0, ServeDrive: 0, ServeTossJitter: 36},
+		ServeFault: 0.095, ServeDepth: 0.55, ServeLine: 1.0, ServeTossJitter: 36},
 	Normal: {ReactionTicks: 18, AimNoise: 1.2, Decision: 0.6, PosError: 0.3, TimingError: 3, ChargeError: 0.2, MinSprintStamina: 0.2, NetMargin: 0.5, LineMargin: 1.2, DropChance: 0.15, MissChance: 0.12, IdealErr: 0.12, UsesSpin: true,
-		ServeFault: 0.055, ServeDepth: 0.65, ServeLine: 0.8, ServeDrive: 0.25, ServeTossJitter: 24},
+		ServeFault: 0.055, ServeDepth: 0.65, ServeLine: 0.8, ServeTossJitter: 24},
 	Hard: {ReactionTicks: 9, AimNoise: 0.6, Decision: 0.85, PosError: 0.25, TimingError: 1, ChargeError: 0.1, MinSprintStamina: 0.3, NetMargin: 0.35, LineMargin: 0.9, DropChance: 0.25, MissChance: 0.09, IdealErr: 0.08, UsesSpin: true, UsesJump: true,
-		ServeFault: 0.02, ServeDepth: 0.75, ServeLine: 0.6, ServeDrive: 0.4, ServeTossJitter: 16},
+		ServeFault: 0.02, ServeDepth: 0.75, ServeLine: 0.6, ServeTossJitter: 16},
 	Pro: {ReactionTicks: 0, AimNoise: 0.25, Decision: 1.0, PosError: 0.15, TimingError: 0, ChargeError: 0, MinSprintStamina: 0.35, NetMargin: 0.2, LineMargin: 0.6, DropChance: 0.35, MissChance: 0.05, IdealErr: 0.06, UsesSpin: true, UsesJump: true,
-		ServeFault: 0.01, ServeDepth: 0.8, ServeLine: 0.45, ServeDrive: 0.5, ServeTossJitter: 10},
+		ServeFault: 0.01, ServeDepth: 0.8, ServeLine: 0.45, ServeTossJitter: 10},
 }
 
 // LevelOf returns the preset for d (out-of-range values clamp to Pro).

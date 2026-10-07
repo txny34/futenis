@@ -188,7 +188,9 @@ func strike(s *State, i int8, part BodyPart, u float64, ev []Event) []Event {
 	h := strikeHash(s.Tick, p.Team, s.Ball.Pos)
 
 	shot := p.ShotType
-	if shot == ShotLob && !ps.AllowLob {
+	// Padel: the serve is struck at/below the waist, there is no lob serve
+	// (the server's Lob latch strikes the regular serve).
+	if shot == ShotLob && (!ps.AllowLob || s.Phase == PhaseServe) {
 		shot = ShotDrive
 	}
 
