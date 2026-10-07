@@ -138,3 +138,31 @@ func TestRunFrameHeldInputPersistsAcrossTicks(t *testing.T) {
 		t.Fatalf("Player 0 Held: want BtnStrike still set after 5 ticks of a held input, got %+v", st.Players[0])
 	}
 }
+
+func TestLayoutEntriesExposeLobbyKeys(t *testing.T) {
+	want := map[string]float64{
+		"snapLen": 93, "inputPerPlayer": 6, "eventStride": eventStride, "maxEvents": maxEvents, "cfgLen": 152,
+		"modeLobby": 3, "snapLobbyPad": 91, "snapLobbyHold": 92,
+		"evPadEnter": 24, "evPadLeave": 25, "evPadStart": 26,
+		"cfgLobbyHoldTime": 72, "cfgLobbyHalfX": 73, "cfgLobbyHalfZ": 74, "lobbyPadRadius": 1.5,
+	}
+	got := layoutEntries()
+	if len(got) != len(want) {
+		t.Fatalf("got %d keys, want %d", len(got), len(want))
+	}
+	for _, e := range got {
+		if w, ok := want[e.key]; !ok || w != e.val {
+			t.Errorf("%s = %v, want %v (known=%v)", e.key, e.val, w, ok)
+		}
+	}
+	pads := lobbyPadsFlat()
+	wantPads := []float64{-6, -4, 0, -6, 6, -4}
+	if len(pads) != len(wantPads) {
+		t.Fatalf("lobbyPads=%v", pads)
+	}
+	for i, w := range wantPads {
+		if pads[i] != w {
+			t.Fatalf("lobbyPads[%d]=%v want %v", i, pads[i], w)
+		}
+	}
+}

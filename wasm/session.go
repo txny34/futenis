@@ -45,8 +45,8 @@ func (d *aiDriver) fill(m *sim.Match, in *[sim.MaxPlayers]sim.PlayerInput) {
 		return
 	}
 	s := m.State()
-	if s.Cfg.Mode == sim.ModePlayground {
-		return // Entrenamiento: the ball machine is the only rival, no bot
+	if s.Cfg.Mode == sim.ModePlayground || s.Cfg.Mode == sim.ModeLobby {
+		return // Entrenamiento (ball machine) and lobby (no ball): no bot
 	}
 	for i := 0; i < int(s.NumPlayers); i++ {
 		if d.humanMask&(1<<i) == 0 {
@@ -74,8 +74,8 @@ func defaultSession() session {
 // configure validates the JS arguments and rebuilds the match; on error the
 // session is left untouched.
 func (ss *session) configure(mode, difficulty, pointsToWin, humanMask int) error {
-	if mode < int(sim.Mode1v1) || mode > int(sim.ModePlayground) {
-		return fmt.Errorf("futenis.configure: mode %d not in 0..2", mode)
+	if mode < int(sim.Mode1v1) || mode > int(sim.ModeLobby) {
+		return fmt.Errorf("futenis.configure: mode %d not in 0..3", mode)
 	}
 	if difficulty < int(ai.Easy) || difficulty > int(ai.Pro) {
 		return fmt.Errorf("futenis.configure: difficulty %d not in 0..3", difficulty)
@@ -98,11 +98,11 @@ func (ss *session) configure(mode, difficulty, pointsToWin, humanMask int) error
 }
 
 // applyMatchFormat sets the scoring model for cfg.Mode: real padel
-// scoring for 1v1/2v2, the legacy flat tally for the playground. The first
+// scoring for 1v1/2v2, the legacy flat tally for the playground/lobby. The first
 // server alternates with the parity of n (the configure call count).
 func applyMatchFormat(cfg *sim.Config, n int) {
 	cfg.FirstServer = int8(n % 2)
-	if cfg.Mode == sim.ModePlayground {
+	if cfg.Mode == sim.ModePlayground || cfg.Mode == sim.ModeLobby {
 		cfg.ScoringMode = sim.ScoringSimple
 		return
 	}

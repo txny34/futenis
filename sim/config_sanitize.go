@@ -60,6 +60,7 @@ func (c *Config) Sanitize() {
 	c.sanitizeSpinAndMisc()
 	c.sanitizeParts()
 	c.sanitizeFeed()
+	c.sanitizeLobby()
 	c.recomputeTickCaches()
 }
 
@@ -160,7 +161,7 @@ func (c *Config) sanitizeSpinAndMisc() {
 		c.KickMaxSpeed = c.KickMinSpeed
 	}
 
-	if c.Mode > ModePlayground {
+	if c.Mode > ModeLobby {
 		c.Mode = Mode1v1
 	}
 
@@ -238,6 +239,7 @@ func (c *Config) recomputeTickCaches() {
 	c.dashTicks = clampTickCount(ticksOf(c.DashTime), math.MaxUint16)
 	c.dashCooldownTicks = clampTickCount(ticksOf(c.DashCooldownTime), math.MaxUint16)
 	c.feedIntervalTicks = clampTickCount(ticksOf(c.FeedInterval), math.MaxInt32)
+	c.lobbyHoldTicks = clampTickCount(ticksOf(c.LobbyHoldTime), math.MaxInt32)
 }
 
 // defaultParts returns the §6 contact table. PartNone is left zero-valued

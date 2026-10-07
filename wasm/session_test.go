@@ -10,7 +10,7 @@ import (
 
 func TestConfigureValidates(t *testing.T) {
 	ss := defaultSession()
-	bad := [][4]int{{3, 0, 5, 0}, {-1, 0, 5, 0}, {0, 4, 5, 0}, {0, 0, 0, 0}, {0, 0, 100, 0}, {0, 0, 5, 16}, {0, 0, 5, -1}}
+	bad := [][4]int{{4, 0, 5, 0}, {-1, 0, 5, 0}, {0, 4, 5, 0}, {0, 0, 0, 0}, {0, 0, 100, 0}, {0, 0, 5, 16}, {0, 0, 5, -1}}
 	for _, b := range bad {
 		if err := ss.configure(b[0], b[1], b[2], b[3]); err == nil {
 			t.Errorf("configure%v: want error", b)
@@ -158,5 +158,33 @@ func TestPlaygroundRunsNoBotAndFeedsOnDemand(t *testing.T) {
 	runFrame(ss.match, in, 1, out, &ss.drv)
 	if !ss.match.State().Feed.Live || out[outCurr+sim.SnapFeedCount] != 1 {
 		t.Fatalf("respawnBall must feed a ball: %+v", ss.match.State().Feed)
+	}
+}
+
+func TestLobbyConfigureRunsNoBot(t *testing.T) {
+	ss := defaultSession()
+	if err := ss.configure(int(sim.ModeLobby), int(ai.Pro), 5, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ss.configure(int(sim.ModeLobby)+1, int(ai.Pro), 5, 1); err == nil || err.Error() != "futenis.configure: mode 4 not in 0..3" {
+		t.Fatalf("mode 4: err=%v", err)
+	}
+	ss.reset()
+	st := ss.match.State()
+	if st.Cfg.Mode != sim.ModeLobby || st.NumPlayers != 1 || st.Players[0].Pos != sim.LobbySpawn {
+		t.Fatalf("lobby session: mode=%d players=%d pos=%+v", st.Cfg.Mode, st.NumPlayers, st.Players[0].Pos)
+	}
+	in := [sim.MaxPlayers]sim.PlayerInput{{MoveX: 0.25}}
+	ss.drv.fill(ss.match, &in)
+	if in[0].MoveX != 0.25 || in[1] != (sim.PlayerInput{}) {
+		t.Fatalf("bot must not run in lobby: %+v", in)
+	}
+	if err := ss.respawnBall(); err == nil {
+		t.Fatal("respawnBall is playground-only")
+	}
+	out := make([]float64, outLen)
+	runFrame(ss.match, in, 2, out, &ss.drv)
+	if out[outCurr+sim.SnapLobbyPad] != -1 || out[outCurr+sim.SnapMode] != float64(sim.ModeLobby) {
+		t.Fatalf("lobby snapshot: pad=%v mode=%v", out[outCurr+sim.SnapLobbyPad], out[outCurr+sim.SnapMode])
 	}
 }

@@ -75,7 +75,7 @@ func TestFeedConfig_SanitizeClampsAndSwaps(t *testing.T) {
 }
 
 func TestFeedConfig_LayoutAppendedAfterFirstServer(t *testing.T) {
-	if cfgMachineZMin != cfgFirstServer+1 || cfgFeedValidBounce != CfgScalarLen-1 {
+	if cfgMachineZMin != cfgFirstServer+1 || cfgFeedValidBounce != cfgLobbyHoldTime-1 {
 		t.Fatalf("feed fields must be appended after cfgFirstServer and end the scalar block")
 	}
 	want := DefaultConfig()

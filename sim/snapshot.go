@@ -140,6 +140,10 @@ const (
 	SnapMachineX // last machine mouth position
 	SnapMachineZ
 
+	// --- Lobby additions (docs/design/lobby.md §5), appended. ---
+	SnapLobbyPad  // active pad: -1 none, 0..2
+	SnapLobbyHold // 0..1 = Hold / lobbyHoldTicks; 0 outside ModeLobby
+
 	SnapLen
 )
 
@@ -169,6 +173,7 @@ func WriteSnapshot(s *State, dst []float64) {
 	writeScoring(s, dst)
 	writePrediction(s, dst)
 	writeFeed(s, dst)
+	writeLobby(s, dst)
 }
 
 // writeFeed fills the Entrenamiento block (docs/design/training.md §3).

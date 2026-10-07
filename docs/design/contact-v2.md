@@ -1116,6 +1116,28 @@ anterior se mueve):
 
 ---
 
+### 20.10 Lobby (post wave-0 addition, `docs/design/lobby.md`)
+
+Todo **append-only** (ningún índice/valor anterior se mueve):
+
+- **Mode**: `3 ModeLobby` después de `2 ModePlayground`. `numPlayersForMode = 1`, sin bot, sin pelota
+  (la pelota queda en `Ball{}` y no se integra), sin puntuación. `Sanitize` acepta `Mode` en `0..3`;
+  `configure` del wasm también (`mode %d not in 0..3`).
+- **EventKind** (§20.2): `24 EvPadEnter  25 EvPadLeave  26 EvPadStart`, después de `23 EvReturnFail`.
+  Sólo en `ModeLobby`; `Player = 0`, `Side = índice del pad (0..2)` (reuso del campo), `Pos = centro
+  del pad (Y = 0)`. El tick de entrada cuenta como el primero sobre el pad: `EvPadStart` sale en el
+  tick número `lobbyHoldTicks` sobre el pad (entrada + `lobbyHoldTicks - 1`).
+- **Snapshot** (§20.3): `91 SnapLobbyPad` (-1 ninguno, 0..2) y `92 SnapLobbyHold` (0..1); `SnapLen = 93`.
+  Fuera de `ModeLobby` valen `-1` / `0`.
+- **Config** (§20.4): `72 LobbyHoldTime [0.3, 5] s = 1.5`, `73 LobbyHalfX [10, 30] m = 16`,
+  `74 LobbyHalfZ [8, 25] m = 12`; `CfgScalarLen = CfgPartsStart = 75`, `CfgLen = 152`. `Sanitize`
+  deriva `lobbyHoldTicks` (no exportado).
+- **Constantes** (`sim/lobby.go`): `LobbyPads = [(-6,-4), (0,-6), (6,-4)]` (X, Z), `LobbyPadRadius = 1.5`,
+  `LobbySpawn = (0, 0, 6)`. `State` ganó `Lobby LobbyState{Pad, Hold, Started}` al final.
+- **`futenis.layout()`** agrega `modeLobby, snapLobbyPad, snapLobbyHold, evPadEnter, evPadLeave,
+  evPadStart, cfgLobbyHoldTime, cfgLobbyHalfX, cfgLobbyHalfZ, lobbyPadRadius` y
+  `lobbyPads: [x0, z0, x1, z1, x2, z2]`. `PlayerInput` no cambia (`inputPerPlayer = 6`).
+
 ## 21. Puntuación de pádel
 
 `Config.ScoringMode` (`ScoringSimple` | `ScoringPadel`, `sim/scoring.go`) decide qué modelo de
