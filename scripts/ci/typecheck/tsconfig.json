@@ -1,13 +1,12 @@
 {
   "extends": "../../../client/tsconfig.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
-      "three": ["node_modules/@types/three"],
-      "three/addons/*": ["node_modules/@types/three/examples/jsm/*"],
-      "three/*": ["node_modules/@types/three/*"]
+      "three": ["./node_modules/@types/three"],
+      "three/addons/*": ["./node_modules/@types/three/examples/jsm/*"],
+      "three/*": ["./node_modules/@types/three/*"]
     },
-    "typeRoots": ["node_modules/@types"],
+    "typeRoots": ["./node_modules/@types"],
     "types": []
   },
   "include": ["../../../client/src/**/*.ts"]
