@@ -1130,7 +1130,7 @@ Todo **append-only** (ningún índice/valor anterior se mueve):
 - **Snapshot** (§20.3): `91 SnapLobbyPad` (-1 ninguno, 0..2) y `92 SnapLobbyHold` (0..1); `SnapLen = 93`.
   Fuera de `ModeLobby` valen `-1` / `0`.
 - **Config** (§20.4): `72 LobbyHoldTime [0.3, 5] s = 1.5`, `73 LobbyHalfX [10, 30] m = 16`,
-  `74 LobbyHalfZ [8, 25] m = 12`; `CfgScalarLen = CfgPartsStart = 75`, `CfgLen = 152`. `Sanitize`
+  `74 LobbyHalfZ [8, 25] m = 18`; `CfgScalarLen = CfgPartsStart = 75`, `CfgLen = 152`. `Sanitize`
   deriva `lobbyHoldTicks` (no exportado).
 - **Constantes** (`sim/lobby.go`): `LobbyPads = [(-6,-4), (0,-6), (6,-4)]` (X, Z), `LobbyPadRadius = 1.5`,
   `LobbySpawn = (0, 0, 6)`. `State` ganó `Lobby LobbyState{Pad, Hold, Started}` al final.
