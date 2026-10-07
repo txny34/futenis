@@ -80,6 +80,24 @@ export interface LobbyDecorTheme {
   readonly hemiGround: number;
   /** NPC looks: shirt colors (shorts/skin/hair/boots reuse crowd tokens). */
   readonly npcShirts: readonly number[];
+  /** Zona 2 · Salón de la fama (lobby/zone2): calm boards, podium medals, statue. */
+  readonly hall: HallTheme;
+}
+
+export interface HallTheme {
+  /** Board canvas (CSS): background, title, muted placeholder, own-row fill + text. */
+  readonly boardBg: string;
+  readonly boardTitle: string;
+  readonly boardMuted: string;
+  readonly ownRow: string;
+  readonly ownText: string;
+  /** Board frame + podium medal trims (numbers): gold, silver, bronze. */
+  readonly frame: number;
+  readonly medals: readonly [number, number, number];
+  readonly podium: number;
+  readonly light: number;
+  /** Floor arrow sign (CSS). */
+  readonly signText: string;
 }
 
 export interface HudTheme {
@@ -162,6 +180,18 @@ export const THEME: Theme = {
     hemiSky: 0x6a3dd8,
     hemiGround: 0x0a1a3a,
     npcShirts: [0x7a4dff, 0x19c6a0, 0xffb020, 0x3b7bff, 0xff4fa3],
+    hall: {
+      boardBg: "#0b0f26",
+      boardTitle: "#ffd36b",
+      boardMuted: "#55628a",
+      ownRow: "#1d3fa8",
+      ownText: "#eef6ff",
+      frame: 0x2a3160,
+      medals: [0xd9a93a, 0xaeb7c6, 0xb0703a],
+      podium: 0x1c2250,
+      light: 0xfff1d6,
+      signText: "#ffd36b",
+    },
   },
   hud: {
     card: "rgba(8, 16, 38, 0.62)",

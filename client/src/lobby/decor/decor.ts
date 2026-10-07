@@ -9,6 +9,7 @@ import { PadFx } from "./pad-fx";
 import { buildPosters } from "./posters";
 import { Scoreboard } from "./screen";
 import { Showcase } from "./showcase";
+import { HallOfFame } from "../zone2/hall";
 
 // Lobby decor pass (docs/design/lobby.md §7.1). Everything lives under one
 // group owned by LobbyView, so setLobby(false) hides it all (lights included).
@@ -28,14 +29,15 @@ export class LobbyDecor {
   private readonly confetti = new Confetti();
   private readonly npcs = new Npcs();
   private readonly showcase: Showcase;
+  private readonly hall = new HallOfFame();
   private time = 0;
 
   constructor(halfX: number, halfZ: number) {
     this.floor = buildFloor(halfX, halfZ);
     this.showcase = new Showcase((a, b) => this.screen.setScore(a, b));
     this.group.add(this.floor.mesh, this.arches.group, this.screen.group, buildPosters(), this.pads.group,
-      this.ambient.group, this.confetti.points, this.npcs.group, this.showcase.group, this.showcase.stage);
-    this.lights.add(this.ambient.lights, this.showcase.lights);
+      this.ambient.group, this.confetti.points, this.npcs.group, this.showcase.group, this.showcase.stage, this.hall.group);
+    this.lights.add(this.ambient.lights, this.showcase.lights, this.hall.lights);
     this.lights.traverse((o) => { if (o instanceof THREE.Light) this.lit.push([o, o.intensity]); });
     this.setLit(false);
   }

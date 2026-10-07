@@ -35,7 +35,7 @@ NO existen en este modo para el sim (el cliente dibuja su propio decorado, ver �
 
 | Elemento | Valor |
 |---|---|
-| Límites caminables | `|X| <= LobbyHalfX - PlayerRadius`, `|Z| <= LobbyHalfZ - PlayerRadius`; default `LobbyHalfX = 16`, `LobbyHalfZ = 12` |
+| Límites caminables | `|X| <= LobbyHalfX - PlayerRadius`, `|Z| <= LobbyHalfZ - PlayerRadius`; default `LobbyHalfX = 16`, `LobbyHalfZ = 18` |
 | Spawn | `(0, 0, 6)`, mirando a -Z (hacia los pads) |
 | Pad 0 · "Entrenamiento · Lanzapelotas" | centro `(-6, 0, -4)` |
 | Pad 1 · "1v1 contra el bot" | centro `(0, 0, -6)` |
@@ -55,7 +55,7 @@ NO existen en este modo para el sim (el cliente dibuja su propio decorado, ver �
 |---|---|---|---|---|
 | 72 | `LobbyHoldTime` | s, `[0.3, 5]` | `1.5` | Tiempo parado sobre un pad para arrancar el modo |
 | 73 | `LobbyHalfX` | m, `[10, 30]` | `16` | Medio largo del área caminable |
-| 74 | `LobbyHalfZ` | m, `[8, 25]` | `12` | Medio ancho del área caminable |
+| 74 | `LobbyHalfZ` | m, `[8, 25]` | `18` | Medio ancho del área caminable |
 
 - `CfgScalarLen = 75`, `CfgPartsStart = 75`, `CfgLen = 75 + 77 = 152`.
 - `Sanitize()` deriva `lobbyHoldTicks = ticksOf(LobbyHoldTime)` (campo no exportado, como los demás `*Ticks`).
@@ -166,6 +166,18 @@ luz que barren, confeti al pisar/arrancar, NPCs decorativos (mismo rig) y una **
 (fuera de los límites) con dos atletas en un rally infinito. Nada de esto toca el sim; geometría de pads/límites igual.
 Colores en `THEME.lobbyDecor`. Update sin allocations (uniforms, matrices, strings precomputados).
 
+### 7.2 Zona 2 · Salón de la fama (`client/src/lobby/zone2/*`, solo cliente)
+
+Detrás del spawn (extremo +Z). Para hacer lugar, el default `LobbyHalfZ` pasó de 12 a 18 (solo valor default, sin cambio
+de layout) y la pared del fondo de z=+14 a z=+23. Tres pantallas enmarcadas mirando a -Z en z≈22.4: izquierda
+"MEJOR ELO 1v1" (x=-8, giro 0.35 rad hacia el centro), centro "TOP VICTORIAS" (x=0), derecha "MEJOR ELO 2v2" (x=+8),
+título "SALÓN DE LA FAMA" arriba. Datos **solo locales** (`profile/store.ts`): fila propia resaltada "TÚ · <nombre>"
+con su stat real + zona "RANKING ONLINE — PRÓXIMAMENTE" con slots vacíos (sin nombres inventados). Podios 1-2-3 en
+z=19.6 (fuera de lo caminable) bajo las pantallas laterales; el #1 muestra una estatua del rig del jugador si tiene
+≥ 1 victoria, si no "¿Serás vos?". Flecha en el piso en z=10.5 "ZONA 2 · SALÓN DE LA FAMA". Canvases redibujados
+solo en `onChange` del perfil; una SpotLight cálida fija dentro de `LobbyDecor.lights` (set de luces constante).
+Colores en `THEME.lobbyDecor.hall`. Emisivos bajos, sin parpadeo.
+
 ## 8. Split de archivos (dos implementadores en paralelo)
 
 El contrato de esta doc (índices §3/§5, eventos §4, nombres en `layout()`) es la interfaz; nadie toca archivos del otro.
@@ -225,3 +237,56 @@ El contrato de esta doc (índices §3/§5, eventos §4, nombres en `layout()`) e
 
 Otros jugadores visibles en el lobby, chat, cuentas/login, cosméticos, tienda, emotes, NPCs, pelota libre para patear en
 el lobby, colisión con decorado. Todo eso es Fase 2+.
+
+## Perfil local y misiones
+
+Todo es **local** (invitado, `localStorage`), sin servidor y sin jugadores falsos. El sim no cambia: el cliente cuenta
+a partir de los eventos y resultados que ya existen.
+
+### Perfil (`client/src/profile/store.ts`, API congelada)
+
+`profileStore(): ProfileStore` (singleton) con `get()` y `onChange(cb) -> unsubscribe`. `ProfileStats`: `name`
+("Invitado"), `level/xp/xpToNext`, `elo` por cola (`1v1`, `2v2`, arranca 1000), `wins/losses/streak/bestStreak`,
+`perfects`, `trainings`, `bestTrainingStreak`. Clave `futenis.profile.v1`, validada al cargar (campo inválido → default,
+JSON roto o storage bloqueado → perfil por defecto en memoria). La escritura (`profileWriter().update`) es interna a
+`profile/`; el resto del cliente (incl. la Zona 2) solo lee.
+
+### Cómo se alimenta (`profile/recorder.ts`)
+
+| Fuente | Qué registra |
+|---|---|
+| `flow.startMatch` → `recorder().begin(cola \| "training", dificultad)` | Abre la actividad actual |
+| `GameLoop.onGameEvent` (todo evento no-lobby) | `EvKick` del slot 0 con `quality === Quality.Perfect` → `perfects++` (+5 XP); en entrenamiento `EvReturnOK`/`EvReturnFail` llevan la racha |
+| `GameLoop.onMatchOver` → `flow.showResult` → `recorder().matchOver(won)` | Victoria/derrota, racha, ELO, XP |
+| `flow.enterLobby` / nuevo `startMatch` → `recorder().end()` | Cierra el entrenamiento: cuenta como completado con ≥ 5 devoluciones válidas (+30 XP, `bestTrainingStreak`) |
+
+Abandonar un partido (Esc → Volver al lobby) no cuenta como derrota ni gana XP.
+
+- **XP**: victoria 100, derrota 40, perfecto 5, entrenamiento 30. `xpToNext = 100 + 40·nivel` (sube varias veces si alcanza).
+- **ELO** vs bots (solo partidos; el entrenamiento no toca ELO): rating del bot por dificultad — Fácil 800, Normal 1000,
+  Difícil 1200, Pro 1400 — `K = 32`, `E = 1 / (1 + 10^((bot − yo)/400))`, por cola.
+
+### Misiones (`profile/missions.ts`, clave `futenis.missions.v1`)
+
+4 diarias (reset a medianoche local) y 3 semanales (reset el lunes local). Cada bucket guarda su clave de período; si no
+coincide con la fecha actual se descarta. Métricas: `win`, `match`, `perfect`, `training` (suman) y `trainStreak` (máximo).
+Reclamar suma la XP de la misión al perfil.
+
+| Diarias | Meta | XP | Semanales | Meta | XP |
+|---|---|---|---|---|---|
+| Ganá 1 partido | 1 | 60 | Ganá 5 partidos | 5 | 250 |
+| 10 golpes perfectos | 10 | 50 | Jugá 10 partidos | 10 | 200 |
+| Completá 2 entrenamientos | 2 | 50 | 50 golpes perfectos | 50 | 200 |
+| Racha de 5 en el lanzapelotas | 5 | 40 | | | |
+
+### UI del lobby
+
+- **Barra inferior**: fila compacta arriba (chips de dificultad · Entrenamiento ⚙ · Ajustes) y dock principal
+  `[Equipo · Estilos · Misiones]  JUGAR  [Regalo · Tienda · Mercancía]`. JUGAR es verde (tokens `--fx-go`,
+  `--fx-go-deep`, `--fx-go-ink` en `menu.css`), sin animación. Íconos SVG en línea (`lobby/icons.ts`, `currentColor`).
+  Misiones pliega/despliega el panel y muestra un badge con la cantidad reclamable; los otros cinco muestran un aviso
+  "Próximamente" (sin contenido falso).
+- **Panel de misiones** (`lobby/missions-panel.ts`): izquierda, plegable, pestañas Día/Sem., filas con progreso, recompensa
+  y botón de reclamar.
+- **Tarjeta de perfil** (`lobby/profile-card.ts`): arriba a la derecha, avatar con nivel, nombre, barra "x / y XP", chips ELO.
+- Todo visible solo en el lobby; el DOM se toca únicamente en `onChange` del perfil/misiones o en clicks.

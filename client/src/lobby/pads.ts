@@ -8,7 +8,7 @@ export const LOBBY_PADS: readonly number[] = [-6, -4, 0, -6, 6, -4];
 export const LOBBY_PAD_RADIUS = 1.5;
 /** Default walkable half extents (Config LobbyHalfX/Z, lobby.md §3). */
 export const LOBBY_HALF_X = 16;
-export const LOBBY_HALF_Z = 12;
+export const LOBBY_HALF_Z = 18;
 
 /** Config scalar indices appended after cfgFeedValidBounce = 71 (lobby.md §3). */
 export const LobbyCfg = { HoldTime: 72, HalfX: 73, HalfZ: 74 } as const;

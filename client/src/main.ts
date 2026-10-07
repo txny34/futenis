@@ -4,6 +4,8 @@ import { Hud } from "./hud";
 import { Controls } from "./input";
 import { GameLoop, LoopState } from "./loop";
 import { BottomBar } from "./lobby/bottom-bar";
+import { ProfileCard } from "./lobby/profile-card";
+import { recorder } from "./profile/recorder";
 import { App, enterLobby, errText, landingAllowed, lobbyOptions, onPadEvent, safeStart, showResult } from "./lobby/flow";
 import { CourtView } from "./render";
 import { MatchScreens } from "./ui/match-screens";
@@ -98,12 +100,13 @@ function boot(): void {
   let ref: App | null = null;
   const get = (): App => { if (!ref) throw new Error("app no inicializada"); return ref; };
   const app: App = {
-    engine, view, hud, controls, state, bar: lobbyBar(get, menu), screens: new MatchScreens(document.body), menu,
+    engine, view, hud, controls, state, bar: lobbyBar(get, menu), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu,
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
   };
   ref = app;
   const loop = new GameLoop(engine, view, hud, controls, state);
   loop.onMatchOver = (r, snap) => showResult(app, r, snap);
+  loop.onGameEvent = (e) => recorder().onEvent(e);
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);
   app.loop = loop;
   wire(app, menu);

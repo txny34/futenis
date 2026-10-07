@@ -247,7 +247,7 @@ func DefaultConfig() Config {
 		FeedInterval:    1.5,
 		FeedValidBounce: 1,
 
-		LobbyHoldTime: 1.5, LobbyHalfX: 16, LobbyHalfZ: 12,
+		LobbyHoldTime: 1.5, LobbyHalfX: 16, LobbyHalfZ: 18,
 	}
 	c.Sanitize()
 	return c

@@ -39,6 +39,8 @@ export class GameLoop {
   onMatchOver: ((r: Readonly<MatchResult>, snap: Float64Array) => void) | null = null;
   /** Lobby pad events (EvPadEnter/Leave/Start, lobby.md §4). Fired after the step's other events. */
   onPadEvent: ((kind: number, pad: number) => void) | null = null;
+  /** Every non-lobby sim event (profile/recorder.ts: perfects, training streak). */
+  onGameEvent: ((e: SimEvent) => void) | null = null;
   private frame: StepResult;
   private acc = 0;
   private last = 0;
@@ -136,6 +138,7 @@ export class GameLoop {
       return;
     }
     if (e.kind === EventKind.BounceFloor && this.shots.rematePending) this.view.fx.splat(e.x, e.z);
+    this.onGameEvent?.(e);
     const shot = this.shots.onEvent(e);
     this.view.players.onEvent(e);
     this.hud.onEvent(e, shot, now);

@@ -1,4 +1,5 @@
 import type { Engine, MatchSetup } from "../engine";
+import { recorder } from "../profile/recorder";
 import type { Hud } from "../hud";
 import type { Controls } from "../input";
 import type { GameLoop, LoopState, MatchResult } from "../loop";
@@ -10,6 +11,7 @@ import type { Difficulty, GameMode, MatchOptions, MenuUI, Settings } from "../ui
 import { DEFAULT_TRAINING, loadTraining } from "../ui/training-settings";
 import { DEFAULT_POINTS } from "../ui/types";
 import type { BottomBar } from "./bottom-bar";
+import type { ProfileCard } from "./profile-card";
 import { PAD_MODES } from "./pads";
 
 // Lobby <-> match flow (docs/design/lobby.md §6): the sim detects pads, the
@@ -36,6 +38,7 @@ export interface App {
   controls: Controls;
   state: LoopState;
   bar: BottomBar;
+  profile: ProfileCard;
   screens: MatchScreens;
   menu: MenuUI;
   /** null while in the lobby. */
@@ -71,6 +74,7 @@ function arm(app: App, lobby: boolean): void {
   app.view.setLobby(lobby);
   app.view.rig.face(lobby ? YAW_LOBBY : YAW_COURT);
   app.bar.visible = lobby;
+  app.profile.visible = lobby;
   app.menu.setInGame(!lobby);
   app.refreshDev?.();
 }
@@ -79,8 +83,10 @@ function arm(app: App, lobby: boolean): void {
 export function enterLobby(app: App): void {
   app.view.setLobby(true);
   app.bar.visible = true;
+  app.profile.visible = true;
   if (!app.engine.loaded) return; // load() calls back once wasm is up
   app.hud.error("");
+  recorder().end();
   app.engine.clearInputs();
   app.engine.configure(setup(LOBBY_MODE_ID, app.bar.difficulty, DEFAULT_POINTS));
   app.mode = null;
@@ -103,6 +109,8 @@ export function startMatch(app: App, o: MatchOptions): void {
   if (o.mode === "playground") applyTraining(app.engine, training);
   app.mode = o.mode;
   app.last = o;
+  recorder().end();
+  recorder().begin(o.mode === "playground" ? "training" : o.mode, o.difficulty);
   app.bar.remember(o.mode);
   app.state.showLanding = landingAllowed(app.menu.settings, o);
   app.hud.setTrainingOnDemand(o.mode === "playground" && training.onDemand);
@@ -159,6 +167,7 @@ export function showResult(app: App, r: Readonly<MatchResult>, snap: Float64Arra
   app.controls.enabled = false;
   app.controls.releaseAll();
   const winner = r.winner >= 0 ? r.winner : snap[Snap.Sets0] >= snap[Snap.Sets1] ? 0 : 1;
+  recorder().matchOver(winner === HUMAN_TEAM);
   app.screens.showResult({ won: winner === HUMAN_TEAM, games0: r.games0, games1: r.games1 }, {
     rematch: () => { if (app.last) safeStart(app, app.last); },
     lobby: () => {

@@ -77,7 +77,7 @@ func TestLobby_PadContract(t *testing.T) {
 
 func TestLobby_ConfigRoundTripAndSanitize(t *testing.T) {
 	want := DefaultConfig()
-	if want.LobbyHoldTime != 1.5 || want.LobbyHalfX != 16 || want.LobbyHalfZ != 12 || want.lobbyHoldTicks != 180 {
+	if want.LobbyHoldTime != 1.5 || want.LobbyHalfX != 16 || want.LobbyHalfZ != 18 || want.lobbyHoldTicks != 180 {
 		t.Fatalf("defaults: %v %v %v %d", want.LobbyHoldTime, want.LobbyHalfX, want.LobbyHalfZ, want.lobbyHoldTicks)
 	}
 	want.Mode = ModeLobby
@@ -297,7 +297,7 @@ func TestLobby_ClampDispatchKeepsCourtClampElsewhere(t *testing.T) {
 	s.Cfg.Mode = ModeLobby
 	p.Pos = Vec3{X: -40, Z: 40}
 	clampPlayer(&s, &p)
-	if p.Pos.X != -(16-PlayerRadius) || p.Pos.Z != 12-PlayerRadius {
+	if p.Pos.X != -(16-PlayerRadius) || p.Pos.Z != 18-PlayerRadius {
 		t.Fatalf("lobby clamp: %+v", p.Pos)
 	}
 }
