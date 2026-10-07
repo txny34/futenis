@@ -29,6 +29,8 @@ jobs:
       - name: build wasm + TS bundle
         run: go run ./cmd/dev -check
       - name: staticcheck
+        env:
+          GOTOOLCHAIN: auto # staticcheck v0.8.1 needs go >= 1.26
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
