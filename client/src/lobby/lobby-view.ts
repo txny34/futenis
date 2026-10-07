@@ -63,12 +63,13 @@ export class LobbyView {
   constructor(scene: THREE.Scene) {
     this.group.visible = false;
     this.group.add(this.decor.group);
+    scene.add(this.decor.lights);
     this.buildEdge();
     for (let i = 0; i < LOBBY_PAD_COUNT; i++) this.pads.push(this.buildPad(i));
     scene.add(this.group);
   }
 
-  set visible(v: boolean) { this.group.visible = v; }
+  set visible(v: boolean) { this.group.visible = v; this.decor.setLit(v); }
 
   /** EvPadEnter: pulse; EvPadStart: flash (side = pad index). */
   pulse(pad: number): void { const p = this.pads[pad]; if (p) p.pulse = 1; }

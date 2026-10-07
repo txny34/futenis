@@ -12,11 +12,11 @@ const COURT_Z = -21;
 const STAGE_Y = 0.6; // raised stage: reads over the lobby edge strip
 const ATHLETE_SCALE = 1.25;
 const LIGHT_Y = 9;
-const LIGHT_INTENSITY = 60;
+const LIGHT_INTENSITY = 12;
 const LIGHT_ANGLE = Math.PI / 5;
 const PLAYER_X = 7.4;
 const HIT_X = 6.9;
-const LANE_Z = 3.2; // ball lane spread around the court center
+const LANE_Z = 1.6; // ball lane spread around the court center
 const CROSS_S = 1.45; // one crossing (s)
 const BOUNCE_S = 0.66; // fraction of the crossing when the ball bounces
 const HIT_Y = 0.45;
@@ -24,10 +24,13 @@ const PEAK = 2.3;
 const REBOUND = 0.9;
 const CLIP_S = 0.8;
 const CROSSINGS_PER_POINT = 7;
-const BALL_R = 0.11;
+const BALL_R = 0.2; // oversized so it reads from spawn
 const BALL_BOOST = 1.6;
 const STEP_SPEED = 0.45;
 const STAGE = { w: 24, d: 13 } as const;
+const MAX_DT = 0.1;
+const GLASS_H = 1.6;
+const GLASS_OPACITY = 0.14;
 const FLOOR_PAD = { w: 44, d: 24, z: -3 } as const; // starts just past the lobby edge (no z-fight)
 
 interface Athlete { readonly ch: Character; readonly pose: CharacterPose; readonly strike: StrikePose; readonly side: 1 | -1; z: number }
@@ -38,8 +41,31 @@ function athlete(shirt: number, side: 1 | -1): Athlete {
   return { ch, strike, side, z: 0, pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: side * Math.PI / 2 } };
 }
 
+/** Low see-through glass: full back walls (X = ±10) and short side returns, so nothing blocks the view. */
+function lowGlass(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: THEME.glass, transparent: true, opacity: GLASS_OPACITY, depthWrite: false, side: THREE.DoubleSide });
+  const edge = new THREE.MeshBasicMaterial({ color: THEME.lobbyDecor.padRim });
+  const panel = (w: number, x: number, z: number, ry: number): void => {
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(w, GLASS_H), mat);
+    p.position.set(x, GLASS_H / 2, z);
+    p.rotation.y = ry;
+    const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, 0.04), edge);
+    top.position.set(x, GLASS_H, z);
+    top.rotation.y = ry;
+    g.add(p, top);
+  };
+  for (const sx of [-1, 1]) {
+    panel(10, sx * 10, 0, Math.PI / 2);
+    for (const sz of [-1, 1]) panel(2, sx * 9, sz * 5, 0);
+  }
+  return g;
+}
+
 export class Showcase {
   readonly group = new THREE.Group();
+  /** Court lights, outside the hideable group (constant light set, see LobbyDecor.setLit). */
+  readonly lights = new THREE.Group();
   /** Unraised ground under the stage (sibling of group, same visibility via LobbyDecor). */
   readonly stage = new THREE.Group();
   private readonly ball: THREE.Mesh;
@@ -57,25 +83,27 @@ export class Showcase {
     const stage = new THREE.Mesh(new THREE.BoxGeometry(STAGE.w, STAGE_Y, STAGE.d), new THREE.MeshStandardMaterial({ color: THEME.lobbyDecor.plinth, roughness: 0.4, metalness: 0.6 }));
     stage.position.y = -STAGE_Y / 2;
     const trim = new THREE.Mesh(new THREE.BoxGeometry(STAGE.w + 0.1, 0.08, STAGE.d + 0.1), new THREE.MeshBasicMaterial({ color: new THREE.Color(THEME.lobbyDecor.padRim).multiplyScalar(2) }));
-    trim.position.y = -0.04;
-    this.group.add(stage, trim, court);
+    trim.position.y = -0.15; // band on the stage side only: its top must NOT touch the court floor (z-fight = mint slab)
+    this.group.add(stage, trim, court, lowGlass());
     this.stage.add(ground);
     for (const x of [-6, 6]) { // own court lights (no shadows): the rally reads from spawn
       const l = new THREE.SpotLight(THEME.lobbyDecor.showcaseLight, LIGHT_INTENSITY, 30, LIGHT_ANGLE, 0.5, 1);
       l.position.set(x, LIGHT_Y, 6);
       l.target.position.set(x * 0.6, 0, 0);
-      this.group.add(l, l.target);
+      this.lights.add(l, l.target);
     }
     this.ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(THEME.ball).multiplyScalar(BALL_BOOST) }));
     this.players = [athlete(THEME.team[0], 1), athlete(THEME.team[1], -1)];
     for (const p of this.players) { p.ch.root.scale.setScalar(ATHLETE_SCALE); this.group.add(p.ch.root); }
     this.group.add(this.ball);
     this.group.position.set(0, STAGE_Y, COURT_Z);
+    this.lights.position.copy(this.group.position);
     this.stage.position.z = COURT_Z;
   }
 
-  update(dt: number): void {
-    if (!(dt > 0)) return; // dt = 0 would put NaN into pose.speed -> NaN bones -> black bloom blocks
+  update(rawDt: number): void {
+    if (!(rawDt > 0)) return;
+    const dt = Math.min(rawDt, MAX_DT); // dt = 0 would put NaN into pose.speed -> NaN bones -> black bloom blocks
     this.time += dt;
     const k = Math.floor(this.time / CROSS_S);
     const s = this.time / CROSS_S - k;

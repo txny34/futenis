@@ -75,6 +75,7 @@ export class CourtView {
     this.fx = new ImpactFx(this.scene);
     this.machine = new MachineView(this.scene);
     this.post = new PostFx(this.renderer, this.scene, this.rig.camera);
+    this.prewarm();
     window.addEventListener("resize", () => this.resize());
     this.applyVideo("high", true);
   }
@@ -128,6 +129,13 @@ export class CourtView {
     this.rig.update(hasHuman ? this.humanFeet : null, this.ball.position, dt);
     this.arena.update(dt);
     this.post.render(dt);
+  }
+
+  /** Compiles every program (court + lobby + stadium visible at once) so the first lobby<->match switch never stalls. */
+  private prewarm(): void {
+    this.lobby.group.visible = true;
+    this.renderer.compile(this.scene, this.rig.camera);
+    this.lobby.group.visible = false;
   }
 
   /** Projects a world point to normalized screen coords into out (allocation-free). */

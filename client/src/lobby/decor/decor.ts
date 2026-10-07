@@ -17,6 +17,9 @@ const CONFETTI_START = 0.7; // calm burst, pad start only
 
 export class LobbyDecor {
   readonly group = new THREE.Group();
+  /** Always in the scene; dimmed to 0 outside the lobby so material programs never recompile. */
+  readonly lights = new THREE.Group();
+  private readonly lit: Array<readonly [THREE.Light, number]> = [];
   private readonly floor: LobbyFloor;
   private readonly arches = new Arches();
   private readonly screen = new Scoreboard();
@@ -32,6 +35,14 @@ export class LobbyDecor {
     this.showcase = new Showcase((a, b) => this.screen.setScore(a, b));
     this.group.add(this.floor.mesh, this.arches.group, this.screen.group, buildPosters(), this.pads.group,
       this.ambient.group, this.confetti.points, this.npcs.group, this.showcase.group, this.showcase.stage);
+    this.lights.add(this.ambient.lights, this.showcase.lights);
+    this.lights.traverse((o) => { if (o instanceof THREE.Light) this.lit.push([o, o.intensity]); });
+    this.setLit(false);
+  }
+
+  /** Lobby lights on (base intensity) or off (0). Not per frame. */
+  setLit(on: boolean): void {
+    for (const [l, base] of this.lit) l.intensity = on ? base : 0;
   }
 
   /** Pad i heat 0..1 (hold progress, pulse, flash). */

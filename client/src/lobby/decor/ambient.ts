@@ -35,15 +35,17 @@ void main() { gl_FragColor = clamp(vec4(uColor, pow(vY, 1.6) * 0.035), vec4(0.0)
 
 export class Ambient {
   readonly group = new THREE.Group();
+  /** Lights live outside the hideable group: the scene light set never changes (no recompiles). */
+  readonly lights = new THREE.Group();
   private readonly time = { value: 0 };
 
   constructor() {
     const D = THEME.lobbyDecor;
-    this.group.add(new THREE.HemisphereLight(D.hemiSky, D.hemiGround, HEMI_INTENSITY));
+    this.lights.add(new THREE.HemisphereLight(D.hemiSky, D.hemiGround, HEMI_INTENSITY));
     D.neon.forEach((c, i) => {
       const l = new THREE.PointLight(c, FILL_INTENSITY, FILL_DIST, 1.2);
       l.position.set((i - 1) * 11, 6, -11);
-      this.group.add(l);
+      this.lights.add(l);
     });
     this.group.add(this.buildDust());
     const geo = new THREE.CylinderGeometry(0.15, CONE_R, CONE_H, 32, 1, true);
