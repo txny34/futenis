@@ -45,7 +45,35 @@ export interface Theme {
   /** Pad sign canvas (CSS colors): background and text. */
   readonly lobbySignBg: string;
   readonly lobbySignText: string;
+  /** Lobby decor pass (lobby.md §7.1): floor, architecture, screen, showcase, ambient life. */
+  readonly lobbyDecor: LobbyDecorTheme;
   readonly hud: HudTheme;
+}
+
+export interface LobbyDecorTheme {
+  /** Floor canvas (CSS): tile base, tile highlight, seam glow, center logo. */
+  readonly floorTile: string;
+  readonly floorTileHi: string;
+  readonly floorSeam: string;
+  readonly floorLogo: string;
+  /** Neon arches / tubes cycle between these three. */
+  readonly neon: readonly [number, number, number];
+  readonly wallPanel: number;
+  readonly wallTrim: number;
+  readonly plinth: number;
+  /** Giant screen + posters (CSS). */
+  readonly screenBg: string;
+  readonly screenText: string;
+  readonly screenAccentA: string;
+  readonly screenAccentB: string;
+  readonly posterBg: readonly string[];
+  readonly dust: number;
+  readonly beam: number;
+  readonly confetti: readonly number[];
+  readonly hemiSky: number;
+  readonly hemiGround: number;
+  /** NPC looks: shirt colors (shorts/skin/hair/boots reuse crowd tokens). */
+  readonly npcShirts: readonly number[];
 }
 
 export interface HudTheme {
@@ -105,6 +133,27 @@ export const THEME: Theme = {
   padFill: 0xe6ff1f,
   lobbySignBg: "rgba(5, 9, 20, 0.82)",
   lobbySignText: "#eef6ff",
+  lobbyDecor: {
+    floorTile: "#161c3a",
+    floorTileHi: "#1f2752",
+    floorSeam: "#7a4dff",
+    floorLogo: "#19e3ff",
+    neon: [0xb04dff, 0x19e3ff, 0xff4fa3],
+    wallPanel: 0x120f2e,
+    wallTrim: 0x7a4dff,
+    plinth: 0x1a1d3d,
+    screenBg: "#07051a",
+    screenText: "#eef6ff",
+    screenAccentA: "#b04dff",
+    screenAccentB: "#19e3ff",
+    posterBg: ["#2a0f4a", "#0b2a4a", "#4a0f33"],
+    dust: 0xc9b8ff,
+    beam: 0x9b6bff,
+    confetti: [0xe6ff1f, 0xff4fa3, 0x19e3ff, 0xb04dff, 0xff5a4e],
+    hemiSky: 0x6a3dd8,
+    hemiGround: 0x0a1a3a,
+    npcShirts: [0x7a4dff, 0x19c6a0, 0xffb020, 0x3b7bff, 0xff4fa3],
+  },
   hud: {
     card: "rgba(8, 16, 38, 0.62)",
     cardBorder: "rgba(25, 227, 255, 0.35)",

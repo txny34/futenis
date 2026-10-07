@@ -156,6 +156,16 @@ el cliente ya hace hoy para arrancar un partido.
 - Colores **solo** en `client/src/env/theme.ts` (tokens nuevos `lobbyFloor`, `lobbyEdge`, `padTraining`, `pad1v1`,
   `pad2v2`, `padFill`). Archivos TS < 200 líneas, strict, sin `any`.
 
+### 7.1 Pase visual (decor, solo cliente)
+
+`client/src/lobby/decor/*` (agregado por `LobbyDecor`, hijo del grupo de `LobbyView` → `setLobby(false)` oculta todo,
+luces incluidas). Piso de canvas (paneles, juntas que brillan, logo "FUTENIS"), 3 arcos neón con color cíclico en
+z=-13.5, paredes con paneles + trims instanciados, pantalla gigante (canvas redibujado a 12 Hz, marcador de la cancha
+de exhibición + ticker), pósters, pads con plinto, borde animado, haz de luz y partículas, polvo flotante, conos de
+luz que barren, confeti al pisar/arrancar, NPCs decorativos (mismo rig) y una **cancha de exhibición** en z=-25
+(fuera de los límites) con dos atletas en un rally infinito. Nada de esto toca el sim; geometría de pads/límites igual.
+Colores en `THEME.lobbyDecor`. Update sin allocations (uniforms, matrices, strings precomputados).
+
 ## 8. Split de archivos (dos implementadores en paralelo)
 
 El contrato de esta doc (índices §3/§5, eventos §4, nombres en `layout()`) es la interfaz; nadie toca archivos del otro.
