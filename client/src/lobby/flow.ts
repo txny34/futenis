@@ -73,7 +73,7 @@ function arm(app: App, lobby: boolean): void {
   app.state.running = true;
   app.state.paused = false;
   app.controls.releaseAll();
-  app.controls.enabled = !app.menu.isOpen;
+  app.controls.enabled = !app.menu.isOpen && !app.play.isOpen;
   app.loop?.rearm();
   app.hud.resetMatch();
   app.screens.hide();
