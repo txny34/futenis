@@ -12,3 +12,7 @@ updates:
     directory: /scripts/ci/typecheck
     schedule:
       interval: monthly
+    ignore:
+      # Types must match the three.js runtime pinned in client/*.html (0.169.0).
+      # Bump both together in one PR when upgrading three.
+      - dependency-name: "@types/three"
