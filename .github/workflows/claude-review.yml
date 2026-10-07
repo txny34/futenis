@@ -1,0 +1,55 @@
+name: claude-review
+
+# Automatic Claude Code review when a PR is opened: reviews the diff against
+# CLAUDE.md, comments findings on the PR and pushes fix commits to the PR branch.
+# Only on opened/ready_for_review (not on every push) so its own fix commits
+# don't loop. Needs the CLAUDE_CODE_OAUTH_TOKEN secret (`claude setup-token`)
+# and the Claude GitHub App installed on the repo.
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are reviewing PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+            Read CLAUDE.md first: it is the source of truth (architecture, determinism,
+            zero allocs per tick/frame, append-only layout, file size limits, TS strict, colors in theme tokens).
+
+            1. Review `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`.
+               Only report real issues: bugs, rule violations from CLAUDE.md, security problems,
+               missing tests for new sim/ai logic. Skip style nitpicks.
+            2. Fix every CRITICAL/HIGH issue and clear MEDIUM ones directly on this branch:
+               small focused commits, conventional commit messages, no AI attribution lines.
+               After fixing run: gofmt -l . ; go vet ./... ; GOOS=js GOARCH=wasm go vet ./wasm/ ;
+               go test -short ./... ; go run ./cmd/dev -check  — all must pass before you push.
+               Never force-push, never touch main, never edit .github/workflows.
+            3. Post one PR comment (in Spanish, rioplatense) with: what you checked, each finding
+               (severity, file:line, why), what you fixed (commit SHAs) and what is left for a human.
+          claude_args: |
+            --allowedTools "Bash(git:*),Bash(go:*),Bash(gofmt:*),Bash(gh pr comment:*),Bash(gh pr view:*),Bash(gh pr diff:*),Read,Edit,Write,Glob,Grep"
