@@ -1,0 +1,87 @@
+/* "Elegí un modo" cards: casual = teal identity, ranked = gold identity (night arena,
+   gold frame, trophy). Calm motion only: transitions >= 150ms, nothing loops/blinks.
+   Colors only from --fx-* tokens (menu.css :root) plus alpha overlays. */
+.fx-play__center { display: grid; gap: 22px; }
+.fx-play__cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fx-play__heading { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font: 400 15px var(--fx-display); letter-spacing: .08em; text-transform: uppercase; }
+.fx-play__section--casual .fx-play__heading { color: var(--fx-teal); }
+.fx-play__section--ranked .fx-play__label {
+  background: linear-gradient(180deg, var(--fx-gold-light), var(--fx-gold) 55%, var(--fx-gold-deep));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 0 var(--fx-gold-ink));
+}
+.fx-play__icon, .fx-ballicon { width: 24px; height: 24px; flex: none; }
+.fx-ballicon__body { fill: var(--fx-teal); }
+.fx-ballicon__seam { fill: none; stroke: var(--fx-teal-deep); stroke-width: 1.8; stroke-linecap: round; }
+
+/* Card shell */
+.fx-mode {
+  --accent: var(--fx-teal);
+  position: relative; display: block; padding: 0; overflow: hidden; aspect-ratio: 2 / 1; min-height: 150px;
+  border-radius: var(--fx-radius); border: 3px solid rgba(233, 241, 255, .16); cursor: pointer; color: var(--fx-line); text-align: left;
+  background: var(--fx-court-deep); box-shadow: 0 10px 26px rgba(0, 0, 0, .35);
+  transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.fx-mode--casual { border-color: rgba(51, 225, 210, .35); }
+.fx-mode--ranked { --accent: var(--fx-gold); border-color: var(--fx-gold-deep); box-shadow: 0 10px 26px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(255, 241, 184, .35); }
+.fx-mode:hover, .fx-mode:focus-visible { transform: translateY(-3px) scale(1.015); border-color: var(--accent); outline: none; }
+.fx-mode--casual:hover { box-shadow: 0 14px 30px rgba(0, 0, 0, .4), 0 0 18px rgba(51, 225, 210, .25); }
+.fx-mode--ranked:hover { box-shadow: 0 14px 30px rgba(0, 0, 0, .45), 0 0 20px rgba(255, 201, 60, .3); }
+.fx-mode.is-selected { border-width: 5px; border-color: var(--accent); }
+
+.fx-mode__sheen {
+  position: absolute; inset: 0; pointer-events: none; opacity: .5; transition: opacity .4s ease, background-position .6s ease;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .1) 45%, transparent 60%) 0 0 / 220% 100%;
+}
+.fx-mode--ranked .fx-mode__sheen { background-image: linear-gradient(115deg, transparent 30%, rgba(255, 241, 184, .2) 45%, transparent 60%); }
+.fx-mode:hover .fx-mode__sheen { opacity: 1; background-position: 100% 0; }
+
+/* Diagonal title band, top-left */
+.fx-mode__band {
+  position: absolute; top: 0; left: 0; padding: 9px 44px 9px 14px; max-width: 86%;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 26px) 100%, 0 100%);
+  background: linear-gradient(90deg, rgba(3, 6, 15, .88), rgba(3, 6, 15, .6));
+  border-bottom: 2px solid var(--accent);
+}
+.fx-mode__title { display: block; font: 400 clamp(15px, 1.6vw, 22px) var(--fx-display); letter-spacing: .02em; white-space: nowrap; text-shadow: 0 2px 0 rgba(0, 0, 0, .55); }
+.fx-mode--casual .fx-mode__title { color: var(--fx-line); }
+.fx-mode--ranked .fx-mode__title {
+  background: linear-gradient(180deg, var(--fx-gold-light) 10%, var(--fx-gold) 55%, var(--fx-gold-deep) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none;
+  filter: drop-shadow(0 1px 0 var(--fx-gold-ink)) drop-shadow(0 2px 2px rgba(0, 0, 0, .6));
+}
+
+.fx-mode__check {
+  position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center;
+  border: 2px solid rgba(233, 241, 255, .55); background: rgba(3, 6, 15, .6); transition: background-color .2s ease, border-color .2s ease;
+}
+.fx-mode.is-selected .fx-mode__check { background: var(--accent); border-color: var(--accent); }
+.fx-mode.is-selected .fx-mode__check::after {
+  content: ""; width: 12px; height: 7px; margin-top: -3px; transform: rotate(-45deg);
+  border-left: 3px solid var(--fx-court-deep); border-bottom: 3px solid var(--fx-court-deep);
+}
+
+.fx-mode__sub {
+  position: absolute; left: 12px; bottom: 10px; padding: 4px 10px; border-radius: 8px;
+  font: 600 13px var(--fx-body); color: var(--fx-line); background: rgba(3, 6, 15, .7); border-left: 3px solid var(--fx-teal);
+}
+.fx-mode__pill {
+  border: 1px solid var(--fx-gold-light); border-radius: 999px; padding: 4px 12px; color: var(--fx-gold-ink); font-weight: 700;
+  background: linear-gradient(180deg, var(--fx-gold-light), var(--fx-gold) 60%, var(--fx-gold-deep));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+}
+.fx-mode__trophy {
+  position: absolute; right: 10px; bottom: 8px; width: 54px; height: 54px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .6)) drop-shadow(0 0 10px rgba(255, 201, 60, .35));
+  transition: transform .25s ease;
+}
+.fx-mode:hover .fx-mode__trophy { transform: translateY(-2px) rotate(-4deg); }
+
+/* Trophy parts */
+.fx-trophy__handle { fill: none; stroke: var(--fx-gold); stroke-width: 4; stroke-linecap: round; }
+.fx-trophy__rim { fill: var(--fx-gold-light); }
+.fx-trophy__plate { fill: var(--fx-gold-ink); opacity: .45; }
+.fx-trophy__star { fill: var(--fx-gold-light); stroke: var(--fx-gold-deep); stroke-width: .8; }
+.fx-trophy__shine { fill: none; stroke: var(--fx-line); stroke-width: 2; stroke-linecap: round; opacity: .55; }
+
+@media (max-width: 560px) { .fx-play__cards { grid-template-columns: 1fr; } }

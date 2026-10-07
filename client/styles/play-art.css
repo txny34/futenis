@@ -1,0 +1,60 @@
+/* SVG card art (src/ui/play-modal/art/*). Gradient stops and shapes by class. */
+.fx-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fx-st--deep { stop-color: var(--fx-court-deep); }
+.fx-st--court { stop-color: var(--fx-court); }
+.fx-st--night { stop-color: var(--fx-night); }
+.fx-st--ember { stop-color: var(--fx-ember); }
+.fx-st--teal-hi { stop-color: var(--fx-teal); stop-opacity: .45; }
+.fx-st--teal-0 { stop-color: var(--fx-teal); stop-opacity: 0; }
+.fx-st--gold-hi { stop-color: var(--fx-gold); stop-opacity: .4; }
+.fx-st--gold-0 { stop-color: var(--fx-gold); stop-opacity: 0; }
+.fx-st--gold-light { stop-color: var(--fx-gold-light); }
+.fx-st--gold { stop-color: var(--fx-gold); }
+.fx-st--gold-deep { stop-color: var(--fx-gold-deep); }
+.fx-st--floor-far { stop-color: var(--fx-teal-deep); }
+.fx-st--floor-near { stop-color: var(--fx-court); }
+.fx-art--ranked .fx-st--floor-far { stop-color: var(--fx-court); }
+.fx-art--ranked .fx-st--floor-near { stop-color: var(--fx-court-deep); }
+
+.fx-art__stand { fill: var(--fx-night); opacity: .55; }
+.fx-art__fan { fill: none; stroke: var(--fx-crowd); stroke-width: 3.4; stroke-linecap: round; }
+.fx-art__fan--0 { opacity: .5; } .fx-art__fan--1 { opacity: .3; } .fx-art__fan--2 { opacity: .18; } .fx-art__fan--3 { opacity: .4; stroke: var(--fx-hot); }
+.fx-art--ranked .fx-art__fan--3 { stroke: var(--fx-gold); }
+.fx-art__lamp { fill: var(--fx-line); }
+.fx-art--ranked .fx-art__lamp { fill: var(--fx-gold-light); }
+.fx-art__mesh { fill: none; stroke: var(--fx-line); stroke-width: .5; opacity: .22; }
+.fx-art__glass { fill: rgba(150, 220, 255, .07); stroke: rgba(233, 241, 255, .35); stroke-width: 1; }
+.fx-art__seam { fill: none; stroke: rgba(233, 241, 255, .3); stroke-width: 1.2; }
+.fx-art__shine { fill: none; stroke: var(--fx-line); stroke-width: 1.6; stroke-linecap: round; opacity: .2; }
+.fx-art__lines { fill: none; stroke: var(--fx-line); stroke-width: 1.6; opacity: .7; }
+.fx-art--ranked .fx-art__lines { stroke: var(--fx-gold); opacity: .8; }
+.fx-art__netshadow { stroke: var(--fx-night); stroke-width: 4; opacity: .35; }
+.fx-art__netmesh { fill: none; stroke: var(--fx-line); stroke-width: .5; opacity: .45; }
+.fx-art__tape { fill: var(--fx-line); }
+.fx-art__post { fill: var(--fx-muted); }
+.fx-art--ranked .fx-art__post { fill: var(--fx-gold-deep); }
+.fx-art__trail { fill: var(--fx-ball); }
+.fx-art__ballglow { fill: var(--fx-ball); opacity: .22; }
+.fx-art__ball { fill: var(--fx-ball); stroke: var(--fx-ball-ink); stroke-width: .6; }
+.fx-art__ballseam { fill: none; stroke: var(--fx-line); stroke-width: 1; opacity: .8; }
+.fx-art__ballgloss { fill: var(--fx-line); opacity: .8; }
+
+/* Athletes */
+.fx-fig--home { --jersey: var(--fx-go); --shorts: var(--fx-go-deep); }
+.fx-fig--rival { --jersey: var(--fx-hot); --shorts: var(--fx-court-deep); }
+.fx-fig__shadow { fill: var(--fx-night); opacity: .45; }
+.fx-fig__limb { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fx-fig__shorts { stroke: var(--shorts); }
+.fx-fig__sleeve { stroke: var(--jersey); }
+.fx-fig__sock { stroke: var(--fx-line); }
+.fx-fig__skin { stroke: var(--fx-skin); }
+.fx-fig__hand, .fx-fig__face { fill: var(--fx-skin); }
+.fx-fig__shoe { fill: var(--fx-shoe); stroke: var(--fx-night); stroke-width: 1; }
+.fx-fig__jersey { fill: var(--jersey); }
+.fx-fig__shade { fill: var(--fx-night); opacity: .28; }
+.fx-fig__stripe { stroke: var(--fx-line); stroke-width: 2.4; opacity: .85; }
+.fx-fig__band { stroke: var(--shorts); stroke-width: 3; }
+.fx-fig__hair { fill: var(--fx-hair); }
+.fx-fig__gloss { fill: var(--fx-line); opacity: .35; }
+.fx-art--ranked .fx-fig--home { --shorts: var(--fx-gold-deep); }
+.fx-art--ranked .fx-fig__stripe { stroke: var(--fx-gold); }

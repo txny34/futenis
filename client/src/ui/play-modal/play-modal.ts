@@ -30,8 +30,8 @@ export class PlayModal {
       return b;
     });
     const center = el("div", "fx-play__center");
-    center.append(cardSection("Partidas casuales", "fx-play__section--casual", mk(CASUAL_CARDS)),
-      cardSection("Clasificatorias", "fx-play__section--ranked", mk(RANKED_CARDS)));
+    center.append(cardSection("Partidas casuales", false, mk(CASUAL_CARDS)),
+      cardSection("Clasificatorias", true, mk(RANKED_CARDS)));
     const left = el("div", "fx-play__left");
     left.append(this.profile.root);
     const right = el("nav", "fx-play__right", "", { "aria-label": "Más" });
