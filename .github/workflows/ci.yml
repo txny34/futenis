@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: go vet
+        run: go vet ./...
+      - name: go vet (wasm)
+        run: GOOS=js GOARCH=wasm go vet ./wasm/
+      - name: tests (race)
+        run: go test -short -race ./...
+      - name: sim coverage >= 95%
+        run: bash scripts/ci/coverage-check.sh
+      - name: build wasm + TS bundle
+        run: go run ./cmd/dev -check
+
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: install typecheck deps
+        working-directory: scripts/ci/typecheck
+        run: npm install --no-audit --no-fund
+      - name: tsc (strict)
+        working-directory: scripts/ci/typecheck
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: file size limits
+        run: bash scripts/ci/size-check.sh

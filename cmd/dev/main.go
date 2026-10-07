@@ -2,7 +2,9 @@
 // bundles the TypeScript client with esbuild's Go API (no Node), then serves
 // client/ over HTTP, rebuilding whenever the page is reloaded.
 //
-// Usage: go run ./cmd/dev [-addr :8090] [-root .]
+// Usage: go run ./cmd/dev [-addr :8090] [-root .] [-check]
+//
+// -check builds once (wasm + TS bundle) and exits non-zero on failure (CI).
 package main
 
 import (
@@ -19,6 +21,7 @@ func main() {
 	// All interfaces: WSL2 NAT does not forward loopback-only binds to Windows.
 	addr := flag.String("addr", ":8090", "listen address")
 	root := flag.String("root", ".", "repo root")
+	check := flag.Bool("check", false, "build once and exit (CI)")
 	flag.Parse()
 
 	absRoot, err := filepath.Abs(*root)
@@ -29,6 +32,13 @@ func main() {
 	defer stop()
 
 	b := newBuilder(absRoot)
+	if *check {
+		if err := b.Build(ctx); err != nil {
+			log.Fatalf("build failed:\n%v", err)
+		}
+		log.Printf("build ok")
+		return
+	}
 	if err := b.Build(ctx); err != nil {
 		log.Printf("initial build failed:\n%v", err)
 	} else {

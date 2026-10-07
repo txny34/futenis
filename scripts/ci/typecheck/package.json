@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "description": "CI-only TypeScript typecheck. The game itself builds without Node (esbuild Go API).",
+  "devDependencies": {
+    "@types/three": "0.169.0",
+    "typescript": "5.9.3"
+  }
+}
