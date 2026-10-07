@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Character, CharacterPose, StrikePose, createCharacter } from "../../character/character";
 import { IMPACT_T } from "../../character/timing";
 import { buildCourt } from "../../court";
+import { buildEnclosure } from "../../env/enclosure";
 import { THEME } from "../../env/theme";
 import { rand } from "./util";
 
@@ -29,8 +30,6 @@ const BALL_BOOST = 1.6;
 const STEP_SPEED = 0.45;
 const STAGE = { w: 24, d: 13 } as const;
 const MAX_DT = 0.1;
-const GLASS_H = 1.6;
-const GLASS_OPACITY = 0.14;
 const FLOOR_PAD = { w: 44, d: 24, z: -3 } as const; // starts just past the lobby edge (no z-fight)
 
 interface Athlete { readonly ch: Character; readonly pose: CharacterPose; readonly strike: StrikePose; readonly side: 1 | -1; z: number }
@@ -39,27 +38,6 @@ function athlete(shirt: number, side: 1 | -1): Athlete {
   const ch = createCharacter({ shirt, shorts: THEME.crowdBody[0], skin: THEME.crowdSkin[side > 0 ? 1 : 0], hair: THEME.crowdBody[3], boots: THEME.lobbyDecor.neon[1] });
   const strike: StrikePose = { tier: "low", t: 0, contact: null };
   return { ch, strike, side, z: 0, pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: side * Math.PI / 2 } };
-}
-
-/** Low see-through glass: full back walls (X = ±10) and short side returns, so nothing blocks the view. */
-function lowGlass(): THREE.Group {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color: THEME.glass, transparent: true, opacity: GLASS_OPACITY, depthWrite: false, side: THREE.DoubleSide });
-  const edge = new THREE.MeshBasicMaterial({ color: THEME.lobbyDecor.padRim });
-  const panel = (w: number, x: number, z: number, ry: number): void => {
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(w, GLASS_H), mat);
-    p.position.set(x, GLASS_H / 2, z);
-    p.rotation.y = ry;
-    const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, 0.04), edge);
-    top.position.set(x, GLASS_H, z);
-    top.rotation.y = ry;
-    g.add(p, top);
-  };
-  for (const sx of [-1, 1]) {
-    panel(10, sx * 10, 0, Math.PI / 2);
-    for (const sz of [-1, 1]) panel(2, sx * 9, sz * 5, 0);
-  }
-  return g;
 }
 
 export class Showcase {
@@ -76,7 +54,7 @@ export class Showcase {
 
   constructor(private readonly onScore: (a: number, b: number) => void) {
     const court = buildCourt();
-    court.remove(court.children[3], court.children[0]); // enclosure (its mesh hid the rally) + apron
+    court.remove(court.children[3], court.children[0]); // match enclosure (faded near wall, dark +Z mesh) + apron
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_PAD.w, FLOOR_PAD.d), new THREE.MeshStandardMaterial({ color: THEME.apron, roughness: 0.8 }));
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(0, -0.005, FLOOR_PAD.z);
@@ -84,7 +62,7 @@ export class Showcase {
     stage.position.y = -STAGE_Y / 2;
     const trim = new THREE.Mesh(new THREE.BoxGeometry(STAGE.w + 0.1, 0.08, STAGE.d + 0.1), new THREE.MeshBasicMaterial({ color: new THREE.Color(THEME.lobbyDecor.padRim).multiplyScalar(2) }));
     trim.position.y = -0.15; // band on the stage side only: its top must NOT touch the court floor (z-fight = mint slab)
-    this.group.add(stage, trim, court, lowGlass());
+    this.group.add(stage, trim, court, buildEnclosure({ symmetric: true, sparseSideZ: 1 })); // real padel cage; lobby-facing (+Z) mesh is faint
     this.stage.add(ground);
     for (const x of [-6, 6]) { // own court lights (no shadows): the rally reads from spawn
       const l = new THREE.SpotLight(THEME.lobbyDecor.showcaseLight, LIGHT_INTENSITY, 30, LIGHT_ANGLE, 0.5, 1);
