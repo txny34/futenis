@@ -10,6 +10,7 @@ const Y = 4.2;
 const WALL_X = 19.3;
 const ZS: readonly number[] = [-8, -1, 6];
 const D = THEME.lobbyDecor;
+const POSTER_DIM = 0.6;
 
 interface PosterSpec { readonly title: string; readonly sub: string }
 const SPECS: readonly PosterSpec[] = [
@@ -51,7 +52,7 @@ export function buildPosters(): THREE.Group {
   SPECS.forEach((spec, i) => {
     const side = i < ZS.length ? -1 : 1;
     const tex = canvasTexture(W, H, (ctx) => draw(ctx, spec, i));
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(POSTER_DIM, POSTER_DIM, POSTER_DIM) }));
     m.position.set(side * WALL_X, Y, ZS[i % ZS.length]);
     m.rotation.y = (-side * Math.PI) / 2;
     g.add(m);

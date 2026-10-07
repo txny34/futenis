@@ -14,9 +14,9 @@ const RING_Y = 0.02;
 const FILL_Y = 0.17; // above the decor plinth (decor/pad-fx.ts)
 const EDGE_W = 0.12;
 const EDGE_H = 0.08;
-const EDGE_BOOST = 2.2; // > 1 so the border crosses the bloom threshold
+const EDGE_BOOST = 1.2; // > 1 so the border crosses the bloom threshold
 const DISC_OPACITY = 0.28;
-const DISC_FLASH_OPACITY = 0.9;
+const DISC_FLASH_OPACITY = 0.36; // no start flash: barely brighter
 const OUTLINE_W = 0.08;
 const FILL_IN = 0.12;
 const FILL_OUT = 0.38;
@@ -24,11 +24,11 @@ const SEGMENTS = 64;
 const SIGN_Y = 3.4;
 const SIGN_BOB = 0.15;
 const SIGN_BOB_HZ = 0.5;
-const PULSE_SCALE = 0.18;
+const PULSE_SCALE = 0.05;
 const PULSE_DECAY = 4; // 1/s
 const FLASH_DECAY = 2.5;
-const IDLE_HZ = 0.6;
-const IDLE_AMP = 0.06;
+const IDLE_HZ = 0.2;
+const IDLE_AMP = 0.03;
 
 const FILL_VERT = "varying vec2 vP; void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const FILL_FRAG = `uniform float progress; uniform vec3 color; varying vec2 vP;
@@ -36,7 +36,7 @@ void main() {
   float a = atan(vP.x, vP.y) / 6.28318530718; // 0 at the top, clockwise
   if (a < 0.0) a += 1.0;
   if (a > progress) discard;
-  gl_FragColor = vec4(color * 1.8, 1.0);
+  gl_FragColor = vec4(color * 1.1, 1.0);
 }`;
 
 interface Pad {
@@ -71,7 +71,7 @@ export class LobbyView {
   set visible(v: boolean) { this.group.visible = v; }
 
   /** EvPadEnter: pulse; EvPadStart: flash (side = pad index). */
-  pulse(pad: number): void { const p = this.pads[pad]; if (p) { p.pulse = 1; this.decor.burst(pad, false); } }
+  pulse(pad: number): void { const p = this.pads[pad]; if (p) p.pulse = 1; }
   flash(pad: number): void { const p = this.pads[pad]; if (p) { p.flash = 1; this.decor.burst(pad, true); } }
 
   update(curr: Float64Array, dt: number): void {
@@ -88,7 +88,7 @@ export class LobbyView {
       p.disc.scale.set(s, s, 1);
       p.disc.material.opacity = DISC_OPACITY + (DISC_FLASH_OPACITY - DISC_OPACITY) * p.flash;
       p.sign.position.y = SIGN_Y + Math.sin(this.time * Math.PI * 2 * SIGN_BOB_HZ + i * 2) * SIGN_BOB;
-      this.decor.setPadHeat(i, Math.max(p.progress.value, p.pulse, p.flash));
+      this.decor.setPadHeat(i, p.progress.value);
     }
     this.decor.update(dt);
   }

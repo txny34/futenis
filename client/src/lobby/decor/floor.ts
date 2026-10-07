@@ -14,8 +14,8 @@ const LOGO_MAX_PX = 200;
 const LOGO_Z = 1.5; // logo center (m), between spawn and pads
 const ROUGHNESS = 0.55;
 const METALNESS = 0.25;
-const GLOW_BASE = 0.45;
-const GLOW_AMP = 0.12;
+const GLOW_BASE = 0.25;
+const GLOW_AMP = 0; // static: no luminance swings on a large area
 const GLOW_HZ = 0.25;
 
 const D = THEME.lobbyDecor;
@@ -59,7 +59,7 @@ function drawLogo(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   ctx.lineWidth = 6;
   ctx.strokeStyle = D.floorLogo;
   ctx.shadowColor = D.floorLogo;
-  ctx.shadowBlur = 30;
+  ctx.shadowBlur = 14;
   ctx.strokeText("FUTENIS", 0, 0);
   ctx.beginPath();
   ctx.ellipse(0, 0, target * 0.62, px * 0.95, 0, 0, Math.PI * 2);

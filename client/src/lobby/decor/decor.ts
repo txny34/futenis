@@ -13,7 +13,7 @@ import { Showcase } from "./showcase";
 // Lobby decor pass (docs/design/lobby.md §7.1). Everything lives under one
 // group owned by LobbyView, so setLobby(false) hides it all (lights included).
 // update() is allocation-free: uniforms, matrices, a throttled canvas redraw.
-const CONFETTI_START = 1.6;
+const CONFETTI_START = 0.7; // calm burst, pad start only
 const CONFETTI_ENTER = 0.55;
 
 export class LobbyDecor {

@@ -3,7 +3,7 @@ import * as THREE from "three";
 // Shared helpers for the lobby decor modules (all built once at load).
 
 /** > 1 so unlit neon crosses the bloom threshold (view/post.ts). */
-export const NEON_BOOST = 2.2;
+export const NEON_BOOST = 1.1; // halved for the calm lobby (photosensitivity)
 
 export const boosted = (hex: number, k = NEON_BOOST): THREE.Color => new THREE.Color(hex).multiplyScalar(k);
 

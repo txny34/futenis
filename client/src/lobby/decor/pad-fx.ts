@@ -15,25 +15,25 @@ const RIM_R = PLINTH_OUT - 0.04;
 const RIM_W = 0.07;
 const BEAM_H = 7;
 const MOTES_PER_PAD = 90;
-const MOTE_RISE = 1.4; // m/s
+const MOTE_RISE = 0.6; // m/s
 const SEG = 64;
 const LABEL_Y = 4.0;
 const LABEL_BOB = 0.15;
 const LABEL_HZ = 0.4;
-const LABEL_HEAT_SCALE = 0.25;
+const LABEL_HEAT_SCALE = 0.08;
 const LABELS: ReadonlyArray<readonly [string, string]> = [["ENTRENÁ", "LANZAPELOTAS"], ["1v1", "CONTRA EL BOT"], ["2v2", "CONTRA BOTS"]];
 
 const RIM_VERT = "varying vec2 vP; void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const RIM_FRAG = `uniform float uTime; uniform float uHeat; uniform vec3 uColor; varying vec2 vP;
 void main() {
-  float dash = step(0.5, fract(atan(vP.y, vP.x) / 6.28318 * 24.0 - uTime * 0.6));
-  gl_FragColor = clamp(vec4(uColor * (0.6 + dash * 1.6 + uHeat * 2.0), 1.0), vec4(0.0), vec4(4.0));
+  float dash = smoothstep(0.3, 0.7, fract(atan(vP.y, vP.x) / 6.28318 * 24.0 - uTime * 0.12));
+  gl_FragColor = clamp(vec4(uColor * (0.55 + dash * 0.25 + uHeat * 0.4), 1.0), vec4(0.0), vec4(4.0));
 }`;
 const BEAM_FRAG = `uniform float uTime; uniform float uHeat; uniform vec3 uColor; varying vec2 vUv;
 void main() {
   float fade = pow(1.0 - vUv.y, 2.2);
-  float bands = 0.75 + 0.25 * sin(vUv.y * 30.0 - uTime * 4.0);
-  gl_FragColor = clamp(vec4(uColor, fade * bands * (0.16 + uHeat * 0.4)), vec4(0.0), vec4(4.0));
+  float bands = 0.9 + 0.1 * sin(vUv.y * 12.0 - uTime * 0.6);
+  gl_FragColor = clamp(vec4(uColor, fade * bands * (0.06 + uHeat * 0.06)), vec4(0.0), vec4(4.0));
 }`;
 const UV_VERT = "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const MOTE_VERT = `uniform float uTime; attribute vec3 aSeed; attribute vec3 aColor; varying vec3 vColor; varying float vA;
@@ -49,7 +49,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }`;
 const MOTE_FRAG = `varying vec3 vColor; varying float vA;
-void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = clamp(vec4(vColor * 2.0, vA * (1.0 - d * 2.0)), vec4(0.0), vec4(4.0)); }`;
+void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = clamp(vec4(vColor * 0.8, vA * 0.5 * (1.0 - d * 2.0)), vec4(0.0), vec4(4.0)); }`;
 
 export const PAD_COLORS: readonly number[] = [THEME.padTraining, THEME.pad1v1, THEME.pad2v2];
 

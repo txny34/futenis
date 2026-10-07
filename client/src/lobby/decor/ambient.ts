@@ -11,10 +11,10 @@ const CONE_H = 15;
 const CONE_R = 3.2;
 const CONE_Y = 14.5;
 const CONES: ReadonlyArray<readonly [number, number, number]> = [[-10, -6, 0], [10, -6, 1.7], [-12, 6, 3.1], [12, 6, 4.6]];
-const SWEEP_AMP = 0.38; // rad
-const SWEEP_HZ = 0.07;
+const SWEEP_AMP = 0.22; // rad
+const SWEEP_HZ = 0.025;
 const HEMI_INTENSITY = 0.9;
-const FILL_INTENSITY = 18;
+const FILL_INTENSITY = 8;
 const FILL_DIST = 30;
 
 const DUST_VERT = `uniform float uTime; attribute vec3 aSeed; varying float vA;
@@ -22,17 +22,17 @@ void main() {
   vec3 box = vec3(${DUST_BOX.x.toFixed(1)}, ${DUST_BOX.y.toFixed(1)}, ${DUST_BOX.z.toFixed(1)});
   vec3 p = aSeed * box + vec3(sin(uTime * 0.2 + aSeed.y * 9.0), uTime * (0.08 + aSeed.x * 0.12), cos(uTime * 0.17 + aSeed.z * 7.0));
   p = mod(p, box) - vec3(box.x * 0.5, 0.0, box.z * 0.5);
-  vA = 0.35 + 0.65 * abs(sin(uTime * (0.5 + aSeed.z) + aSeed.x * 20.0));
+  vA = 0.6 + 0.4 * sin(uTime * 0.25 * (0.5 + aSeed.z) + aSeed.x * 20.0); // < 0.1 Hz twinkle
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_PointSize = clamp(22.0 / max(-mv.z, 1.0), 1.0, 32.0);
   if (mv.z > -0.3) gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // behind/at camera: cull
   gl_Position = projectionMatrix * mv;
 }`;
 const DUST_FRAG = `uniform vec3 uColor; varying float vA;
-void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = clamp(vec4(uColor, vA * (1.0 - d * 2.0) * 0.8), vec4(0.0), vec4(4.0)); }`;
+void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = clamp(vec4(uColor, vA * (1.0 - d * 2.0) * 0.35), vec4(0.0), vec4(4.0)); }`;
 const CONE_VERT = "varying float vY; void main() { vY = uv.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const CONE_FRAG = `uniform vec3 uColor; varying float vY;
-void main() { gl_FragColor = clamp(vec4(uColor, pow(vY, 1.6) * 0.09), vec4(0.0), vec4(4.0)); }`;
+void main() { gl_FragColor = clamp(vec4(uColor, pow(vY, 1.6) * 0.035), vec4(0.0), vec4(4.0)); }`;
 
 export class Ambient {
   readonly group = new THREE.Group();

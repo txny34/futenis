@@ -102,6 +102,7 @@ export class CourtView {
     this.court.visible = !on;
     this.lobby.visible = on;
     this.arena.setLobby(on);
+    this.post.setLobby(on);
     this.ball.setVisible(!on);
   }
 

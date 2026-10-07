@@ -12,7 +12,7 @@ const WORLD_W = 7;
 // (camera ≈ (0, 3.1, 9.4), pitch -0.34, vFOV 70: top edge of view ≈ +15° up).
 const POS = { x: 0, y: 6.0, z: -27.5 } as const;
 const REDRAW_HZ = 12;
-const TICKER_SPEED = 140; // px/s
+const TICKER_SPEED = 55; // px/s
 const FRAME_W = 0.25;
 const MAX_SCORE = 99;
 const TICKER = "★ PISÁ UN PAD PARA JUGAR  ·  1v1 CONTRA EL BOT  ·  2v2  ·  ENTRENAMIENTO CON LANZAPELOTAS  ·  UN TOQUE POR EQUIPO  ";
@@ -37,7 +37,7 @@ export class Scoreboard {
     this.tex = new THREE.CanvasTexture(canvas);
     this.tex.colorSpace = THREE.SRGBColorSpace;
     const worldH = (WORLD_W * H) / W;
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_W, worldH), new THREE.MeshBasicMaterial({ map: this.tex, toneMapped: false }));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_W, worldH), new THREE.MeshBasicMaterial({ map: this.tex, color: new THREE.Color(0.7, 0.7, 0.7) }));
     const frame = new THREE.Mesh(new THREE.BoxGeometry(WORLD_W + FRAME_W * 2, worldH + FRAME_W * 2, 0.3),
       new THREE.MeshBasicMaterial({ color: new THREE.Color(D.neon[0]).multiplyScalar(NEON_BOOST) }));
     frame.position.z = -0.2;

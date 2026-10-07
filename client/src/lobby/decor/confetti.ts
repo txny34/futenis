@@ -5,9 +5,9 @@ import { rand } from "./util";
 // Confetti burst (EvPadStart / pad enter): one preallocated Points system; a
 // burst only rewrites two uniforms (origin, start time). Ballistic motion and
 // fade are computed in the vertex shader.
-const COUNT = 260;
-const LIFE = 2.2; // s
-const GRAVITY = 6;
+const COUNT = 90;
+const LIFE = 2.6; // s
+const GRAVITY = 3.5;
 
 const VERT = `uniform float uAge; uniform vec3 uOrigin; uniform float uPower; attribute vec3 aVel; attribute vec3 aColor;
 varying vec3 vColor; varying float vA;
@@ -23,7 +23,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }`;
 const FRAG = `varying vec3 vColor; varying float vA;
-void main() { vec2 q = abs(gl_PointCoord - 0.5); if (q.x > 0.5 || q.y > 0.22) discard; gl_FragColor = clamp(vec4(vColor * 1.6, vA), vec4(0.0), vec4(4.0)); }`;
+void main() { vec2 q = abs(gl_PointCoord - 0.5); if (q.x > 0.5 || q.y > 0.22) discard; gl_FragColor = clamp(vec4(vColor * 0.7, vA * 0.8), vec4(0.0), vec4(4.0)); }`;
 
 export class Confetti {
   readonly points: THREE.Points;
@@ -50,7 +50,7 @@ export class Confetti {
     geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
     this.points = new THREE.Points(geo, new THREE.ShaderMaterial({
       uniforms: { uAge: this.age, uOrigin: this.origin, uPower: this.power }, vertexShader: VERT, fragmentShader: FRAG,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      transparent: true, depthWrite: false,
     }));
     this.points.frustumCulled = false;
     this.points.visible = false;
