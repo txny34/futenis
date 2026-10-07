@@ -11,6 +11,8 @@
   filter: drop-shadow(0 1px 0 var(--fx-gold-ink));
 }
 .fx-play__icon, .fx-ballicon { width: 24px; height: 24px; flex: none; }
+.fx-play__section--ranked .fx-play__heading { gap: 12px; margin-bottom: 12px; font-size: 26px; letter-spacing: .1em; }
+.fx-play__section--ranked .fx-play__icon { width: 40px; height: 40px; filter: drop-shadow(0 2px 6px var(--fx-gold-ink)); }
 .fx-ballicon__body { fill: var(--fx-teal); }
 .fx-ballicon__seam { fill: none; stroke: var(--fx-teal-deep); stroke-width: 1.8; stroke-linecap: round; }
 
