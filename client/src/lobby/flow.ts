@@ -11,6 +11,7 @@ import type { Difficulty, GameMode, MatchOptions, MenuUI, Settings } from "../ui
 import { DEFAULT_TRAINING, loadTraining } from "../ui/training-settings";
 import { DEFAULT_POINTS } from "../ui/types";
 import type { BottomBar } from "./bottom-bar";
+import { getDifficulty, setDifficulty } from "./difficulty";
 import type { ProfileCard } from "./profile-card";
 import { PAD_MODES } from "./pads";
 
@@ -88,7 +89,7 @@ export function enterLobby(app: App): void {
   app.hud.error("");
   recorder().end();
   app.engine.clearInputs();
-  app.engine.configure(setup(LOBBY_MODE_ID, app.bar.difficulty, DEFAULT_POINTS));
+  app.engine.configure(setup(LOBBY_MODE_ID, getDifficulty(), DEFAULT_POINTS));
   app.mode = null;
   app.state.holdUntil = 0;
   app.state.showLanding = false;
@@ -125,9 +126,9 @@ export function startMatch(app: App, o: MatchOptions): void {
   }
 }
 
-/** Options for a mode picked from the lobby (pad or JUGAR) with the bar's difficulty. */
-export function lobbyOptions(app: App, mode: GameMode, training = loadTraining()): MatchOptions {
-  return { mode, difficulty: app.bar.difficulty, pointsToWin: DEFAULT_POINTS, training: mode === "playground" ? training : undefined };
+/** Options for a mode picked from the lobby (pad or JUGAR) with the lobby difficulty. */
+export function lobbyOptions(mode: GameMode, training = loadTraining()): MatchOptions {
+  return { mode, difficulty: getDifficulty(), pointsToWin: DEFAULT_POINTS, training: mode === "playground" ? training : undefined };
 }
 
 export function safeStart(app: App, o: MatchOptions): void {
@@ -139,7 +140,6 @@ export function onPadEvent(app: App, kind: number, pad: number): void {
   if (!app.inLobby) return;
   if (kind === EventKind.PadEnter) {
     app.view.lobby.pulse(pad);
-    app.bar.dismissHint();
   } else if (kind === EventKind.PadStart) {
     const mode = PAD_MODES[pad];
     if (!mode) return;
@@ -153,13 +153,13 @@ export function onPadEvent(app: App, kind: number, pad: number): void {
 function openPadSetup(app: App, mode: GameMode): void {
   if (app.menu.isOpen) return;
   if (mode === "playground") {
-    app.menu.openTraining((t) => safeStart(app, lobbyOptions(app, "playground", t)));
+    app.menu.openTraining((t) => safeStart(app, lobbyOptions("playground", t)));
     return;
   }
-  app.menu.openMatchSetup(mode, app.bar.difficulty, {
+  app.menu.openMatchSetup(mode, getDifficulty(), {
     go: (o) => safeStart(app, { ...o, pointsToWin: DEFAULT_POINTS }),
     back: () => undefined,
-    difficulty: (d) => app.bar.setDifficulty(d),
+    difficulty: setDifficulty,
   });
 }
 

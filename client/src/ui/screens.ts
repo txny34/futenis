@@ -2,7 +2,7 @@
 import { button, Choice, el, segmented } from "./dom";
 import { DEFAULT_POINTS, Difficulty, GameMode, MatchOptions } from "./types";
 
-const DIFFICULTIES: readonly Choice<Difficulty>[] = [
+export const DIFFICULTIES: readonly Choice<Difficulty>[] = [
   { value: "easy", label: "Fácil" }, { value: "normal", label: "Normal" },
   { value: "hard", label: "Difícil" }, { value: "pro", label: "Pro" },
 ];
@@ -20,7 +20,7 @@ export function panel(title: string, ...children: HTMLElement[]): HTMLElement {
 export interface SetupActions {
   go: (o: MatchOptions) => void;
   back: () => void;
-  /** Every difficulty pick (the lobby bar mirrors it). */
+  /** Every difficulty pick (persisted as the lobby difficulty). */
   difficulty: (d: Difficulty) => void;
 }
 

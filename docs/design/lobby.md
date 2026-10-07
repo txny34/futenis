@@ -122,7 +122,7 @@ el cliente ya hace hoy para arrancar un partido.
 - Arranque: el cliente carga wasm y llama `configure(3, difficulty, pointsToWin, 1)` + `reset()` → lobby.
 - `EvPadStart(Side = p)` → el cliente mapea `p` → `GameMode` (`0 → playground`, `1 → 1v1`, `2 → 2v2`), hace el flash
   del pad y **abre la pantalla de setup de ese modo** (no arranca solo): 1v1/2v2 → `matchSetup` (dificultad
-  preseleccionada desde la barra, "¡A la cancha!" / "Volver"); Entrenamiento → panel de entrenamiento ("Empezar").
+  preseleccionada desde el menú del lobby, "¡A la cancha!" / "Volver"); Entrenamiento → panel de entrenamiento ("Empezar").
   Mientras está abierta, controles deshabilitados y puntero liberado; Esc o "Volver" la cierran y devuelven el control
   en el lobby. Al confirmar se llama a `startMatch(opts)` (`configure(mode,...)`, `applyTraining` si playground,
   `reset()`), con VS intro como hoy. El sim solo re-emite `EvPadStart` tras salir y volver a entrar al pad
@@ -137,22 +137,26 @@ el cliente ya hace hoy para arrancar un partido.
 ## 7. Cliente (UI del lobby)
 
 - **Sin título/menú inicial**: `main.ts` arranca en el lobby (se eliminaron `titleScreen`/`mainMenu`). El menú se
-  conserva como overlay: Ajustes y config de Entrenamiento desde la barra inferior, y el setup de modo al pisar un pad.
+  conserva como overlay: el **menú del lobby** (Esc) con Dificultad, Entrenamiento y Ajustes, y el setup de modo al pisar un pad.
 - **Escena**: piso grande del lobby (`2·LobbyHalfX × 2·LobbyHalfZ`) con borde neón; la cancha de pádel NO se dibuja en
   `ModeLobby` (se oculta/muestra el grupo de la cancha). Misma cámara (seguimiento detrás del jugador) e input.
 - **Pads**: disco emisivo de radio 1.5 m + **cartel 3D** (plano con textura de canvas generada una vez al cargar,
   billboard) con el nombre: "Entrenamiento · Lanzapelotas", "1v1 contra el bot", "2v2 contra bots".
   **Anillo de llenado** alrededor del pad que muestra `SnapLobbyHold` (0→1); pulso al `EvPadEnter`, flash al
   `EvPadStart`. Geometrías/materiales creados una vez; por frame solo se actualizan uniforms/escalas (cero allocations).
-- **Dificultad (decisión)**: chips de dificultad (`Fácil · Normal · Difícil · Pro`) en la **barra inferior**, siempre
-  visibles en el lobby; se aplican a los pads 1v1/2v2 y a JUGAR. Opción más simple: un solo control, consistente,
-  sin sub-elecciones por pad. La pantalla de setup de los pads 1v1/2v2 preselecciona esa dificultad y, si se cambia
-  ahí, la barra se sincroniza (mismo valor, mismo `localStorage`). Junto a ella, un botón **Entrenamiento ⚙** abre el panel de entrenamiento existente
-  (`training-view.ts`) para editar la máquina antes de pisar el pad.
-- **Barra inferior**: chips de dificultad · botón grande **JUGAR** (arranca el último modo jugado, `localStorage`
-  `futenis.lastMode`; default `1v1`) · **Ajustes**. Nada de tienda, monedas ni placeholders.
-- **HUD del lobby**: oculto el marcador/racha; hint breve "Pará sobre un pad para jugar" (desaparece al primer
-  `EvPadEnter`).
+- **Menú del lobby (Esc)**: modal estilo juego (`ui/lobby-menu.ts`, mismo `panel`/`fx-stack` que la pausa). Contiene
+  **Dificultad** (`Fácil · Normal · Difícil · Pro`, segmented con la actual marcada; `localStorage` `futenis.difficulty`,
+  `lobby/difficulty.ts`), **Entrenamiento** (panel existente `training-view.ts`; "Volver" regresa al menú),
+  **Ajustes** ("Volver" regresa al menú) y **Volver** (cierra). Los ítems son una lista simple en `main.ts`
+  (`setLobbyMenu`): agregar uno es sumar `{ label, run }`. La dificultad se aplica a JUGAR y es el default de las
+  pantallas de setup de los pads 1v1/2v2 (si se cambia ahí, se persiste la misma clave).
+  Abrir/cerrar: con el puntero bloqueado el navegador consume el primer Esc para soltar el pointer lock, así que
+  `onLockLost` en el lobby (sin otro menú abierto) abre el menú — igual que la pausa en partido; con el puntero libre,
+  `keydown Escape` lo alterna (debounce de 150 ms por si el mismo Esc llega por ambos caminos). Mientras está abierto,
+  controles deshabilitados y mouse libre; al cerrar vuelve el control. En partido, Esc sigue abriendo la pausa.
+- **Barra inferior**: solo el dock `[Equipo · Estilos · Misiones]  JUGAR  [Regalo · Tienda · Mercancía]`. JUGAR arranca
+  el último modo jugado (`localStorage` `futenis.lastMode`; default `1v1`).
+- **HUD del lobby**: oculto el marcador/racha; la línea de ayuda abajo a la izquierda muestra "Esc menú". Sin hint de pads.
 - Colores **solo** en `client/src/env/theme.ts` (tokens nuevos `lobbyFloor`, `lobbyEdge`, `padTraining`, `pad1v1`,
   `pad2v2`, `padFill`). Archivos TS < 200 líneas, strict, sin `any`.
 
@@ -199,7 +203,7 @@ El contrato de esta doc (índices §3/§5, eventos §4, nombres en `layout()`) e
 - `client/src/main.ts` / `client/src/loop.ts` (arranque en lobby, `EvPadStart` → `startMatch`, volver al lobby).
   `main.ts` está en 190 líneas: extraer el flujo lobby↔partida a `client/src/lobby/flow.ts`.
 - Nuevos: `client/src/lobby/pads.ts` (constantes espejo), `client/src/lobby/lobby-view.ts` (piso, borde, pads, carteles,
-  anillos), `client/src/lobby/bottom-bar.ts` (dificultad, JUGAR, Entrenamiento ⚙, Ajustes).
+  anillos), `client/src/lobby/bottom-bar.ts` (dock + JUGAR), `client/src/ui/lobby-menu.ts` (menú Esc: dificultad, Entrenamiento, Ajustes).
 - `client/src/ui/menu.ts`, `ui/match-screens.ts` (botón "Volver al lobby"), pausa con "Volver al lobby",
   `client/src/env/theme.ts` (tokens), `client/src/render.ts`/`view/scene.ts` (mostrar/ocultar cancha), `index.html`/CSS.
 - Mientras A no mergea, B puede trabajar contra este contrato; `assertLayout` fallará hasta integrar ambos (esperado).
@@ -281,7 +285,7 @@ Reclamar suma la XP de la misión al perfil.
 
 ### UI del lobby
 
-- **Barra inferior**: fila compacta arriba (chips de dificultad · Entrenamiento ⚙ · Ajustes) y dock principal
+- **Barra inferior**: dock principal (dificultad, Entrenamiento y Ajustes están en el menú Esc)
   `[Equipo · Estilos · Misiones]  JUGAR  [Regalo · Tienda · Mercancía]`. JUGAR es verde (tokens `--fx-go`,
   `--fx-go-deep`, `--fx-go-ink` en `menu.css`), sin animación. Íconos SVG en línea (`lobby/icons.ts`, `currentColor`).
   Misiones pliega/despliega el panel y muestra un badge con la cantidad reclamable; los otros cinco muestran un aviso

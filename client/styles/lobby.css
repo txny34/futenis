@@ -1,4 +1,4 @@
-/* Lobby (docs/design/lobby.md §7): bottom bar + hint. Colors come from the
+/* Lobby (docs/design/lobby.md §7): bottom bar. Colors come from the
    theme tokens (env/theme.ts -> --hud-* custom properties on #hud) and the
    menu's --fx-* palette; nothing new is hardcoded here. */
 #hud.is-lobby #score, #hud.is-lobby #shots, #hud.is-lobby #train, #hud.is-lobby #msg, #hud.is-lobby #hint { display: none; }
@@ -9,23 +9,12 @@
   font-family: var(--fx-body); color: var(--fx-line); pointer-events: none;
 }
 .fx-lobby[hidden] { display: none; }
-.fx-lobby__hint {
-  margin: 0; padding: 8px 16px; border-radius: 999px; font-weight: 600; letter-spacing: .04em;
-  background: rgba(6, 22, 50, .7); border: 1px solid rgba(233, 241, 255, .2);
-  animation: fx-lobby-hint 1.6s ease-in-out infinite alternate;
-}
-.fx-lobby__hint[hidden] { display: none; }
 .fx-lobby__bar {
   pointer-events: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
   padding: 10px 14px; border-radius: var(--fx-radius);
   background: var(--fx-card); border: 2px solid rgba(233, 241, 255, .12);
   box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
 }
-.fx-lobby__diff { display: flex; gap: 6px; }
-.fx-lobby__btn { font-size: 16px; padding: 12px 16px; }
-.fx-lobby__btn:hover, .fx-lobby__btn:focus-visible { transform: translateY(-2px); }
-.fx-lobby__row { pointer-events: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.fx-lobby__row .fx-lobby__btn { font-size: 13px; padding: 7px 12px; }
 .fx-lobby__play {
   font-family: var(--fx-display); font-size: 30px; letter-spacing: .06em; color: var(--fx-go-ink);
   padding: 14px 52px; margin: 0 10px; border: 0; border-radius: 14px; cursor: pointer;
@@ -89,7 +78,6 @@
 .fx-mission__reward { color: var(--fx-ball); font-size: 12px; font-weight: 600; }
 .fx-mission__claim { font-size: 12px; padding: 3px 10px; background: var(--fx-go); color: var(--fx-go-ink); }
 .fx-mission.is-claimed { opacity: .55; }
-@keyframes fx-lobby-hint { to { transform: translateY(-4px); } }
 
 @media (max-width: 640px) {
   .fx-lobby__play { font-size: 22px; padding: 12px 24px; margin: 0 4px; }
@@ -97,6 +85,4 @@
   .fx-icon { width: 24px; height: 24px; }
   .fx-profile { width: 200px; top: 8px; right: 8px; }
   .fx-missions { width: 240px; top: 80px; }
-  .fx-lobby__btn { font-size: 14px; padding: 10px 12px; }
 }
-@media (prefers-reduced-motion: reduce) { .fx-lobby__hint { animation: none; } }

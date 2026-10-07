@@ -4,6 +4,7 @@ import { Hud } from "./hud";
 import { Controls } from "./input";
 import { GameLoop, LoopState } from "./loop";
 import { BottomBar } from "./lobby/bottom-bar";
+import { getDifficulty, setDifficulty } from "./lobby/difficulty";
 import { ProfileCard } from "./lobby/profile-card";
 import { recorder } from "./profile/recorder";
 import { App, enterLobby, errText, landingAllowed, lobbyOptions, onPadEvent, safeStart, showResult } from "./lobby/flow";
@@ -49,7 +50,11 @@ function wire(app: App, menu: MenuUI): void {
   app.controls.onLook = (dx, dy) => app.view.rig.look(dx, dy);
   app.controls.onZoom = (d) => app.view.rig.zoom(d);
   app.controls.onLockChange = (locked) => app.hud.setCrosshair(locked);
-  app.controls.onLockLost = () => { if (app.state.running && !app.inLobby && !menu.isOpen) menu.showPause(); }; // native Esc
+  app.controls.onLockLost = () => { // native Esc: the browser eats the keydown that drops pointer lock
+    if (!app.state.running || menu.isOpen) return;
+    if (app.inLobby) menu.openLobbyMenu();
+    else menu.showPause();
+  };
   menu.onSettingsChange((s) => applySettings(app, s));
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {
@@ -81,12 +86,20 @@ async function load(app: App): Promise<void> {
   }
 }
 
-function lobbyBar(app: () => App, menu: MenuUI): BottomBar {
-  return new BottomBar(document.body, {
-    play: (mode) => safeStart(app(), lobbyOptions(app(), mode)),
-    training: () => menu.openTraining((t) => safeStart(app(), lobbyOptions(app(), "playground", t))),
-    settings: () => menu.openSettings(),
-  });
+function lobbyBar(app: () => App): BottomBar {
+  return new BottomBar(document.body, { play: (mode) => safeStart(app(), lobbyOptions(mode)) });
+}
+
+/** Esc in the lobby (lobby.md "Menú del lobby"): add future entries to `items`. */
+function lobbyMenu(app: () => App, menu: MenuUI): void {
+  menu.setLobbyMenu(() => ({
+    difficulty: getDifficulty(),
+    onDifficulty: setDifficulty,
+    items: [
+      { label: "Entrenamiento", run: () => menu.openTraining((t) => safeStart(app(), lobbyOptions("playground", t))) },
+      { label: "Ajustes", run: () => menu.openSettings() },
+    ],
+  }));
 }
 
 function boot(): void {
@@ -100,7 +113,7 @@ function boot(): void {
   let ref: App | null = null;
   const get = (): App => { if (!ref) throw new Error("app no inicializada"); return ref; };
   const app: App = {
-    engine, view, hud, controls, state, bar: lobbyBar(get, menu), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu,
+    engine, view, hud, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu,
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
   };
   ref = app;
@@ -110,6 +123,7 @@ function boot(): void {
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);
   app.loop = loop;
   wire(app, menu);
+  lobbyMenu(get, menu);
   enterLobby(app); // lobby decor + bar now; the sim spawns the player once wasm loads
   loop.start();
   void load(app);

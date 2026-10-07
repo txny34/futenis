@@ -12,6 +12,7 @@ const NAMES = ["Local", "Visita"] as const; // team colors come from the theme, 
 const HELP_TEXT =
   "WASD mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · Espacio salto · " +
   "Q dash · Ctrl mouse libre · Esc pausa";
+const LOBBY_HELP = "WASD mover · Mouse cámara · Espacio salto · Ctrl mouse libre · Esc menú";
 const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
 const PLAYGROUND_HELP = ` · ${LAUNCH_KEY} lanzar bola`;
 const CALL_MS = 1800;
@@ -125,7 +126,7 @@ export class Hud {
     this.root.classList.toggle("is-lobby", mode === Mode.Lobby); // lobby.md §7: no scoreboard/streak
     this.msg.textContent = playground ? "" : message(phase, server); // RACHA owns the top in Entrenamiento
     this.hint.hidden = playground || phase !== Phase.Serve || server !== HUMAN_TEAM;
-    this.help.textContent = playground ? HELP_TEXT + PLAYGROUND_HELP : HELP_TEXT;
+    this.help.textContent = mode === Mode.Lobby ? LOBBY_HELP : playground ? HELP_TEXT + PLAYGROUND_HELP : HELP_TEXT;
   }
 
   error(text: string): void { this.err.textContent = text; }
