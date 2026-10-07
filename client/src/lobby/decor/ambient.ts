@@ -3,26 +3,25 @@ import { THEME } from "../../env/theme";
 import { rand } from "./util";
 
 // Ambient life: drifting dust motes (one Points, shader-animated), sweeping
-// fake-volumetric spotlight cones from the roof, and a purple/navy hemisphere
+// static soft spotlight cones from the roof (no sweep), and a purple/navy hemisphere
 // fill that only exists while the lobby group is visible.
-const DUST_COUNT = 700;
+const DUST_COUNT = 350;
 const DUST_BOX = { x: 36, y: 12, z: 28 } as const;
 const CONE_H = 15;
 const CONE_R = 3.2;
 const CONE_Y = 14.5;
 const CONES: ReadonlyArray<readonly [number, number, number]> = [[-10, -6, 0], [10, -6, 1.7], [-12, 6, 3.1], [12, 6, 4.6]];
-const SWEEP_AMP = 0.22; // rad
-const SWEEP_HZ = 0.025;
+const TILT = 0.2; // rad, fixed
 const HEMI_INTENSITY = 0.9;
-const FILL_INTENSITY = 8;
+const FILL_INTENSITY = 4;
 const FILL_DIST = 30;
 
 const DUST_VERT = `uniform float uTime; attribute vec3 aSeed; varying float vA;
 void main() {
   vec3 box = vec3(${DUST_BOX.x.toFixed(1)}, ${DUST_BOX.y.toFixed(1)}, ${DUST_BOX.z.toFixed(1)});
-  vec3 p = aSeed * box + vec3(sin(uTime * 0.2 + aSeed.y * 9.0), uTime * (0.08 + aSeed.x * 0.12), cos(uTime * 0.17 + aSeed.z * 7.0));
+  vec3 p = aSeed * box + vec3(sin(uTime * 0.08 + aSeed.y * 9.0), uTime * (0.03 + aSeed.x * 0.05), cos(uTime * 0.07 + aSeed.z * 7.0));
   p = mod(p, box) - vec3(box.x * 0.5, 0.0, box.z * 0.5);
-  vA = 0.6 + 0.4 * sin(uTime * 0.25 * (0.5 + aSeed.z) + aSeed.x * 20.0); // < 0.1 Hz twinkle
+  vA = 0.5 + 0.5 * aSeed.z; // constant per mote: no twinkle
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_PointSize = clamp(22.0 / max(-mv.z, 1.0), 1.0, 32.0);
   if (mv.z > -0.3) gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // behind/at camera: cull
@@ -37,7 +36,6 @@ void main() { gl_FragColor = clamp(vec4(uColor, pow(vY, 1.6) * 0.035), vec4(0.0)
 export class Ambient {
   readonly group = new THREE.Group();
   private readonly time = { value: 0 };
-  private readonly cones: Array<{ readonly pivot: THREE.Object3D; readonly phase: number }> = [];
 
   constructor() {
     const D = THEME.lobbyDecor;
@@ -59,16 +57,12 @@ export class Ambient {
       pivot.position.set(x, CONE_Y, z);
       pivot.add(new THREE.Mesh(geo, mat));
       this.group.add(pivot);
-      this.cones.push({ pivot, phase });
+      pivot.rotation.set(Math.sin(phase) * TILT, 0, Math.cos(phase) * TILT);
     }
   }
 
   update(time: number): void {
     this.time.value = time;
-    for (const c of this.cones) {
-      const a = time * Math.PI * 2 * SWEEP_HZ + c.phase;
-      c.pivot.rotation.set(Math.sin(a) * SWEEP_AMP, 0, Math.cos(a * 1.3) * SWEEP_AMP);
-    }
   }
 
   private buildDust(): THREE.Points {

@@ -8,7 +8,7 @@ import { THEME } from "../../env/theme";
 const TAU = Math.PI * 2;
 const HOP_H = 0.35;
 const HOP_S = 0.5;
-const HOP_EVERY_S = 3.2;
+const HOP_EVERY_S = 9;
 const WALK_SPEED_NORM = 6; // m/s mapped to pose.speed 1
 
 interface Walker { readonly cx: number; readonly cz: number; readonly rx: number; readonly rz: number; readonly w: number; readonly phase: number }

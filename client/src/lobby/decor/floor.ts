@@ -14,7 +14,7 @@ const LOGO_MAX_PX = 200;
 const LOGO_Z = 1.5; // logo center (m), between spawn and pads
 const ROUGHNESS = 0.55;
 const METALNESS = 0.25;
-const GLOW_BASE = 0.25;
+const GLOW_BASE = 0.14;
 const GLOW_AMP = 0; // static: no luminance swings on a large area
 const GLOW_HZ = 0.25;
 

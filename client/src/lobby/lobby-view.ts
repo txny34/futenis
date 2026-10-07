@@ -14,7 +14,7 @@ const RING_Y = 0.02;
 const FILL_Y = 0.17; // above the decor plinth (decor/pad-fx.ts)
 const EDGE_W = 0.12;
 const EDGE_H = 0.08;
-const EDGE_BOOST = 1.2; // > 1 so the border crosses the bloom threshold
+const EDGE_BOOST = 0.7; // > 1 so the border crosses the bloom threshold
 const DISC_OPACITY = 0.28;
 const DISC_FLASH_OPACITY = 0.36; // no start flash: barely brighter
 const OUTLINE_W = 0.08;
@@ -28,7 +28,7 @@ const PULSE_SCALE = 0.05;
 const PULSE_DECAY = 4; // 1/s
 const FLASH_DECAY = 2.5;
 const IDLE_HZ = 0.2;
-const IDLE_AMP = 0.03;
+const IDLE_AMP = 0.015;
 
 const FILL_VERT = "varying vec2 vP; void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const FILL_FRAG = `uniform float progress; uniform vec3 color; varying vec2 vP;
@@ -72,7 +72,7 @@ export class LobbyView {
 
   /** EvPadEnter: pulse; EvPadStart: flash (side = pad index). */
   pulse(pad: number): void { const p = this.pads[pad]; if (p) p.pulse = 1; }
-  flash(pad: number): void { const p = this.pads[pad]; if (p) { p.flash = 1; this.decor.burst(pad, true); } }
+  flash(pad: number): void { const p = this.pads[pad]; if (p) { p.flash = 1; this.decor.burst(pad); } }
 
   update(curr: Float64Array, dt: number): void {
     this.time += dt;

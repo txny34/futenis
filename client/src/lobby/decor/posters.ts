@@ -10,7 +10,7 @@ const Y = 4.2;
 const WALL_X = 19.3;
 const ZS: readonly number[] = [-8, -1, 6];
 const D = THEME.lobbyDecor;
-const POSTER_DIM = 0.6;
+const POSTER_DIM = 0.4;
 
 interface PosterSpec { readonly title: string; readonly sub: string }
 const SPECS: readonly PosterSpec[] = [

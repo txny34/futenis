@@ -14,32 +14,32 @@ const PLINTH_H = 0.16;
 const RIM_R = PLINTH_OUT - 0.04;
 const RIM_W = 0.07;
 const BEAM_H = 7;
-const MOTES_PER_PAD = 90;
-const MOTE_RISE = 0.6; // m/s
+const MOTES_PER_PAD = 45;
+const MOTE_RISE = 0.3; // m/s
 const SEG = 64;
 const LABEL_Y = 4.0;
-const LABEL_BOB = 0.15;
-const LABEL_HZ = 0.4;
+const LABEL_BOB = 0.04;
+const LABEL_HZ = 0.15;
 const LABEL_HEAT_SCALE = 0.08;
 const LABELS: ReadonlyArray<readonly [string, string]> = [["ENTRENÁ", "LANZAPELOTAS"], ["1v1", "CONTRA EL BOT"], ["2v2", "CONTRA BOTS"]];
 
 const RIM_VERT = "varying vec2 vP; void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const RIM_FRAG = `uniform float uTime; uniform float uHeat; uniform vec3 uColor; varying vec2 vP;
 void main() {
-  float dash = smoothstep(0.3, 0.7, fract(atan(vP.y, vP.x) / 6.28318 * 24.0 - uTime * 0.12));
+  float dash = smoothstep(0.3, 0.7, fract(atan(vP.y, vP.x) / 6.28318 * 24.0));
   gl_FragColor = clamp(vec4(uColor * (0.55 + dash * 0.25 + uHeat * 0.4), 1.0), vec4(0.0), vec4(4.0));
 }`;
 const BEAM_FRAG = `uniform float uTime; uniform float uHeat; uniform vec3 uColor; varying vec2 vUv;
 void main() {
   float fade = pow(1.0 - vUv.y, 2.2);
-  float bands = 0.9 + 0.1 * sin(vUv.y * 12.0 - uTime * 0.6);
-  gl_FragColor = clamp(vec4(uColor, fade * bands * (0.06 + uHeat * 0.06)), vec4(0.0), vec4(4.0));
+  float bands = 1.0;
+  gl_FragColor = clamp(vec4(uColor, fade * bands * (0.03 + uHeat * 0.03)), vec4(0.0), vec4(4.0));
 }`;
 const UV_VERT = "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const MOTE_VERT = `uniform float uTime; attribute vec3 aSeed; attribute vec3 aColor; varying vec3 vColor; varying float vA;
 void main() {
   float h = mod(aSeed.z * ${BEAM_H.toFixed(1)} + uTime * ${MOTE_RISE.toFixed(2)} * (0.6 + aSeed.y), ${BEAM_H.toFixed(1)});
-  float a = aSeed.x * 6.2831 + uTime * 0.5;
+  float a = aSeed.x * 6.2831 + uTime * 0.15;
   float r = ${LOBBY_PAD_RADIUS.toFixed(2)} * (0.25 + 0.7 * aSeed.y);
   vec3 p = position + vec3(cos(a) * r, h, sin(a) * r);
   vColor = aColor; vA = 1.0 - h / ${BEAM_H.toFixed(1)};

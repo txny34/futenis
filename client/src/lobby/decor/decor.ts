@@ -14,7 +14,6 @@ import { Showcase } from "./showcase";
 // group owned by LobbyView, so setLobby(false) hides it all (lights included).
 // update() is allocation-free: uniforms, matrices, a throttled canvas redraw.
 const CONFETTI_START = 0.7; // calm burst, pad start only
-const CONFETTI_ENTER = 0.55;
 
 export class LobbyDecor {
   readonly group = new THREE.Group();
@@ -38,15 +37,15 @@ export class LobbyDecor {
   /** Pad i heat 0..1 (hold progress, pulse, flash). */
   setPadHeat(i: number, h: number): void { this.pads.setHeat(i, h); }
 
-  burst(pad: number, start: boolean): void {
+  /** Calm confetti at pad start (EvPadStart only). */
+  burst(pad: number): void {
     if (pad < 0 || pad >= LOBBY_PAD_COUNT) return;
-    this.confetti.burst(padX(pad), padZ(pad), start ? CONFETTI_START : CONFETTI_ENTER);
+    this.confetti.burst(padX(pad), padZ(pad), CONFETTI_START);
   }
 
   update(dt: number): void {
     this.time += dt;
     this.floor.update(this.time);
-    this.arches.update(this.time);
     this.screen.update(dt);
     this.pads.update(this.time);
     this.ambient.update(this.time);

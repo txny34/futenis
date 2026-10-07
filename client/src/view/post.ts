@@ -13,8 +13,8 @@ import type { Quality } from "../ui/settings";
 const BLOOM_THRESHOLD = 0.85;
 const BLOOM_RADIUS = 0.45;
 const BLOOM_STRENGTH: Readonly<Record<Quality, number>> = { low: 0, med: 0.7, high: 0.85 };
-// Lobby (calm night arena, photosensitivity): ~45% of the match bloom, higher threshold.
-const LOBBY_BLOOM_SCALE = 0.45;
+// Lobby (calm night arena, photosensitivity): ~22% of the match bloom, higher threshold.
+const LOBBY_BLOOM_SCALE = 0.22;
 const LOBBY_BLOOM_THRESHOLD = 1.0;
 const MSAA_SAMPLES = 4; // composer targets lose the canvas MSAA; restore it here
 // Bloom mips are blurred anyway: render them at a fraction of the canvas.
