@@ -5,6 +5,10 @@ import { HEADER, INPUT_MSG_LEN, Msg, PING_MSG_LEN, PROTO_VERSION, f64At, setF64A
 
 const FRAME_BYTES = HEADER + OUT_LEN * 8;
 const QUEUE_CAP = 256;
+// Control messages (WELCOME, WAITING, PONG, PEER_LEFT) get their own queue so a
+// backlog of frames (hidden tab: no rAF, no drain) can never push them out.
+const CONTROL_CAP = 32;
+const CONTROL_BYTES = HEADER + 2 * 8;
 const PING_EVERY_MS = 1000;
 
 export type NetStatus =
@@ -28,6 +32,7 @@ export class RemoteEngine implements StepEngine {
   private readonly result: StepResult;
   private readonly up: LagQueue;
   private readonly down: LagQueue;
+  private readonly control: LagQueue;
   private readonly inputBuf = new Uint8Array(INPUT_MSG_LEN);
   private readonly inputView = new DataView(this.inputBuf.buffer);
   private readonly pingBuf = new Uint8Array(PING_MSG_LEN);
@@ -37,6 +42,7 @@ export class RemoteEngine implements StepEngine {
   constructor(private readonly url: string, lagMs: number) {
     this.up = new LagQueue(QUEUE_CAP, INPUT_MSG_LEN, lagMs / 2);
     this.down = new LagQueue(QUEUE_CAP, FRAME_BYTES, lagMs / 2);
+    this.control = new LagQueue(CONTROL_CAP, CONTROL_BYTES, lagMs / 2);
     this.result = {
       prev: this.out.subarray(0, SNAP_LEN),
       curr: this.out.subarray(SNAP_LEN, 2 * SNAP_LEN),
@@ -47,12 +53,17 @@ export class RemoteEngine implements StepEngine {
     writeHeader(this.pingView, Msg.Ping);
   }
 
-  get loaded(): boolean { return this.status === "jugando"; }
+  /** True while the socket is open: GameLoop must keep calling step() so WAITING/WELCOME get drained. */
+  get loaded(): boolean { return this.ws?.readyState === WebSocket.OPEN; }
 
   connect(): void {
+    this.setStatus("conectando");
     const ws = new WebSocket(this.url);
     ws.binaryType = "arraybuffer";
-    ws.onmessage = (m: MessageEvent<ArrayBuffer>) => this.down.push(new Uint8Array(m.data), performance.now());
+    ws.onmessage = (m: MessageEvent<ArrayBuffer>) => {
+      const b = new Uint8Array(m.data);
+      (b[0] === Msg.Frame ? this.down : this.control).push(b, performance.now());
+    };
     ws.onclose = () => { if (this.status !== "el rival se fue") this.setStatus("desconectado"); };
     this.ws = ws;
   }
@@ -75,6 +86,7 @@ export class RemoteEngine implements StepEngine {
     this.up.drain(now, this.sendUp);
     this.pending = 0;
     this.result.eventCount = 0;
+    this.control.drain(now, this.receive);
     this.down.drain(now, this.receive);
     return this.result;
   }
