@@ -1,4 +1,6 @@
-package main
+// Buffer layout shared with the client and the online server (client/src
+// mirrors it; keep EXACT). All values are float64 little-endian.
+package game
 
 import (
 	"encoding/binary"
@@ -7,8 +9,6 @@ import (
 	"github.com/txny34/futenis/sim"
 )
 
-// Buffer layout shared with the client (client/src mirrors it; keep EXACT).
-// All values are float64 little-endian.
 const (
 	// inputPerPlayer is the float count per player: moveX, moveZ, targetX,
 	// targetZ, buttons, spin (docs/design/contact-v2.md §11.3/§2 v2).
