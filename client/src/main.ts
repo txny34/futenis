@@ -1,3 +1,4 @@
+import { Sound } from "./audio/sound";
 import { mountDevPanel, isDevMode } from "./dev/panel";
 import { Engine } from "./engine";
 import { Hud } from "./hud";
@@ -31,6 +32,7 @@ function applySettings(app: App, s: Settings): void {
   app.view.rig.sensitivity = s.controls.mouseSensitivity;
   app.hud.setFpsVisible(s.video.showFps);
   app.hud.setScale(s.game.hudScale);
+  app.sound.setVolumes(s.audio);
 }
 
 /** Lobby overlays (Esc menu, "Elegí un modo"): controls off + mouse free while any is up. */
@@ -126,13 +128,13 @@ function boot(): void {
   let ref: App | null = null;
   const get = (): App => { if (!ref) throw new Error("app no inicializada"); return ref; };
   const app: App = {
-    engine, view, hud, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
+    engine, view, hud, sound: new Sound(), controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
   };
   ref = app;
   const loop = new GameLoop(engine, view, hud, controls, state);
   loop.onMatchOver = (r, snap) => showResult(app, r, snap);
-  loop.onGameEvent = (e) => recorder().onEvent(e);
+  loop.onGameEvent = (e) => { recorder().onEvent(e); app.sound.onEvent(e); };
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);
   app.loop = loop;
   wire(app, menu);

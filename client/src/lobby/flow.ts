@@ -1,3 +1,4 @@
+import { Sound } from "../audio/sound";
 import type { Engine, MatchSetup } from "../engine";
 import { recorder } from "../profile/recorder";
 import { profileStore } from "../profile/store";
@@ -39,6 +40,7 @@ export interface App {
   engine: Engine;
   view: CourtView;
   hud: Hud;
+  sound: Sound;
   controls: Controls;
   state: LoopState;
   bar: BottomBar;
