@@ -95,7 +95,10 @@ func TestHubThirdPeerRejected(t *testing.T) {
 	defer srv.Close()
 	c1 := dial(ctx, t, srv)
 	readMsg(ctx, t, c1, msgWaiting, headerLen)
-	dial(ctx, t, srv)
+	c2 := dial(ctx, t, srv)
+	// WELCOME proves c2 joined: only then is the room full for c3 (dial returns
+	// at the handshake, before the server-side join runs).
+	readMsg(ctx, t, c2, msgWelcome, welcomeLen)
 	c3 := dial(ctx, t, srv)
 	if _, _, err := c3.Read(ctx); websocket.CloseStatus(err) != closeFull {
 		t.Fatalf("third peer err %v", err)

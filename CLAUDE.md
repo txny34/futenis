@@ -87,6 +87,7 @@ go run ./cmd/dev          # http://localhost:8090  (?dev=1 = panel de tuning)
                           # http://localhost:8090/character.html = visor del personaje
 go run ./cmd/server       # ws://localhost:8091  ->  http://localhost:8090/online.html?room=ABCDE (2 pestañas; ?lag=150)
 go test -short ./...      # rápido;  sin -short incluye soak y harness del bot (lento)
+bash scripts/ci/local.sh  # CI completo local (mismos pasos que ci.yml). OBLIGATORIO antes de cada push. STRESS=20 para flaky
 ```
 
 ## Fuera de alcance por ahora (YAGNI)
