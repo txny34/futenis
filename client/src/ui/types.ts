@@ -12,6 +12,8 @@ export interface MatchOptions {
   readonly pointsToWin: number;
   /** Entrenamiento ball-machine settings (playground only). */
   readonly training?: TrainingSettings;
+  /** Guided tutorial over the ball machine (playground only). */
+  readonly tutorial?: boolean;
 }
 
 export const DEFAULT_POINTS = 11;

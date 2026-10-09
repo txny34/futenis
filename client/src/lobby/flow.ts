@@ -1,5 +1,6 @@
 import { Sound } from "../audio/sound";
 import type { Engine, MatchSetup } from "../engine";
+import type { Tutorial } from "../tutorial/tutorial";
 import { recorder } from "../profile/recorder";
 import { profileStore } from "../profile/store";
 import type { Hud } from "../hud";
@@ -41,6 +42,7 @@ export interface App {
   view: CourtView;
   hud: Hud;
   sound: Sound;
+  tutorial: Tutorial;
   controls: Controls;
   state: LoopState;
   bar: BottomBar;
@@ -101,6 +103,7 @@ export function enterLobby(app: App): void {
   app.state.holdUntil = 0;
   app.state.showLanding = false;
   app.hud.setTrainingOnDemand(false);
+  app.tutorial.stop();
   arm(app, true);
 }
 
@@ -123,6 +126,8 @@ export function startMatch(app: App, o: MatchOptions): void {
   app.hud.setTrainingOnDemand(o.mode === "playground" && training.onDemand);
   app.hud.setDashCooldown(app.engine.getConfig()[CFG_DASH_COOLDOWN]);
   arm(app, false);
+  if (o.tutorial) app.tutorial.start();
+  else app.tutorial.stop();
   app.controls.lock();
   if (o.mode !== "playground") {
     app.state.holdUntil = performance.now() + VS_INTRO_MS;
@@ -136,6 +141,11 @@ export function startMatch(app: App, o: MatchOptions): void {
 export function lobbyOptions(mode: GameMode, ranked = false, training = loadTraining()): MatchOptions {
   const difficulty = mode === "playground" ? LOBBY_BOT : botLevelFor(profileStore().get().elo[mode]);
   return { mode, difficulty, ranked: ranked && mode !== "playground", pointsToWin: DEFAULT_POINTS, training: mode === "playground" ? training : undefined };
+}
+
+/** The guided tutorial: default ball machine (drives at a steady pace). */
+export function tutorialOptions(): MatchOptions {
+  return { ...lobbyOptions("playground", false, DEFAULT_TRAINING), tutorial: true };
 }
 
 export function safeStart(app: App, o: MatchOptions): void {

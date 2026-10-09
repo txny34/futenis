@@ -1,0 +1,15 @@
+/* Tutorial step card (client/src/tutorial/tutorial.ts). Colors: --hud-* / --fx-* theme tokens. */
+.tut {
+  position: absolute; top: 96px; left: 24px; width: min(340px, calc(100vw - 48px)); padding: 14px 16px;
+  border-radius: 14px; background: var(--hud-card); border: 1px solid var(--hud-border);
+  color: var(--hud-text); font: 15px/1.4 var(--fx-body); pointer-events: none;
+}
+.tut[hidden] { display: none; }
+.tut__head { font: 600 11px var(--fx-body); letter-spacing: .18em; color: var(--hud-muted); }
+.tut__title { margin: 2px 0 6px; font: 700 24px var(--fx-display); color: var(--hud-accent); text-transform: uppercase; }
+.tut__pips { display: flex; gap: 6px; margin-top: 10px; }
+.tut__pip { flex: 1; height: 4px; border-radius: 4px; background: var(--hud-border); }
+.tut__pip.is-on { background: var(--hud-accent); }
+.tut__pip.is-now { background: var(--fx-gold); }
+.tut.is-done { border-color: var(--fx-gold); }
+.tut.is-done .tut__title { color: var(--fx-gold); }
