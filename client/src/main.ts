@@ -70,6 +70,10 @@ function wire(app: App, menu: MenuUI): void {
       app.hud.resetMatch();
     }
   });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "hidden" || !app.state.running || app.inLobby || app.state.paused) return;
+    if (!menu.isOpen && !app.play.isOpen) menu.showPause();
+  });
 }
 
 async function load(app: App): Promise<void> {

@@ -11,7 +11,7 @@ import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
 const NAMES = ["Local", "Visita"] as const; // team colors come from the theme, so no color names
 const HELP_TEXT =
   "WASD mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · Espacio salto · " +
-  "Q dash · Ctrl mouse libre · Esc pausa";
+  "Q dash · Ctrl mouse libre · Esc pausa · Mando: stick izq mover, der cámara, RT golpe, LT globo, A salto, LB/RB dash";
 const LOBBY_HELP = "WASD mover · Mouse cámara · Espacio salto · Ctrl mouse libre · Esc menú";
 const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
 const PLAYGROUND_HELP = ` · ${LAUNCH_KEY} lanzar bola`;
