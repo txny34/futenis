@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 
 // Highlights the diagonal service box the human must serve into.
 // Box: rival half between the net (X=0) and the service line (X=6.95),
@@ -6,7 +7,7 @@ import * as THREE from "three";
 const SERVICE_X = 6.95;
 const HALF_W = 5;
 const FLOOR_Y = 0.004;
-const COLOR = 0xffd23f;
+const COLOR = THEME.fx.serveBox;
 const OPACITY = 0.22;
 const PULSE_HZ = 1.5;
 const PULSE_AMOUNT = 0.1;

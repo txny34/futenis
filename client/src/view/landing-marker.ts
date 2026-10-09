@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 
 // Landing marker (contact-v2 §22.2): ring + dot on the floor where the ball
 // will next bounce. Pulses faster as the bounce approaches. Allocation-free.
@@ -8,7 +9,7 @@ const RING_INNER = 0.3;
 const RING_OUTER = 0.38;
 const DOT_R = 0.08;
 const SEGMENTS = 40;
-const COLOR = 0xffffff;
+const COLOR = THEME.fx.landing;
 const RING_OPACITY = 0.8;
 const NEAR_TICKS = 60; // inside this the ring shrinks toward the dot
 const MIN_SCALE = 0.55;

@@ -34,7 +34,7 @@ func (c *contactProfile) profile(ball sim.Ball, p *sim.Player, tgt sim.Vec3, cfg
 		pos := approach(p, tgt, j)
 		dH := math.Hypot(ball.Pos.X-pos.X, ball.Pos.Z-pos.Z)
 		hRel := ball.Pos.Y - pos.Y
-		_, c.u[j] = bestErr(cfg, hRel, dH, false)
+		_, c.u[j] = sim.BestPart(cfg, hRel, dH, false)
 		c.early[j] = bounces < minBounces && c.u[j] < 2
 		c.body[j] = dH < sim.PlayerRadius+sim.BallRadius && hRel < sim.PlayerHeight
 	}

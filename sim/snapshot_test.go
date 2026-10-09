@@ -86,6 +86,48 @@ func TestWriteSnapshotFlags(t *testing.T) {
 	assertFloat(t, "dst[SnapP0Flags]", dst[SnapP0Flags], want)
 }
 
+func TestWriteSnapshotTiebreak(t *testing.T) {
+	cases := []struct {
+		name    string
+		scoring ScoringMode
+		games   [2]int
+		want    float64
+	}{
+		{"padel tiebreak", ScoringPadel, [2]int{6, 6}, 1},
+		{"padel normal game", ScoringPadel, [2]int{5, 6}, 0},
+		{"simple scoring", ScoringSimple, [2]int{6, 6}, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := State{NumPlayers: 2, Cfg: DefaultConfig()}
+			s.Cfg.ScoringMode = c.scoring
+			s.Cfg.GamesPerSet = 6
+			s.Cfg.Sanitize()
+			s.Games = c.games
+			dst := make([]float64, SnapLen)
+			WriteSnapshot(&s, dst)
+			if dst[SnapTiebreak] != c.want {
+				t.Fatalf("SnapTiebreak = %v, want %v", dst[SnapTiebreak], c.want)
+			}
+		})
+	}
+}
+
+func TestWriteSnapshotZeroesInactivePrediction(t *testing.T) {
+	s := State{NumPlayers: 2, Cfg: DefaultConfig()}
+	s.Cfg.Sanitize()
+	dst := make([]float64, SnapLen)
+	for i := range dst {
+		dst[i] = 7
+	}
+	WriteSnapshot(&s, dst)
+	for i := SnapP2ContactTicks; i <= SnapP3ContactOk; i++ {
+		if dst[i] != 0 {
+			t.Fatalf("dst[%d] = %v, want 0 for an inactive slot", i, dst[i])
+		}
+	}
+}
+
 func TestWriteSnapshotDoesNotAllocate(t *testing.T) {
 	s := State{Cfg: DefaultConfig(), Ball: Ball{Pos: Vec3{X: 1, Y: 2, Z: 3}}}
 	dst := make([]float64, SnapLen)

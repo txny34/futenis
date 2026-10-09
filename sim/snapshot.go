@@ -144,6 +144,11 @@ const (
 	SnapLobbyPad  // active pad: -1 none, 0..2
 	SnapLobbyHold // 0..1 = Hold / lobbyHoldTicks; 0 outside ModeLobby
 
+	// --- Tiebreak flag (contact-v2 §20.11), appended: 1 while the current
+	// game is a padel tiebreak, so the HUD shows SnapScore0/1 raw (1, 2, 3…)
+	// instead of the 0/15/30/40 display codes. ---
+	SnapTiebreak
+
 	SnapLen
 )
 
@@ -197,7 +202,9 @@ func writeFeed(s *State, dst []float64) {
 // writePrediction fills the "Predicción" snapshot block (docs/design/
 // contact-v2.md "Predicción (marcador de pique y anillo de timing)"):
 // PredictLanding once for the ball, PredictContact once per active player
-// (inactive slots -- NumPlayers < 4 -- get SnapLen's zero value: Ok=0).
+// (inactive slots -- NumPlayers < 4 -- get zeros: the wasm out buffer is
+// reused across modes, so a stale block from a previous 2v2 match must be
+// cleared rather than left untouched).
 func writePrediction(s *State, dst []float64) {
 	landing, landingTicks, landingOk := PredictLanding(s)
 	dst[SnapLandingX] = landing.X
@@ -208,6 +215,7 @@ func writePrediction(s *State, dst []float64) {
 	starts := [MaxPlayers]int{SnapP0ContactTicks, SnapP1ContactTicks, SnapP2ContactTicks, SnapP3ContactTicks}
 	for i, base := range starts {
 		if int8(i) >= s.NumPlayers {
+			dst[base+0], dst[base+1], dst[base+2], dst[base+3] = 0, 0, 0, 0
 			continue
 		}
 		ticks, part, quality, ok := PredictContact(s, i)
@@ -232,6 +240,7 @@ func writeScoring(s *State, dst []float64) {
 	dst[SnapSets1] = float64(s.Sets[1])
 	dst[SnapServerPlayer] = float64(s.Rally.ServerPlayer)
 	dst[SnapRallyShots] = float64(s.Rally.ShotCount)
+	dst[SnapTiebreak] = boolToFloat(s.Cfg.ScoringMode == ScoringPadel && isTiebreak(s))
 }
 
 // writeDashFlags fills the per-player DashActive flags appended at the end

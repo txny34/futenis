@@ -49,37 +49,6 @@ func ticksOfSec(sec float64) int {
 	return t
 }
 
-// partErr mirrors sim's unexported partError (docs/design/contact-v2.md
-// §7.2): 0 = perfect, >= 1 = out of reach.
-func partErr(ps *sim.PartSpec, hRel, dH float64) float64 {
-	if hRel < ps.HMin || hRel > ps.HMax || dH > ps.Reach {
-		return 2
-	}
-	half := ps.HMax - ps.HIdeal
-	if hRel < ps.HIdeal {
-		half = ps.HIdeal - ps.HMin
-	}
-	if half == 0 {
-		half = 1e-9
-	}
-	return math.Max(math.Abs(hRel-ps.HIdeal)/half, dH/ps.Reach)
-}
-
-// bestErr mirrors sim's bestPartConstrained without the bicycle (the bot
-// never plans bicycle kicks); serveOnly limits it to foot/knee (§7.5).
-func bestErr(cfg *sim.Config, hRel, dH float64, serveOnly bool) (sim.BodyPart, float64) {
-	best, bestU := sim.PartNone, 2.0
-	for i := sim.PartFoot; i < sim.PartBicycle; i++ {
-		if serveOnly && i > sim.PartKnee {
-			break
-		}
-		if u := partErr(&cfg.Parts[i], hRel, dH); u < bestU {
-			best, bestU = i, u
-		}
-	}
-	return best, bestU
-}
-
 // stepBall advances b one tick with sim.PredictBall (which resolves
 // net/floor/wall exactly like the sim) and reports whether that tick was a
 // floor bounce, read off the returned state: the ball sits on the floor and
@@ -176,7 +145,7 @@ func findIntercept(start sim.Ball, cfg *sim.Config, p *sim.Player, speed, errMax
 		if bounces < win.min || !mine {
 			continue
 		}
-		part, u := bestErr(cfg, ball.Pos.Y, off, false)
+		part, u := sim.BestPart(cfg, ball.Pos.Y, off, false)
 		if u > errMax {
 			continue
 		}
@@ -217,7 +186,7 @@ func contactSoon(ball sim.Ball, p *sim.Player, cfg *sim.Config, window int, maxE
 		}
 		pos := p.Pos.AddScaled(p.Vel, float64(j)*sim.Dt)
 		dH := math.Hypot(ball.Pos.X-pos.X, ball.Pos.Z-pos.Z)
-		_, u := bestErr(cfg, ball.Pos.Y-p.Pos.Y, dH, false)
+		_, u := sim.BestPart(cfg, ball.Pos.Y-p.Pos.Y, dH, false)
 		if bounces < minBounces {
 			if u < 2 {
 				return false

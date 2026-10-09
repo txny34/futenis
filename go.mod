@@ -1,6 +1,6 @@
 module github.com/txny34/futenis
 
-go 1.25.13
+go 1.26.9
 
 require github.com/evanw/esbuild v0.28.2
 

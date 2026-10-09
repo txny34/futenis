@@ -19,7 +19,7 @@ export class Scoreboard {
   readonly shots = node("div", "");
   private readonly points = [node("b", "p0"), node("b", "p1")] as const;
   private readonly games = [node("span", "games g0"), node("span", "games g1")] as const;
-  private readonly key = new Float64Array(7).fill(UNSET);
+  private readonly key = new Float64Array(10).fill(UNSET);
   private lastShots = UNSET;
 
   constructor() {
@@ -37,11 +37,16 @@ export class Scoreboard {
     const k = this.key;
     const v0 = snap[Snap.Points0], v1 = snap[Snap.Points1], g0 = snap[Snap.Games0], g1 = snap[Snap.Games1];
     const server = snap[Snap.Server], mode = snap[Snap.Mode], sets = snap[Snap.Sets0] + snap[Snap.Sets1];
-    if (k[0] === v0 && k[1] === v1 && k[2] === g0 && k[3] === g1 && k[4] === server && k[5] === mode && k[6] === sets) return;
+    const tb = snap[Snap.Tiebreak], score0 = snap[Snap.Score0], score1 = snap[Snap.Score1];
+    if (
+      k[0] === v0 && k[1] === v1 && k[2] === g0 && k[3] === g1 && k[4] === server && k[5] === mode &&
+      k[6] === sets && k[7] === tb && k[8] === score0 && k[9] === score1
+    ) return;
     k[0] = v0; k[1] = v1; k[2] = g0; k[3] = g1; k[4] = server; k[5] = mode; k[6] = sets;
+    k[7] = tb; k[8] = score0; k[9] = score1;
     this.score.hidden = mode === Mode.Playground;
-    this.points[0].textContent = POINT_LABELS[v0] ?? String(v0);
-    this.points[1].textContent = POINT_LABELS[v1] ?? String(v1);
+    this.points[0].textContent = tb === 1 ? String(score0) : (POINT_LABELS[v0] ?? String(v0));
+    this.points[1].textContent = tb === 1 ? String(score1) : (POINT_LABELS[v1] ?? String(v1));
     this.games[0].textContent = String(g0);
     this.games[1].textContent = String(g1);
     this.score.dataset.server = String(server);

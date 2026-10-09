@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 
 // Pooled floor effects: an expanding impact ring at each contact and a
 // "splat" decal where a remate lands (fades over SPLAT_S). Geometry and
@@ -13,9 +14,9 @@ const SPLAT_S = 2;
 const SPLAT_LOBES = 11;
 const SPLAT_R = 0.9;
 const SPLAT_JITTER = [1, 0.62, 0.9, 0.55, 1.1, 0.7, 0.95, 0.5, 1.05, 0.66, 0.85] as const; // fixed, deterministic
-const SPLAT_COLOR = 0xff3d6e;
+const SPLAT_COLOR = THEME.fx.splat;
 const SPLAT_OPACITY = 0.75;
-const IMPACT_COLORS: readonly number[] = [0xffd23f, 0x19e3ff, 0xffffff]; // perfect / good / other
+const IMPACT_COLORS: readonly number[] = THEME.fx.impact; // perfect / good / other
 
 interface Fx { readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; left: number }
 
@@ -55,7 +56,7 @@ export class ImpactFx {
   private readonly splats: Fx[];
 
   constructor(scene: THREE.Scene) {
-    this.impacts = pool(scene, new THREE.RingGeometry(0.85, 1, IMPACT_SEGMENTS), 0xffffff);
+    this.impacts = pool(scene, new THREE.RingGeometry(0.85, 1, IMPACT_SEGMENTS), THEME.fx.impact[2]);
     this.splats = pool(scene, splatGeometry(), SPLAT_COLOR);
   }
 

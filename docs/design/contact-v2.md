@@ -1138,6 +1138,14 @@ Todo **append-only** (ningún índice/valor anterior se mueve):
   evPadStart, cfgLobbyHoldTime, cfgLobbyHalfX, cfgLobbyHalfZ, lobbyPadRadius` y
   `lobbyPads: [x0, z0, x1, z1, x2, z2]`. `PlayerInput` no cambia (`inputPerPlayer = 6`).
 
+### 20.11 Tiebreak (post wave-0 addition)
+
+| Índice | Campo | Significado |
+|---|---|---|
+| 93 | `SnapTiebreak` | 1 si el game actual es tiebreak de pádel (`isTiebreak`), si no 0. El HUD muestra `SnapScore0/1` crudos. |
+
+`SnapLen = 94`. Además, los bloques `SnapP*Contact*` de slots inactivos (`i >= NumPlayers`) se escriben en 0.
+
 ## 21. Puntuación de pádel
 
 `Config.ScoringMode` (`ScoringSimple` | `ScoringPadel`, `sim/scoring.go`) decide qué modelo de

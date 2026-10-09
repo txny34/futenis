@@ -220,7 +220,7 @@ func (b *Bot) chargeFor(s *sim.State, slot int, shot uint8) int {
 		return maxT / 4
 	}
 	from := b.plan.ball.Pos
-	part, _ := bestErr(cfg, from.Y, b.plan.off, false)
+	part, _ := sim.BestPart(cfg, from.Y, b.plan.off, false)
 	if part == sim.PartNone {
 		part = sim.PartFoot
 	}

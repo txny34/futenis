@@ -141,7 +141,7 @@ func TestRunFrameHeldInputPersistsAcrossTicks(t *testing.T) {
 
 func TestLayoutEntriesExposeLobbyKeys(t *testing.T) {
 	want := map[string]float64{
-		"snapLen": 93, "inputPerPlayer": 6, "eventStride": eventStride, "maxEvents": maxEvents, "cfgLen": 152,
+		"snapLen": 94, "inputPerPlayer": 6, "eventStride": eventStride, "maxEvents": maxEvents, "cfgLen": 152,
 		"modeLobby": 3, "snapLobbyPad": 91, "snapLobbyHold": 92,
 		"evPadEnter": 24, "evPadLeave": 25, "evPadStart": 26,
 		"cfgLobbyHoldTime": 72, "cfgLobbyHalfX": 73, "cfgLobbyHalfZ": 74, "lobbyPadRadius": 1.5,

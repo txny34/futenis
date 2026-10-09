@@ -59,6 +59,13 @@ func bestPartConstrained(cfg *Config, hRel, dH float64, bicycleEligible, serveOn
 	return best, bestErr
 }
 
+// BestPart is bestPartConstrained without the bicycle kick, exported for the
+// bot (ai/) so it plans with the sim's exact part-error model instead of a
+// copy. serveOnly limits it to foot/knee (§7.5).
+func BestPart(cfg *Config, hRel, dH float64, serveOnly bool) (BodyPart, float64) {
+	return bestPartConstrained(cfg, hRel, dH, false, serveOnly)
+}
+
 // qualityOf buckets a normalized contact error into Perfect/Good/Forced
 // (docs/design/contact-v2.md §8).
 func qualityOf(c *Config, u float64) Quality {
