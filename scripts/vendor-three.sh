@@ -27,7 +27,7 @@ FILES=(
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 curl -fsSL "$URL" -o "$tmp/three.tgz"
-got=$(openssl dgst -sha512 -binary "$tmp/three.tgz" | base64 -w0)
+got=$(openssl dgst -sha512 -binary "$tmp/three.tgz" | openssl base64 -A)
 if [ "$got" != "$INTEGRITY" ]; then
   echo "three ${VERSION}: sha512 mismatch (got $got)" >&2
   exit 1
