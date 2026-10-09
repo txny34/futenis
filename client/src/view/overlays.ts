@@ -1,17 +1,18 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 
 // Human-only court overlays: aim reticle and charge ring (on the floor). Allocation-free per frame.
 const OVERLAY_ORDER = 10;
 const FLOOR_Y = 0.01;
 const RETICLE_INNER = 0.28;
 const RETICLE_OUTER = 0.36;
-const RETICLE_COLOR = 0xffffff;
+const RETICLE_COLOR = THEME.fx.reticle;
 const RETICLE_OPACITY = 0.85;
 const RING_INNER = 0.55;
 const RING_OUTER = 0.68;
 const RING_SEGMENTS = 48;
 const INDICES_PER_SEGMENT = 6; // RingGeometry with 1 phi segment: 2 tris per theta segment
-const RING_COLOR = 0xffd23f;
+const RING_COLOR = THEME.fx.aimRing;
 const RING_START = Math.PI / 2; // charge fills clockwise from "12 o'clock" seen from above
 
 function overlayMat(color: number, opacity = 1): THREE.MeshBasicMaterial {

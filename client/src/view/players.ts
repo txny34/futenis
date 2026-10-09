@@ -8,7 +8,7 @@ import {
 } from "../snapshot";
 
 const TEAM_SHIRTS = THEME.team;
-const PARTNER_SHORTS = [0xf2f2f2, 0x2b2f36] as const; // slot 0 / slot 1 of a team
+const PARTNER_SHORTS = THEME.fx.partnerShorts; // slot 0 / slot 1 of a team
 const TICK_RATE = 120; // mirrors sim.TickRate
 const SPEED_REF = 7.5; // m/s mapped to pose.speed = 1 (top run speed)
 const FACING_MIN_SPEED = 0.5; // below this, players face the net

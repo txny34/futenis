@@ -1,11 +1,12 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 import { CharacterLook } from "./config";
 
 // Toon palette: one shared 3-step gradient, one material per look slot.
 
 const GRADIENT_STEPS = new Uint8Array([90, 170, 255]);
-const EYE_WHITE = 0xffffff;
-const EYE_PUPIL = 0x111111;
+const EYE_WHITE = THEME.fx.eyeWhite;
+const EYE_PUPIL = THEME.fx.eyePupil;
 
 let gradient: THREE.DataTexture | null = null;
 

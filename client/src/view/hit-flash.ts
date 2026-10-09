@@ -1,10 +1,11 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 
 // Gold emissive flash on a character after a perfect hit. Collects the
 // character's emissive-capable materials once (construction), then only
 // scales one shared color per frame: no allocations.
 const FLASH_S = 0.5;
-const FLASH_COLOR = new THREE.Color(0xffc23f);
+const FLASH_COLOR = new THREE.Color(THEME.fx.perfectFlash);
 const FLASH_GAIN = 0.9;
 
 function hasEmissive(m: THREE.Material): m is THREE.MeshToonMaterial | THREE.MeshStandardMaterial {

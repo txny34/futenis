@@ -3,8 +3,9 @@
 // Palette: deep night navy, electric teal court, hot coral (team 0 / neon A)
 // and cyan (team 1 / neon B), neon-yellow ball.
 import { LOBBY_DECOR, type LobbyDecorTheme, type HallTheme } from "./theme-lobby";
+import { FX, type FxTheme } from "./theme-fx";
 
-export type { LobbyDecorTheme, HallTheme };
+export type { LobbyDecorTheme, HallTheme, FxTheme };
 
 export interface Theme {
   readonly skyTop: number;
@@ -51,6 +52,8 @@ export interface Theme {
   readonly lobbySignText: string;
   /** Lobby decor pass (lobby.md §7.1): floor, architecture, screen, showcase, ambient life. */
   readonly lobbyDecor: LobbyDecorTheme;
+  /** Gameplay feedback (theme-fx.ts). */
+  readonly fx: FxTheme;
   readonly hud: HudTheme;
 }
 
@@ -112,6 +115,7 @@ export const THEME: Theme = {
   lobbySignBg: "rgba(5, 9, 20, 0.82)",
   lobbySignText: "#eef6ff",
   lobbyDecor: LOBBY_DECOR,
+  fx: FX,
   hud: {
     card: "rgba(8, 16, 38, 0.62)",
     cardBorder: "rgba(25, 227, 255, 0.35)",

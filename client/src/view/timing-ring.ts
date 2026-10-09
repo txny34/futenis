@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { THEME } from "../env/theme";
 import { Quality } from "../snapshot";
 
 // osu!-style approach circle around the human (contact-v2 §22.3): while
@@ -17,7 +18,7 @@ const SEGMENTS = 64;
 const TARGET_OPACITY = 0.35;
 const RING_OPACITY = 0.9;
 const MIN_OPACITY = 0.35;
-const QUALITY_COLORS: readonly number[] = [0xffd23f, 0x19e3ff, 0xff7a6b]; // perfect / good / forced
+const QUALITY_COLORS: readonly number[] = THEME.fx.quality; // perfect / good / forced
 
 function floorMesh(geo: THREE.BufferGeometry, color: number, opacity: number): THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> {
   const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthTest: false, depthWrite: false });
@@ -30,7 +31,7 @@ function floorMesh(geo: THREE.BufferGeometry, color: number, opacity: number): T
 
 export class TimingRing {
   private readonly ring = floorMesh(new THREE.RingGeometry(RING_INNER, 1, SEGMENTS), QUALITY_COLORS[Quality.Good], RING_OPACITY);
-  private readonly target = floorMesh(new THREE.RingGeometry(TARGET_INNER, TARGET_OUTER, SEGMENTS), 0xffffff, TARGET_OPACITY);
+  private readonly target = floorMesh(new THREE.RingGeometry(TARGET_INNER, TARGET_OUTER, SEGMENTS), THEME.fx.ringTarget, TARGET_OPACITY);
   private lastQuality = -1;
 
   constructor(scene: THREE.Scene) {
