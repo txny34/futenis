@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { HumanInput } from "./engine";
-import { clampUnit, GamepadReader } from "./gamepad";
+import { clampUnit, GamepadReader, PAD_LOOK_PX_PER_S } from "./gamepad";
 import { Btn } from "./snapshot";
 
 // Single human on slot 0, Roblox-style: the mouse (pointer lock) turns the camera, WASD/left
@@ -25,7 +25,6 @@ const MIN_FORWARD_X = 0.05; // camera facing away from the rival: aim straight a
 const SHORT_TARGET_X = 1.5; // crosshair on our own half (looking down): a short drop past the net
 const DEEP_TARGET_X = 9.5; // crosshair above the horizon: deepest shot
 const LOW_AIM_X = -2.5; // crosshair this deep into our own half (aiming really low): the shot goes into the net
-const PAD_LOOK_PX = 12; // right-stick full deflection ~= this many mousemove pixels per sample
 
 /** Keyboard + mouse -> HumanInput. Knows nothing about rules. Allocation-free per frame. */
 export class Controls {
@@ -36,6 +35,7 @@ export class Controls {
   /** Pointer lock lost without the player asking (native Esc): the app pauses. */
   onLockLost: (() => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;
+  onMenu: (() => void) | null = null; // pad Start button (rising edge): opens the pause/lobby menu
   private on = false;
   private locked = false;
   private freeRequested = false;
@@ -55,8 +55,8 @@ export class Controls {
   /** False while a menu is open: input is ignored, levels drop to zero and the pointer is released. */
   get enabled(): boolean { return this.on; }
   set enabled(v: boolean) {
-    this.on = v;
-    if (!v && this.locked) document.exitPointerLock();
+    if (v && !this.on) this.pad.requireRelease();
+    this.on = v; if (!v && this.locked) document.exitPointerLock();
   }
 
   attach(canvas: HTMLElement): void {
@@ -77,21 +77,21 @@ export class Controls {
 
   get isLocked(): boolean { return this.locked; }
 
-  /** Fills and returns the reused input: camera-relative move + crosshair aim. */
-  sample(camera: THREE.Camera): HumanInput {
+  /** Fills and returns the reused input: camera-relative move + crosshair aim. dt in seconds (pad look speed). */
+  sample(camera: THREE.Camera, dt: number): HumanInput {
     const a = this.action;
     a.spin = 0;
     if (!this.on) {
       a.moveX = 0; a.moveZ = 0; a.buttons = 0;
       return a;
     }
-    this.pad.poll();
+    this.pad.poll(); if (this.pad.startPressed) this.onMenu?.();
     camera.getWorldDirection(this.fwd);
     this.move(a);
     a.buttons = this.buttons() | this.pad.buttons;
     this.latched = 0;
     this.aim(camera, a);
-    if (this.pad.lookX !== 0 || this.pad.lookY !== 0) this.onLook?.(this.pad.lookX * PAD_LOOK_PX, this.pad.lookY * PAD_LOOK_PX);
+    if (this.pad.lookX !== 0 || this.pad.lookY !== 0) this.onLook?.(this.pad.lookX * PAD_LOOK_PX_PER_S * dt, this.pad.lookY * PAD_LOOK_PX_PER_S * dt);
     return a;
   }
 

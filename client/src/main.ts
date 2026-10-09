@@ -54,11 +54,14 @@ function wire(app: App, menu: MenuUI): void {
   app.controls.onLook = (dx, dy) => app.view.rig.look(dx, dy);
   app.controls.onZoom = (d) => app.view.rig.zoom(d);
   app.controls.onLockChange = (locked) => app.hud.setCrosshair(locked);
-  app.controls.onLockLost = () => { // native Esc: the browser eats the keydown that drops pointer lock
+  const openPauseOrLobbyMenu = (): void => {
     if (!app.state.running || menu.isOpen || app.play.isOpen) return;
     if (app.inLobby) menu.openLobbyMenu();
     else menu.showPause();
   };
+  // native Esc: the browser eats the keydown that drops pointer lock
+  app.controls.onLockLost = openPauseOrLobbyMenu;
+  app.controls.onMenu = openPauseOrLobbyMenu; // pad Start button: same as Esc
   menu.onSettingsChange((s) => applySettings(app, s));
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {

@@ -109,7 +109,7 @@ export class GameLoop {
       this.acc = 0;
       return;
     }
-    const input = this.controls.sample(this.view.camera);
+    const input = this.controls.sample(this.view.camera, dt);
     this.assistServeAim(input);
     this.human.targetX = input.targetX;
     this.human.targetZ = input.targetZ;

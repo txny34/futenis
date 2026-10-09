@@ -2,8 +2,9 @@ import { Btn } from "./snapshot";
 
 // Standard-mapping gamepad (Xbox/PlayStation layout), read once per sample.
 // Left stick = move (camera-relative, like WASD), right stick = camera look,
-// RT/X = strike, LT/B = lob, A = jump, LB/RB = dash. Held levels; the sim
-// detects edges itself.
+// RT/X = strike, LT/B = lob, A = jump, LB/RB = dash, Start = pause/menu. Held
+// levels; the sim detects edges itself. Non-standard mappings are ignored:
+// button/axis indices only line up for "standard".
 const AXIS_MOVE_X = 0;
 const AXIS_MOVE_Y = 1;
 const AXIS_LOOK_X = 2;
@@ -15,9 +16,12 @@ const BTN_DASH_LB = 4;
 const BTN_DASH_RB = 5;
 const BTN_LOB_TRIGGER = 6; // LT
 const BTN_STRIKE_TRIGGER = 7; // RT
+const BTN_START = 9; // Start/Menu
 const TRIGGER_THRESHOLD = 0.5;
 const STICK_DEADZONE = 0.15;
 const STICK_LIVE = 1 - STICK_DEADZONE;
+/** Right-stick full deflection, in on-screen look pixels per second (Controls.sample multiplies by dt). */
+export const PAD_LOOK_PX_PER_S = 720;
 
 /** Clamps v to [-1, 1]. */
 export function clampUnit(v: number): number {
@@ -31,7 +35,13 @@ function applyDeadzone(v: number, magnitude: number): number {
   return clampUnit(v * scale);
 }
 
-/** First connected gamepad -> move/look levels + buttons. Allocation-free per poll. */
+/**
+ * First connected standard-mapping gamepad -> move/look levels + buttons.
+ * `navigator.getGamepads()` allocates a fresh array every call, so it is only
+ * polled while at least one pad is connected (tracked via the
+ * gamepadconnected/gamepaddisconnected window events); otherwise poll() is a
+ * cheap no-op. Allocation-free once a pad is connected.
+ */
 export class GamepadReader {
   forward = 0;
   right = 0;
@@ -39,28 +49,49 @@ export class GamepadReader {
   lookY = 0;
   buttons = 0;
   connected = false;
+  /** Start button rising edge (standard pad index 9), computed each poll. */
+  startPressed = false;
+  private connectedCount = 0;
+  private startWasDown = false;
+  private releaseGate = false;
+
+  constructor() {
+    window.addEventListener("gamepadconnected", () => { this.connectedCount++; });
+    window.addEventListener("gamepaddisconnected", () => { this.connectedCount = Math.max(0, this.connectedCount - 1); });
+  }
+
+  /** Ignores pad buttons (and Start) until every button is released once. Call after re-enabling input. */
+  requireRelease(): void { this.releaseGate = true; }
 
   poll(): void {
+    if (this.connectedCount <= 0) { this.reset(); return; }
     const pads = navigator.getGamepads?.() ?? [];
     const pad = this.pick(pads);
-    if (!pad) {
-      this.forward = 0; this.right = 0; this.lookX = 0; this.lookY = 0; this.buttons = 0;
-      this.connected = false;
-      return;
-    }
+    if (!pad) { this.reset(); return; }
     this.connected = true;
     this.readSticks(pad);
     this.buttons = this.readButtons(pad);
+    const startDown = pad.buttons[BTN_START]?.pressed ?? false;
+    this.startPressed = startDown && !this.startWasDown;
+    this.startWasDown = startDown;
+    if (this.releaseGate) {
+      if (this.buttons === 0 && !startDown) this.releaseGate = false;
+      else { this.buttons = 0; this.startPressed = false; }
+    }
+  }
+
+  private reset(): void {
+    this.forward = 0; this.right = 0; this.lookX = 0; this.lookY = 0; this.buttons = 0;
+    this.connected = false;
+    this.startPressed = false;
+    this.startWasDown = false;
   }
 
   private pick(pads: readonly (Gamepad | null)[]): Gamepad | null {
-    let fallback: Gamepad | null = null;
     for (const pad of pads) {
-      if (!pad) continue;
-      if (pad.mapping === "standard") return pad;
-      if (!fallback) fallback = pad;
+      if (pad && pad.mapping === "standard") return pad;
     }
-    return fallback;
+    return null;
   }
 
   private readSticks(pad: Gamepad): void {
