@@ -9,7 +9,7 @@ export type ShotKindId = (typeof ShotKind)[keyof typeof ShotKind];
 const REMATE_MIN_Y = 1.5; // m: contact above the head-ish
 const REMATE_MIN_SPEED = 15; // m/s
 const LOB_MIN_VY = 7; // m/s upward
-const LOB_VY_RATIO = 0.6; // vy relative to horizontal speed
+export const LOB_VY_RATIO = 0.6; // vy relative to horizontal speed
 
 export class ShotFeed {
   private bounces = 0;
@@ -68,6 +68,11 @@ function classify(e: SimEvent, volley: boolean): ShotKindId {
   const speed = Math.hypot(horiz, e.vy);
   if (e.y > REMATE_MIN_Y && e.vy < 0 && speed > REMATE_MIN_SPEED) return ShotKind.Remate;
   if (volley) return ShotKind.Volea;
-  if (e.vy > LOB_MIN_VY && e.vy > horiz * LOB_VY_RATIO) return ShotKind.Globo;
+  if (isLob(e)) return ShotKind.Globo;
   return ShotKind.None;
+}
+
+/** High, mostly vertical launch (globo). Shared with the tutorial. */
+export function isLob(e: SimEvent): boolean {
+  return e.vy > LOB_MIN_VY && e.vy > Math.hypot(e.vx, e.vz) * LOB_VY_RATIO;
 }

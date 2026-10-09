@@ -1,4 +1,5 @@
 import { Sound } from "./audio/sound";
+import { Tutorial, tutorialDone } from "./tutorial/tutorial";
 import { mountDevPanel, isDevMode } from "./dev/panel";
 import { Engine } from "./engine";
 import { Hud } from "./hud";
@@ -7,7 +8,7 @@ import { GameLoop, LoopState } from "./loop";
 import { BottomBar } from "./lobby/bottom-bar";
 import { ProfileCard } from "./lobby/profile-card";
 import { recorder } from "./profile/recorder";
-import { App, enterLobby, errText, landingAllowed, lobbyOptions, onPadEvent, safeStart, showResult } from "./lobby/flow";
+import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions, onPadEvent, safeStart, showResult } from "./lobby/flow";
 import { CourtView } from "./render";
 import { MatchScreens } from "./ui/match-screens";
 import { MenuUI, Settings } from "./ui/menu";
@@ -93,6 +94,7 @@ async function load(app: App): Promise<void> {
   app.pending = null;
   try {
     if (queued) safeStart(app, queued);
+    else if (!tutorialDone()) safeStart(app, tutorialOptions()); // first visit: learn before the lobby
     else enterLobby(app);
   } catch (err) {
     app.hud.error(errText(err));
@@ -111,6 +113,7 @@ function playModal(app: () => App): PlayModal {
 function lobbyMenu(app: () => App, menu: MenuUI): void {
   menu.setLobbyMenu(() => ({
     items: [
+      { label: "Tutorial", run: () => safeStart(app(), tutorialOptions()) },
       { label: "Entrenamiento", run: () => menu.openTraining((t) => safeStart(app(), lobbyOptions("playground", false, t))) },
       { label: "Ajustes", run: () => menu.openSettings() },
     ],
@@ -128,13 +131,13 @@ function boot(): void {
   let ref: App | null = null;
   const get = (): App => { if (!ref) throw new Error("app no inicializada"); return ref; };
   const app: App = {
-    engine, view, hud, sound: new Sound(), controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
+    engine, view, hud, sound: new Sound(), tutorial: new Tutorial(requireElement("hud")), controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
   };
   ref = app;
   const loop = new GameLoop(engine, view, hud, controls, state);
   loop.onMatchOver = (r, snap) => showResult(app, r, snap);
-  loop.onGameEvent = (e) => { recorder().onEvent(e); app.sound.onEvent(e); };
+  loop.onGameEvent = (e) => { recorder().onEvent(e); app.sound.onEvent(e); app.tutorial.onEvent(e); };
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);
   app.loop = loop;
   wire(app, menu);
