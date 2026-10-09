@@ -144,7 +144,7 @@ const (
 	SnapLobbyPad  // active pad: -1 none, 0..2
 	SnapLobbyHold // 0..1 = Hold / lobbyHoldTicks; 0 outside ModeLobby
 
-	// --- Tiebreak flag (contact-v2 §20.10), appended: 1 while the current
+	// --- Tiebreak flag (contact-v2 §20.11), appended: 1 while the current
 	// game is a padel tiebreak, so the HUD shows SnapScore0/1 raw (1, 2, 3…)
 	// instead of the 0/15/30/40 display codes. ---
 	SnapTiebreak

@@ -24,7 +24,7 @@ export const Snap = {
   Streak: 85, BestStreak: 86, FeedCount: 87, FeedIn: 88, MachineX: 89, MachineZ: 90,
   // Lobby (docs/design/lobby.md §5): active pad (-1 none, 0..2) and hold progress 0..1.
   LobbyPad: 91, LobbyHold: 92,
-  // Tiebreak flag (contact-v2 §20.10): 1 = show Score0/1 raw instead of 0/15/30/40.
+  // Tiebreak flag (contact-v2 §20.11): 1 = show Score0/1 raw instead of 0/15/30/40.
   Tiebreak: 93,
 } as const;
 
