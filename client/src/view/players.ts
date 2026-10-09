@@ -66,7 +66,7 @@ export class PlayersView {
     s.contact.set(e.x, e.y, e.z);
   }
 
-  /** Dead between a point/fault and the next toss or machine feed. */
+  /** Dead between a point/fault and the next toss or machine feed. No reset needed: the sim emits Toss/Feed before any live BodyHit. */
   private trackBall(kind: number): void {
     switch (kind) {
       case EventKind.Point:
