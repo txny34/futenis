@@ -44,15 +44,18 @@ function makeSlot(scene: THREE.Scene): Slot {
 export class PlayersView {
   private readonly slots: Slot[];
   private lastNumPlayers = -1;
+  private ballDead = false;
 
   constructor(scene: THREE.Scene) {
     this.slots = [];
     for (let i = 0; i < MAX_PLAYERS; i++) this.slots.push(makeSlot(scene));
   }
 
-  /** Starts strike clips from EvKick/EvBodyHit/EvWhiff. */
+  /** Starts strike clips from EvKick/EvBodyHit/EvWhiff (a body graze on a dead ball is ignored). */
   onEvent(e: SimEvent): void {
+    this.trackBall(e.kind);
     if (e.kind !== EventKind.Kick && e.kind !== EventKind.BodyHit && e.kind !== EventKind.Whiff) return;
+    if (e.kind === EventKind.BodyHit && this.ballDead) return;
     if (e.player < 0 || e.player >= MAX_PLAYERS) return;
     const s = this.slots[e.player];
     const name = PART_NAMES[e.part] ?? "none";
@@ -61,6 +64,23 @@ export class PlayersView {
     s.strikeT = STRIKE_START_T;
     s.hasContact = e.kind !== EventKind.Whiff;
     s.contact.set(e.x, e.y, e.z);
+  }
+
+  /** Dead between a point/fault and the next toss or machine feed. */
+  private trackBall(kind: number): void {
+    switch (kind) {
+      case EventKind.Point:
+      case EventKind.ServeFault:
+      case EventKind.Let:
+      case EventKind.GameOver:
+      case EventKind.ReturnFail:
+        this.ballDead = true;
+        break;
+      case EventKind.Toss:
+      case EventKind.Feed:
+        this.ballDead = false;
+        break;
+    }
   }
 
   /** Gold flash on player i (perfect hit). */
