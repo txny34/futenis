@@ -113,7 +113,7 @@ export class RemoteEngine implements StepEngine {
         }
         break;
       case Msg.Waiting:
-        this.setStatus("esperando rival");
+        if (this.status === "conectando") this.setStatus("esperando rival");
         break;
       case Msg.PeerLeft:
         this.setStatus("el rival se fue");

@@ -13,14 +13,24 @@ import (
 )
 
 func newTestHub(tick chan time.Time) *httptest.Server {
+	return newTestHubCap(tick, maxRooms)
+}
+
+func newTestHubCap(tick chan time.Time, rooms int) *httptest.Server {
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+	h.maxRooms = rooms
 	h.ticker = func() (<-chan time.Time, func()) { return tick, func() {} }
 	return httptest.NewServer(h)
 }
 
 func dial(ctx context.Context, t *testing.T, srv *httptest.Server) *websocket.Conn {
 	t.Helper()
-	c, _, err := websocket.Dial(ctx, "ws"+srv.URL[4:]+"/?room=ABC", nil)
+	return dialRoom(ctx, t, srv, "ABC")
+}
+
+func dialRoom(ctx context.Context, t *testing.T, srv *httptest.Server, code string) *websocket.Conn {
+	t.Helper()
+	c, _, err := websocket.Dial(ctx, "ws"+srv.URL[4:]+"/?room="+code, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,5 +112,41 @@ func TestHubBadRoom(t *testing.T) {
 	_ = res.Body.Close()
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status %d", res.StatusCode)
+	}
+}
+
+func TestHubServerFull(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv := newTestHubCap(make(chan time.Time), 1)
+	defer srv.Close()
+	c1 := dialRoom(ctx, t, srv, "AAA")
+	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	c2 := dialRoom(ctx, t, srv, "BBB")
+	if _, _, err := c2.Read(ctx); websocket.CloseStatus(err) != closeBusy {
+		t.Fatalf("second room err %v", err)
+	}
+}
+
+func TestHubBadMessage(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv := newTestHub(make(chan time.Time))
+	defer srv.Close()
+	for _, tc := range []struct {
+		typ websocket.MessageType
+		b   []byte
+	}{
+		{websocket.MessageBinary, []byte{1, 2, 3}},
+		{websocket.MessageText, inputMsg([inputFloats]float64{})},
+	} {
+		c := dial(ctx, t, srv)
+		readMsg(ctx, t, c, msgWaiting, headerLen)
+		if err := c.Write(ctx, tc.typ, tc.b); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := c.Read(ctx); websocket.CloseStatus(err) != websocket.StatusUnsupportedData {
+			t.Fatalf("type %v err %v", tc.typ, err)
+		}
 	}
 }

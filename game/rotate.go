@@ -76,6 +76,9 @@ func rotatePos(d, s []float64) {
 	d[0], d[1], d[2] = -s[0], s[1], -s[2]
 }
 
+// rotateEvent mirrors one event record. side is a team for every event except
+// the EvPad* lobby events, where it is a pad index; those never occur online
+// (1v1 only), so flipping it as a team is safe.
 func rotateEvent(d, s []float64) {
 	rotatePos(d[2:], s[2:]) // posX, posY, posZ
 	rotatePos(d[9:], s[9:]) // velX, velY, velZ

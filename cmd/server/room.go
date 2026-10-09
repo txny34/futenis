@@ -36,32 +36,36 @@ type room struct {
 
 func newRoom() *room { return &room{stop: make(chan struct{})} }
 
-// join adds p and returns its slot, or -1 if the room is full or closed.
-func (r *room) join(p peer) int {
+// join adds p and returns its slot (-1 if full or closed). start is true for
+// exactly one caller: the one whose join fills the room. A lone joiner gets
+// WAITING while the lock is held, so a concurrent WELCOME can never precede
+// it (the send is bounded by the peer's write timeout).
+func (r *room) join(p peer) (slot int, start bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed {
-		return -1
+		return -1, false
 	}
+	slot = -1
 	for i := range r.peers {
 		if r.peers[i] == nil {
 			r.peers[i] = p
-			return i
+			slot = i
+			break
 		}
 	}
-	return -1
-}
-
-// ready reports whether both slots are taken and the loop has not started;
-// it marks the room started so only one caller launches run.
-func (r *room) ready() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.started || r.peers[0] == nil || r.peers[1] == nil {
-		return false
+	if slot < 0 {
+		return -1, false
 	}
-	r.started = true
-	return true
+	if r.peers[1-slot] == nil {
+		_ = p.send(encodeSignal(msgWaiting))
+		return slot, false
+	}
+	if !r.started {
+		r.started = true
+		start = true
+	}
+	return slot, start
 }
 
 func (r *room) isClosed() bool {
