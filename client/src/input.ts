@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import type { HumanInput } from "./engine";
+import { clampUnit, GamepadReader, PAD_LOOK_PX_PER_S } from "./gamepad";
 import { Btn } from "./snapshot";
 
-// Single human on slot 0, Roblox-style: the mouse (pointer lock) turns the
-// camera, WASD moves relative to the camera yaw, and the aim is wherever the
-// crosshair (above the screen center, AIM_NDC_Y) hits the floor. Everything is a held LEVEL
-// (PlayerInput v2); the sim detects edges itself. Spin is always 0.
+// Single human on slot 0, Roblox-style: the mouse (pointer lock) turns the camera, WASD/left
+// stick moves relative to the camera yaw, and the aim is wherever the crosshair (above the
+// screen center, AIM_NDC_Y) hits the floor. Everything is a held LEVEL (PlayerInput v2); the
+// sim detects edges itself. Spin is always 0.
 const KEY_UP = "KeyW";
 const KEY_DOWN = "KeyS";
 const KEY_LEFT = "KeyA";
@@ -34,6 +35,7 @@ export class Controls {
   /** Pointer lock lost without the player asking (native Esc): the app pauses. */
   onLockLost: (() => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;
+  onMenu: (() => void) | null = null; // pad Start button (rising edge): opens the pause/lobby menu
   private on = false;
   private locked = false;
   private freeRequested = false;
@@ -48,12 +50,13 @@ export class Controls {
   private readonly fwd = new THREE.Vector3();
   private readonly action: HumanInput = { moveX: 0, moveZ: 0, targetX: DEFAULT_TARGET_X, targetZ: 0, buttons: 0, spin: 0 };
   private pressHandler: ((code: string) => void) | null = null;
+  private readonly pad = new GamepadReader();
 
   /** False while a menu is open: input is ignored, levels drop to zero and the pointer is released. */
   get enabled(): boolean { return this.on; }
   set enabled(v: boolean) {
-    this.on = v;
-    if (!v && this.locked) document.exitPointerLock();
+    if (v && !this.on) this.pad.requireRelease();
+    this.on = v; if (!v && this.locked) document.exitPointerLock();
   }
 
   attach(canvas: HTMLElement): void {
@@ -74,19 +77,21 @@ export class Controls {
 
   get isLocked(): boolean { return this.locked; }
 
-  /** Fills and returns the reused input: camera-relative move + crosshair aim. */
-  sample(camera: THREE.Camera): HumanInput {
+  /** Fills and returns the reused input: camera-relative move + crosshair aim. dt in seconds (pad look speed). */
+  sample(camera: THREE.Camera, dt: number): HumanInput {
     const a = this.action;
     a.spin = 0;
     if (!this.on) {
       a.moveX = 0; a.moveZ = 0; a.buttons = 0;
       return a;
     }
+    this.pad.poll(); if (this.pad.startPressed) this.onMenu?.();
     camera.getWorldDirection(this.fwd);
     this.move(a);
-    a.buttons = this.buttons();
+    a.buttons = this.buttons() | this.pad.buttons;
     this.latched = 0;
     this.aim(camera, a);
+    if (this.pad.lookX !== 0 || this.pad.lookY !== 0) this.onLook?.(this.pad.lookX * PAD_LOOK_PX_PER_S * dt, this.pad.lookY * PAD_LOOK_PX_PER_S * dt);
     return a;
   }
 
@@ -101,14 +106,13 @@ export class Controls {
     let fz = this.fwd.z;
     const len = Math.hypot(fx, fz);
     if (len < 1e-6) { fx = 1; fz = 0; } else { fx /= len; fz /= len; }
-    const f = this.axis(KEY_DOWN, KEY_UP);
-    const r = this.axis(KEY_LEFT, KEY_RIGHT);
+    const f = clampUnit(this.axis(KEY_DOWN, KEY_UP) + this.pad.forward);
+    const r = clampUnit(this.axis(KEY_LEFT, KEY_RIGHT) + this.pad.right);
     let mx = fx * f - fz * r; // right = (-fz, fx): yaw 0 -> D = +Z
     let mz = fz * f + fx * r;
     const m = Math.hypot(mx, mz);
     if (m > 1) { mx /= m; mz /= m; }
-    a.moveX = mx;
-    a.moveZ = mz;
+    a.moveX = mx; a.moveZ = mz;
   }
 
   private aim(camera: THREE.Camera, a: HumanInput): void {
@@ -157,12 +161,9 @@ export class Controls {
   }
 
   private toggleLock(): void {
-    if (this.locked) {
-      this.freeRequested = true;
-      document.exitPointerLock();
-    } else {
-      this.lock();
-    }
+    if (!this.locked) { this.lock(); return; }
+    this.freeRequested = true;
+    document.exitPointerLock();
   }
 
   /** Requests pointer lock (needs a user gesture; failures are retried on the next click). */
