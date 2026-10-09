@@ -1,4 +1,4 @@
-import { Engine, MAX_STEPS, StepResult } from "./engine";
+import { MAX_STEPS, StepEngine, StepResult } from "./engine";
 import { ShotFeed } from "./feel/shots";
 import { Hud } from "./hud";
 import { Controls } from "./input";
@@ -56,7 +56,7 @@ export class GameLoop {
   private readonly human: HumanView = { slot: HUMAN_SLOT, targetX: 0, targetZ: 0, showOverlays: false, showLanding: false };
 
   constructor(
-    private readonly engine: Engine,
+    private readonly engine: StepEngine,
     private readonly view: CourtView,
     private readonly hud: Hud,
     private readonly controls: Controls,

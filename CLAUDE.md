@@ -14,13 +14,14 @@ sim/      Go puro. Reglas + física + puntuación + predicción. Fuente de verda
 ai/       Go puro. Bot determinista (4 dificultades, 2v2). Produce sim.PlayerInput, como un humano. Sin trampas.
 wasm/     package main (GOOS=js). Único puente sim/ai <-> navegador. Corre el bot en los slots no humanos.
 cmd/dev/  Servidor de desarrollo en Go (estáticos + build con esbuild Go API). Sin Node. Default :8090 (WSL2).
-cmd/server/ (futuro) Servidor autoritativo: corre el MISMO sim + ai nativos.
+game/     Go puro. Sesión (modo, config, bots) + formato de frame. Compartido por wasm/ y cmd/server/.
+cmd/server/ Servidor online autoritativo (spike, docs/design/online-spike.md): corre el MISMO sim + ai nativos.
 client/   TypeScript + three.js. SOLO dibuja, lee input, cámara, HUD, menú, feedback. NUNCA decide reglas.
 docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), character.md (pipeline de personaje).
 ```
 
 - **Sin Node.** TS se compila con la API Go de `esbuild`. three.js (+ `three/addons/`) vía import map.
-- Dependencias en una sola dirección: `client -> wasm -> (ai, sim)`, `ai -> sim`. `sim` no conoce a nadie.
+- Dependencias en una sola dirección: `client -> wasm -> game -> (ai, sim)`, `cmd/server -> game`, `ai -> sim`. `sim` no conoce a nadie.
 
 ## Estándares de juego en browser
 
@@ -84,10 +85,11 @@ docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), charac
 ```
 go run ./cmd/dev          # http://localhost:8090  (?dev=1 = panel de tuning)
                           # http://localhost:8090/character.html = visor del personaje
+go run ./cmd/server       # ws://localhost:8091  ->  http://localhost:8090/online.html?room=ABCDE (2 pestañas; ?lag=150)
 go test -short ./...      # rápido;  sin -short incluye soak y harness del bot (lento)
 ```
 
 ## Fuera de alcance por ahora (YAGNI)
 
-Online / servidor autoritativo, matchmaking, base de datos, pagos, skins comerciales, monedas, habilidades especiales,
-flip en el aire y "por cuatro" (salir y volver por encima del vidrio) → v3. React, ECS.
+Online más allá del spike (predicción, 2v2, reconexión), matchmaking, base de datos, pagos, skins comerciales, monedas, habilidades especiales,
+flip en el aire → v3. React, ECS.

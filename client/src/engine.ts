@@ -30,8 +30,8 @@ export interface MatchSetup {
 const WASM_URL = "dist/futenis.wasm";
 export const INPUT_PER_PLAYER = 6; // [moveX, moveZ, targetX, targetZ, buttons, spin]
 const INPUT_LEN = MAX_PLAYERS * INPUT_PER_PLAYER; // 24
-const EVENT_COUNT_OFFSET = 2 * SNAP_LEN;
-const EVENTS_OFFSET = EVENT_COUNT_OFFSET + 1;
+export const EVENT_COUNT_OFFSET = 2 * SNAP_LEN;
+export const EVENTS_OFFSET = EVENT_COUNT_OFFSET + 1;
 // OUT_LEN/CFG_LEN derive from the same constants layout() asserts against at
 // load time, so a future append on either side fails loudly instead of
 // silently misaligning prev/curr snapshot slices (see assertLayout).
@@ -43,12 +43,34 @@ export const MAX_STEPS = 15; // wasm maxSteps per call
 export const CFG_LEN = 152;
 const F64 = 8;
 
-const emptyEvent = (): SimEvent => ({
+export const emptyEvent = (): SimEvent => ({
   kind: 0, tick: 0, x: 0, y: 0, z: 0, side: 0, player: -1, part: 0, quality: 0, vx: 0, vy: 0, vz: 0, spin: 0,
 });
 
+/** What GameLoop needs from a simulation source (local wasm Engine or net/RemoteEngine). */
+export interface StepEngine {
+  readonly loaded: boolean;
+  peek(): StepResult;
+  setInput(slot: number, a: HumanInput): void;
+  step(n: number): StepResult;
+}
+
+/** Decodes the event block of an out buffer into pool and sets result.eventCount. Allocation-free. */
+export function readEventsInto(o: Float64Array, pool: readonly SimEvent[], result: StepResult, start = 0): void {
+  const count = Math.max(0, Math.min(MAX_EVENTS - start, o[EVENT_COUNT_OFFSET] | 0));
+  for (let i = 0; i < count; i++) {
+    const b = EVENTS_OFFSET + i * EVENT_STRIDE;
+    const e = pool[start + i];
+    e.kind = o[b]; e.tick = o[b + 1];
+    e.x = o[b + 2]; e.y = o[b + 3]; e.z = o[b + 4];
+    e.side = o[b + 5]; e.player = o[b + 6]; e.part = o[b + 7]; e.quality = o[b + 8];
+    e.vx = o[b + 9]; e.vy = o[b + 10]; e.vz = o[b + 11]; e.spin = o[b + 12];
+  }
+  result.eventCount = start + count;
+}
+
 // Engine wraps the WASM bridge. It is the ONLY module aware of the in/out buffer layout.
-export class Engine {
+export class Engine implements StepEngine {
   private readonly input = new Float64Array(INPUT_LEN);
   private readonly out = new Float64Array(OUT_LEN);
   private readonly cfg = new Float64Array(CFG_LEN);
@@ -96,7 +118,7 @@ export class Engine {
   step(n: number): StepResult {
     const bridge = this.requireBridge();
     check("step", bridge.step(Math.max(MIN_STEPS, Math.min(MAX_STEPS, Math.floor(n)))));
-    this.readEvents();
+    readEventsInto(this.out, this.eventPool, this.result);
     return this.result;
   }
 
@@ -138,19 +160,6 @@ export class Engine {
     return this.bridge;
   }
 
-  private readEvents(): void {
-    const o = this.out;
-    const count = Math.max(0, Math.min(MAX_EVENTS, o[EVENT_COUNT_OFFSET] | 0));
-    for (let i = 0; i < count; i++) {
-      const b = EVENTS_OFFSET + i * EVENT_STRIDE;
-      const e = this.eventPool[i];
-      e.kind = o[b]; e.tick = o[b + 1];
-      e.x = o[b + 2]; e.y = o[b + 3]; e.z = o[b + 4];
-      e.side = o[b + 5]; e.player = o[b + 6]; e.part = o[b + 7]; e.quality = o[b + 8];
-      e.vx = o[b + 9]; e.vy = o[b + 10]; e.vz = o[b + 11]; e.spin = o[b + 12];
-    }
-    this.result.eventCount = count;
-  }
 }
 
 function check(fn: string, err: string | null | undefined): void {

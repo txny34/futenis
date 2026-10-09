@@ -119,6 +119,7 @@ func (b *builder) bundleTS() error {
 		EntryPointsAdvanced: []api.EntryPoint{
 			{InputPath: filepath.Join(b.root, "client", "src", "main.ts"), OutputPath: "main"},
 			{InputPath: filepath.Join(b.root, "client", "src", "character", "preview.ts"), OutputPath: "preview"},
+			{InputPath: filepath.Join(b.root, "client", "src", "online.ts"), OutputPath: "online"},
 		},
 		Outdir:    b.dist(""),
 		Bundle:    true,
