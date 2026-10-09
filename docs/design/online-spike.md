@@ -7,7 +7,7 @@ privada por código contra un servidor autoritativo (`cmd/server`) que corre el 
 
 - `game/`: Go puro. Sesión (modo, config, bots) + formato de frame (snapshots prev/curr + eventos, LE float64).
   Lo usan `wasm/` (local) y `cmd/server` (online). Dependencias: `wasm -> game`, `cmd/server -> game`, `game -> (ai, sim)`.
-- `cmd/server`: WebSocket (`github.com/coder/websocket`), `-addr :8091`, `-origins localhost:8090`.
+- `cmd/server`: WebSocket (`github.com/coder/websocket`), `-addr 127.0.0.1:8091` (solo local por defecto), `-origins localhost:8090`.
 - Cliente: `online.html` + `client/src/online.ts`, `net/remote-engine.ts` implementa `StepEngine` (misma interfaz
   que el `Engine` wasm), así `GameLoop`, render y HUD no cambian.
 
@@ -47,3 +47,13 @@ El HUD muestra sala, estado y ping (RTT medido con PING/PONG cada 1 s; incluye e
 
 Predicción local del propio jugador + reconciliación, interpolación por buffer de jitter, compensación de lag en
 el buffer de golpe, red por eventos de toque en vez de frames completos, 2v2, reconexión, matchmaking, cuentas.
+
+## 7. Antes de exponerlo públicamente (revisión de seguridad del spike)
+
+- Límites: conexiones globales y por IP, cantidad máxima de salas, timeout del host esperando rival, deadline de
+  lectura por inactividad y rate limit de INPUT/PING por conexión.
+- TLS: `wss://` detrás de un proxy (el cliente ya usa `wss` cuando la página es https).
+- Códigos de sala: hoy 5 caracteres aleatorios (`crypto.getRandomValues`), sin secreto: el primero que llega con el
+  código entra. Para público: códigos generados por el servidor o un token de invitación.
+- Envíos por peer en goroutines con buffer para que un cliente lento no demore al otro (hoy acotado por el
+  write timeout de 100 ms).

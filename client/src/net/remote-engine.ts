@@ -1,5 +1,5 @@
-import { EVENT_COUNT_OFFSET, EVENTS_OFFSET, HumanInput, OUT_LEN, StepEngine, StepResult, emptyEvent } from "../engine";
-import { EVENT_STRIDE, MAX_EVENTS, SNAP_LEN, SimEvent } from "../snapshot";
+import { HumanInput, OUT_LEN, StepEngine, StepResult, emptyEvent, readEventsInto } from "../engine";
+import { MAX_EVENTS, SNAP_LEN, SimEvent } from "../snapshot";
 import { LagQueue, OwnBytes } from "./lag-queue";
 import { HEADER, INPUT_MSG_LEN, Msg, PING_MSG_LEN, PROTO_VERSION, f64At, setF64At, writeHeader } from "./protocol";
 
@@ -10,6 +10,8 @@ const QUEUE_CAP = 256;
 const CONTROL_CAP = 32;
 const CONTROL_BYTES = HEADER + 2 * 8;
 const PING_EVERY_MS = 1000;
+// Inputs are held levels: one per sim tick (120 Hz) is enough, whatever the display rate.
+const INPUT_EVERY_MS = 1000 / 120;
 
 export type NetStatus =
   | "conectando"
@@ -37,6 +39,7 @@ export class RemoteEngine implements StepEngine {
   private readonly inputView = new DataView(this.inputBuf.buffer);
   private readonly pingBuf = new Uint8Array(PING_MSG_LEN);
   private readonly pingView = new DataView(this.pingBuf.buffer);
+  private lastInputAt = -Infinity;
   private pending = 0; // events accumulated since the last step
 
   constructor(private readonly url: string, lagMs: number) {
@@ -64,7 +67,7 @@ export class RemoteEngine implements StepEngine {
       const b = new Uint8Array(m.data);
       (b[0] === Msg.Frame ? this.down : this.control).push(b, performance.now());
     };
-    ws.onclose = () => { if (this.status !== "el rival se fue") this.setStatus("desconectado"); };
+    ws.onclose = () => { if (this.status === "jugando" || this.status === "esperando rival" || this.status === "conectando") this.setStatus("desconectado"); };
     this.ws = ws;
   }
 
@@ -72,11 +75,13 @@ export class RemoteEngine implements StepEngine {
 
   /** Only slot 0 exists for the client (the server rotates the guest's view). */
   setInput(slot: number, a: HumanInput): void {
-    if (slot !== 0) return;
+    const now = performance.now();
+    if (slot !== 0 || now - this.lastInputAt < INPUT_EVERY_MS) return;
+    this.lastInputAt = now;
     const v = this.inputView;
     setF64At(v, 0, a.moveX); setF64At(v, 1, a.moveZ); setF64At(v, 2, a.targetX);
     setF64At(v, 3, a.targetZ); setF64At(v, 4, a.buttons); setF64At(v, 5, a.spin);
-    this.up.push(this.inputBuf, performance.now());
+    this.up.push(this.inputBuf, now);
   }
 
   /** n is ignored: the server owns the clock. Returns the newest delivered frame and its events. */
@@ -99,6 +104,7 @@ export class RemoteEngine implements StepEngine {
     if (len < HEADER || msg[1] !== PROTO_VERSION) return;
     switch (msg[0]) {
       case Msg.Welcome:
+        if (len < CONTROL_BYTES) break;
         if (f64At(view, 0) !== SNAP_LEN || f64At(view, 1) !== OUT_LEN) {
           this.setStatus("versión distinta, recargá");
           this.ws?.close();
@@ -113,6 +119,7 @@ export class RemoteEngine implements StepEngine {
         this.setStatus("el rival se fue");
         break;
       case Msg.Pong:
+        if (len < PING_MSG_LEN) break;
         this.ping = Math.round(performance.now() - f64At(view, 0));
         this.onStatus(this.status, this.ping);
         break;
@@ -130,20 +137,10 @@ export class RemoteEngine implements StepEngine {
     this.appendEvents();
   }
 
-  /** Copies the frame's events after any already pending this step, up to MAX_EVENTS. */
+  /** Appends the frame's events after any already pending this step, up to MAX_EVENTS. */
   private appendEvents(): void {
-    const o = this.frameIn;
-    const count = Math.max(0, Math.min(MAX_EVENTS - this.pending, o[EVENT_COUNT_OFFSET] | 0));
-    for (let i = 0; i < count; i++) {
-      const b = EVENTS_OFFSET + i * EVENT_STRIDE;
-      const e = this.pool[this.pending + i];
-      e.kind = o[b]; e.tick = o[b + 1];
-      e.x = o[b + 2]; e.y = o[b + 3]; e.z = o[b + 4];
-      e.side = o[b + 5]; e.player = o[b + 6]; e.part = o[b + 7]; e.quality = o[b + 8];
-      e.vx = o[b + 9]; e.vy = o[b + 10]; e.vz = o[b + 11]; e.spin = o[b + 12];
-    }
-    this.pending += count;
-    this.result.eventCount = this.pending;
+    readEventsInto(this.frameIn, this.pool, this.result, this.pending);
+    this.pending = this.result.eventCount;
   }
 
   private pumpPing(now: number): void {

@@ -56,17 +56,17 @@ export interface StepEngine {
 }
 
 /** Decodes the event block of an out buffer into pool and sets result.eventCount. Allocation-free. */
-export function readEventsInto(o: Float64Array, pool: readonly SimEvent[], result: StepResult): void {
-  const count = Math.max(0, Math.min(MAX_EVENTS, o[EVENT_COUNT_OFFSET] | 0));
+export function readEventsInto(o: Float64Array, pool: readonly SimEvent[], result: StepResult, start = 0): void {
+  const count = Math.max(0, Math.min(MAX_EVENTS - start, o[EVENT_COUNT_OFFSET] | 0));
   for (let i = 0; i < count; i++) {
     const b = EVENTS_OFFSET + i * EVENT_STRIDE;
-    const e = pool[i];
+    const e = pool[start + i];
     e.kind = o[b]; e.tick = o[b + 1];
     e.x = o[b + 2]; e.y = o[b + 3]; e.z = o[b + 4];
     e.side = o[b + 5]; e.player = o[b + 6]; e.part = o[b + 7]; e.quality = o[b + 8];
     e.vx = o[b + 9]; e.vy = o[b + 10]; e.vz = o[b + 11]; e.spin = o[b + 12];
   }
-  result.eventCount = count;
+  result.eventCount = start + count;
 }
 
 // Engine wraps the WASM bridge. It is the ONLY module aware of the in/out buffer layout.

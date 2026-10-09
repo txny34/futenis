@@ -19,7 +19,8 @@ function requireElement(id: string): HTMLElement {
 
 function randomCode(): string {
   let s = "";
-  for (let i = 0; i < CODE_LEN; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LEN));
+  for (const b of bytes) s += CODE_CHARS[b % CODE_CHARS.length];
   return s;
 }
 
@@ -46,7 +47,7 @@ function boot(): void {
   controls.onZoom = (d) => view.rig.zoom(d);
   controls.onLockChange = (locked) => hud.setCrosshair(locked);
   const state: LoopState = { running: true, paused: false, fpsCap: 0, cameraShake: true, holdUntil: 0, showLanding: true };
-  const engine = new RemoteEngine(`ws://${location.hostname}:${SERVER_PORT}/ws?room=${room}`, lag);
+  const engine = new RemoteEngine(`${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:${SERVER_PORT}/ws?room=${room}`, lag);
   const lagText = lag > 0 ? ` · lag simulado ${lag} ms` : "";
   engine.onStatus = (s, ping) => {
     net.textContent = `Sala ${room} · ${s}${s === "jugando" ? ` · ${ping} ms` : ""}${lagText}`;
