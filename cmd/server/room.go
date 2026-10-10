@@ -70,12 +70,6 @@ func (r *room) join(p peer) (slot int, start bool) {
 	return slot, start
 }
 
-func (r *room) isStarted() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.started
-}
-
 // startedAt reports when the match began (ok false while waiting).
 func (r *room) startedAt() (t time.Time, ok bool) {
 	r.mu.Lock()
