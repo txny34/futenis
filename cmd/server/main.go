@@ -36,6 +36,7 @@ func main() {
 	mux := http.NewServeMux()
 	h := newHub(splitList(*origins), log.Default())
 	h.proxied = *trustProxy
+	configureRanked(h, log.Default())
 	mux.Handle("/ws", h)
 	mux.HandleFunc("/lobby", h.ServeLobby)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
@@ -74,4 +75,18 @@ func splitList(s string) []string {
 		}
 	}
 	return out
+}
+
+// configureRanked enables ranked queues when the Supabase project and its
+// secret key are set (Fly secrets SUPABASE_URL / SUPABASE_SECRET_KEY).
+func configureRanked(h *hub, logger *log.Logger) {
+	project, key := os.Getenv("SUPABASE_URL"), os.Getenv("SUPABASE_SECRET_KEY")
+	if project == "" || key == "" {
+		logger.Printf("ranked disabled: SUPABASE_URL / SUPABASE_SECRET_KEY not set")
+		return
+	}
+	base := strings.TrimRight(project, "/")
+	h.auth = newVerifier(base+"/auth/v1/.well-known/jwks.json", base+"/auth/v1")
+	h.ratings = newSupabaseRatings(base, key)
+	logger.Printf("ranked enabled (%s)", base)
 }

@@ -1,0 +1,120 @@
+package main
+
+import (
+	"context"
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/coder/websocket"
+	"github.com/txny34/futenis/sim"
+)
+
+const (
+	testIss = "https://proj.supabase.co/auth/v1"
+	userA   = "8d1c7a3e-0000-4000-8000-00000000000a"
+	userB   = "8d1c7a3e-0000-4000-8000-00000000000b"
+)
+
+func newRankedHub(t *testing.T) (*httptest.Server, *fakeIssuer, *memRatings) {
+	t.Helper()
+	iss := newFakeIssuer(t)
+	store := newMemRatings()
+	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+	h.proxied = true
+	h.ticker = func() (<-chan time.Time, func()) { return make(chan time.Time), func() {} }
+	h.auth = newVerifier(iss.srv.URL, testIss)
+	h.ratings = store
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return srv, iss, store
+}
+
+func dialRanked(ctx context.Context, t *testing.T, srv *httptest.Server, ip, token string) *websocket.Conn {
+	t.Helper()
+	c, _, err := websocket.Dial(ctx, "ws"+srv.URL[4:]+"/?queue=ranked1v1", &websocket.DialOptions{HTTPHeader: http.Header{"Fly-Client-IP": {ip}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.CloseNow() })
+	if token != "" {
+		b := make([]byte, headerLen+len(token))
+		putHeader(b, msgAuth)
+		copy(b[headerLen:], token)
+		if err := c.Write(ctx, websocket.MessageBinary, b); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return c
+}
+
+func tokenFor(t *testing.T, iss *fakeIssuer, user string) string {
+	c := goodClaims(testIss)
+	c["sub"] = user
+	return iss.token(t, c)
+}
+
+func TestRankedNeedsAValidToken(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, _, _ := newRankedHub(t)
+	c := dialRanked(ctx, t, srv, "10.3.0.1", "forged.token.here")
+	expectClose(ctx, t, c, closeNoAuth)
+}
+
+func TestRankedPairsTwoAccountsNotOneTwice(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, iss, _ := newRankedHub(t)
+	a := dialRanked(ctx, t, srv, "10.3.1.1", tokenFor(t, iss, userA))
+	readMsg(ctx, t, a, msgWaiting, headerLen)
+	again := dialRanked(ctx, t, srv, "10.3.1.2", tokenFor(t, iss, userA)) // same account, other IP
+	expectClose(ctx, t, again, closeFull)
+	b := dialRanked(ctx, t, srv, "10.3.1.3", tokenFor(t, iss, userB))
+	readMsg(ctx, t, a, msgWelcome, welcomeLen)
+	readMsg(ctx, t, b, msgWelcome, welcomeLen)
+}
+
+func TestRankedDisabledWithoutConfig(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv := newQueueHub()
+	defer srv.Close()
+	c := dialRanked(ctx, t, srv, "10.3.2.1", "x")
+	expectClose(ctx, t, c, closeNoAuth)
+}
+
+func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
+	store := newMemRatings()
+	_ = store.save(context.Background(), "1v1", map[string]int{userA: 1000, userB: 1000})
+	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+	h.ratings = store
+	r := newRoom(sim.Mode1v1)
+	pa, pb := &fakePeer{}, &fakePeer{}
+	r.join(pa)
+	r.join(pb)
+	h.reportRanked("1v1", r, [sim.MaxPlayers]string{userA, userB}, 1)
+	got, _ := store.load(context.Background(), "1v1", []string{userA, userB})
+	if got[userA] != 984 || got[userB] != 1016 {
+		t.Fatalf("stored %v", got)
+	}
+	last := pb.msgs[len(pb.msgs)-1]
+	if last[0] != msgResult || f64(last, 0) != 1000 || f64(last, 1) != 1016 {
+		t.Fatalf("winner result %v", last)
+	}
+}
+
+func TestGameOverWinner(t *testing.T) {
+	out := make([]float64, 2*sim.SnapLen)
+	if _, over := gameOverWinner(out); over {
+		t.Fatal("serve phase reported as over")
+	}
+	out[sim.SnapLen+sim.SnapPhase] = float64(sim.PhaseGameOver)
+	out[sim.SnapLen+sim.SnapSets1] = 1
+	if w, over := gameOverWinner(out); !over || w != 1 {
+		t.Fatalf("w=%d over=%v", w, over)
+	}
+}

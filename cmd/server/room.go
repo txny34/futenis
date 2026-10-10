@@ -46,6 +46,17 @@ type room struct {
 	started bool
 	closed  bool
 	startAt time.Time // when the match began; the idle clock starts here
+
+	ranked bool                                           // ranked queue: no bot fill, ELO at game over
+	users  [sim.MaxPlayers]string                         // verified account per seat (ranked only)
+	onOver func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
+}
+
+// markRanked records slot's verified account; the room becomes ranked.
+func (r *room) markRanked(slot int, user string) {
+	r.mu.Lock()
+	r.ranked, r.users[slot] = true, user
+	r.mu.Unlock()
 }
 
 func newRoom(mode sim.Mode) *room {
@@ -90,7 +101,7 @@ func (r *room) join(p peer) (slot int, start bool, humans int) {
 func (r *room) startEarly() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.closed || r.humansLocked() < minHumans2v2 {
+	if r.closed || r.ranked || r.humansLocked() < minHumans2v2 {
 		return false
 	}
 	return r.startLocked()

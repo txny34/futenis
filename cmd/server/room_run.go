@@ -39,8 +39,9 @@ func (r *room) leave(slot int) {
 // run plays the match until the room stops. tick is injectable for tests.
 func (r *room) run(tick <-chan time.Time) {
 	r.mu.Lock()
-	mode, mask := r.mode, r.humanMaskLocked()
+	mode, mask, onOver := r.mode, r.humanMaskLocked(), r.onOver
 	r.mu.Unlock()
+	reported := false
 	s := game.NewSession()
 	if err := s.Configure(int(mode), int(ai.Normal), roomPointsToWin, mask); err != nil {
 		panic(err) // arguments are validated constants/masks: a failure is a programming error
@@ -66,6 +67,13 @@ func (r *room) run(tick <-chan time.Time) {
 			_ = s.SetHumanMask(mask) // someone left: the bot takes the seat
 		}
 		s.Run(in, ticksPerFrame, out)
+		if w, over := gameOverWinner(out); over && !reported && onOver != nil {
+			reported = true
+			r.mu.Lock()
+			users := r.users
+			r.mu.Unlock()
+			go onOver(w, users)
+		}
 		for i, p := range peers {
 			if p == nil {
 				continue
