@@ -1,0 +1,7 @@
+/* Privacy / terms pages. Colors only from the --fx-* tokens (menu.css :root, duplicated here as fallbacks-free import). */
+@import url("menu.css");
+body { margin: 0; background: var(--fx-court-deep); color: var(--fx-line); font: 16px/1.6 var(--fx-body); }
+.legal { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+.legal h1 { font: 400 32px var(--fx-display); color: var(--fx-ball); }
+.legal h2 { font-size: 20px; margin-top: 28px; }
+.legal a { color: var(--fx-teal); }
