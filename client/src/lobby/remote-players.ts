@@ -13,6 +13,7 @@ const TAG_Y = 2.45;
 const TAG_W = 1.6;
 const TAG_PX_W = 256;
 const TAG_PX_H = 64;
+const STALE_MS = 2000; // not in a roster for this long (missed GONE): drop it
 
 interface Remote {
   readonly ch: Character;
@@ -22,11 +23,14 @@ interface Remote {
   facing: number;
   id: number;
   lastY: number;
+  seenAt: number;
 }
 
 export class RemotePlayers {
   readonly group = new THREE.Group();
   private readonly byId = new Map<number, Remote>();
+  /** Same remotes as byId, iterated by index every frame (no iterator allocations). */
+  private readonly active: Remote[] = [];
   private readonly free: Remote[] = [];
   /** Names that arrived before the first position (join order on the server). */
   private readonly pendingNames = new Map<number, string>();
@@ -40,11 +44,13 @@ export class RemotePlayers {
       r.ch.root.position.set(x, y, z);
       r.ch.root.visible = r.tag.visible = true;
       this.byId.set(id, r);
+      this.active.push(r);
       this.setTag(r, this.pendingNames.get(id) ?? "");
       this.pendingNames.delete(id);
     }
     r.target.set(x, y, z);
     r.facing = facing;
+    r.seenAt = performance.now();
   }
 
   name(id: number, text: string): void {
@@ -58,19 +64,25 @@ export class RemotePlayers {
     this.pendingNames.delete(id);
     if (!r) return;
     this.byId.delete(id);
+    const i = this.active.indexOf(r);
+    this.active[i] = this.active[this.active.length - 1];
+    this.active.pop();
     r.ch.root.visible = r.tag.visible = false;
     this.free.push(r);
   }
 
   clear(): void {
-    for (const id of [...this.byId.keys()]) this.remove(id);
+    while (this.active.length > 0) this.remove(this.active[this.active.length - 1].id);
     this.pendingNames.clear();
   }
 
   update(dt: number): void {
     if (!(dt > 0)) return;
     const k = 1 - Math.exp(-FOLLOW_RATE * dt);
-    for (const r of this.byId.values()) {
+    const now = performance.now();
+    for (let i = this.active.length - 1; i >= 0; i--) {
+      const r = this.active[i];
+      if (now - r.seenAt > STALE_MS) { this.remove(r.id); continue; }
       const p = r.ch.root.position;
       const dx = (r.target.x - p.x) * k;
       const dz = (r.target.z - p.z) * k;
@@ -96,7 +108,7 @@ export class RemotePlayers {
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
     tag.scale.set(TAG_W, (TAG_W * TAG_PX_H) / TAG_PX_W, 1);
     this.group.add(ch.root, tag);
-    return { ch, tag, target: new THREE.Vector3(), facing: 0, id: -1, lastY: 0,
+    return { ch, tag, target: new THREE.Vector3(), facing: 0, id: -1, lastY: 0, seenAt: 0,
       pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike: null, facing: 0 } };
   }
 

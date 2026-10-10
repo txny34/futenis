@@ -40,8 +40,8 @@ type hub struct {
 	queueSeq int           // matchmaking room counter (queue.go)
 	queues   map[string]*queue
 
-	lobby       *lobby // shared online lobby (lobby.go), started on first use
-	lobbyOnce   sync.Once
+	lobbies     []*lobby                          // shared online lobbies (lobby.go), opened on demand
+	lobbyConns  *connLimiter                      // per-client cap for /lobby (stricter than matches)
 	lobbyTicker func() (<-chan time.Time, func()) // injectable for tests
 	lobbyIdle   time.Duration
 	done        chan struct{} // never closed in production; stops the lobby loop in tests
@@ -50,7 +50,7 @@ type hub struct {
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
+		queues: map[string]*queue{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {

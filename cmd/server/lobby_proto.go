@@ -58,13 +58,14 @@ func isNameMsg(b []byte) bool {
 	return len(b) >= headerLen && len(b) <= headerLen+maxNameBytes && b[0] == msgName && b[1] == protoVersion
 }
 
-// sanitizeName keeps printable runes only (no control, format or bidi
-// overrides), trims spaces and caps the length. Invalid UTF-8 is dropped.
+// sanitizeName keeps printable runes only (no control, format/bidi overrides
+// or combining marks, so no "zalgo" stacks), trims spaces and caps the length.
+// Invalid UTF-8 is dropped.
 func sanitizeName(s string) string {
 	var b strings.Builder
 	n := 0
 	for _, r := range strings.TrimSpace(s) {
-		if r == utf8.RuneError || !unicode.IsPrint(r) || unicode.Is(unicode.Cf, r) {
+		if r == utf8.RuneError || !unicode.IsPrint(r) || unicode.In(r, unicode.Cf, unicode.Mn, unicode.Me) {
 			continue
 		}
 		if n == maxNameRunes {

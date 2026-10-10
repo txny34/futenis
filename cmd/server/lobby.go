@@ -10,6 +10,10 @@ import (
 // decodePresence; the server relays a ROSTER of the others 10 times a second.
 const (
 	maxLobby      = 48
+	maxLobbyShard = 8 // a full lobby opens another, up to maxLobby*maxLobbyShard people
+	maxLobbyPerIP = 2
+	maxLobbyMsgs  = 30 // per second: 10 PRESENCE + 1 PING need far less than the match cap
+	nameEvery     = 2 * time.Second
 	lobbyInterval = time.Second / 10
 	lobbyIdle     = 30 * time.Second // nothing received (hidden tab, dead peer): close
 )
@@ -19,6 +23,7 @@ type lobbyPeer struct {
 	pos    presence
 	name   string
 	placed bool // sent at least one PRESENCE
+	nameAt time.Time
 	buf    []byte
 }
 
@@ -26,6 +31,7 @@ type lobby struct {
 	mu      sync.Mutex
 	peers   map[int]*lobbyPeer
 	nextID  int
+	dirty   bool         // something changed since the last ROSTER (idle lobby: no traffic)
 	entries []lobbyEntry // scratch for broadcast (run goroutine only)
 	out     []rosterOut  // scratch for broadcast (run goroutine only)
 }
@@ -39,41 +45,55 @@ func newLobby() *lobby {
 	return &lobby{peers: map[int]*lobbyPeer{}, entries: make([]lobbyEntry, 0, maxLobby), out: make([]rosterOut, 0, maxLobby)}
 }
 
-// join adds p and sends it the names already known. ok is false when full.
+// join adds p and then sends it the names already known (outside the lock:
+// a slow joiner never blocks the lobby). ok is false when full.
 func (l *lobby) join(p peer) (id int, ok bool) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	if len(l.peers) >= maxLobby {
+		l.mu.Unlock()
 		return 0, false
 	}
 	l.nextID++
 	id = l.nextID
+	names := make([][]byte, 0, len(l.peers))
 	for oid, o := range l.peers {
 		if o.name != "" {
-			_ = p.send(encodeLobbyName(oid, o.name))
+			names = append(names, encodeLobbyName(oid, o.name))
 		}
 	}
 	l.peers[id] = &lobbyPeer{p: p, buf: make([]byte, rosterMsgLen(maxLobby))}
+	l.dirty = true
+	l.mu.Unlock()
+	for _, m := range names {
+		_ = p.send(m)
+	}
 	return id, true
+}
+
+func (l *lobby) full() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.peers) >= maxLobby
 }
 
 func (l *lobby) setPos(id int, pos presence) {
 	l.mu.Lock()
-	if lp := l.peers[id]; lp != nil {
-		lp.pos, lp.placed = pos, true
+	if lp := l.peers[id]; lp != nil && (!lp.placed || lp.pos != pos) {
+		lp.pos, lp.placed, l.dirty = pos, true, true
 	}
 	l.mu.Unlock()
 }
 
-// setName stores id's sanitized name and tells everyone else.
-func (l *lobby) setName(id int, name string) {
+// setName stores id's sanitized name and tells everyone else. At most one
+// change per nameEvery reaches the others (spam guard); extra ones are ignored.
+func (l *lobby) setName(id int, name string, now time.Time) {
 	l.mu.Lock()
 	lp := l.peers[id]
-	if lp == nil || lp.name == name {
+	if lp == nil || lp.name == name || now.Sub(lp.nameAt) < nameEvery {
 		l.mu.Unlock()
 		return
 	}
-	lp.name = name
+	lp.name, lp.nameAt = name, now
 	others := l.othersLocked(id)
 	l.mu.Unlock()
 	msg := encodeLobbyName(id, name)
@@ -85,6 +105,7 @@ func (l *lobby) setName(id int, name string) {
 func (l *lobby) leave(id int) {
 	l.mu.Lock()
 	delete(l.peers, id)
+	l.dirty = true
 	others := l.othersLocked(id)
 	l.mu.Unlock()
 	msg := encodeGone(id)
@@ -109,6 +130,11 @@ func (l *lobby) othersLocked(id int) []peer {
 // next tick, by this same goroutine.
 func (l *lobby) broadcast() {
 	l.mu.Lock()
+	if !l.dirty {
+		l.mu.Unlock()
+		return
+	}
+	l.dirty = false
 	l.out = l.out[:0]
 	for id, lp := range l.peers {
 		l.entries = l.entries[:0]

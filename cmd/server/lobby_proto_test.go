@@ -52,3 +52,9 @@ func TestEncodeRoster(t *testing.T) {
 		t.Fatalf("bad roster: n=%d", n)
 	}
 }
+
+func TestSanitizeNameDropsCombiningMarks(t *testing.T) {
+	if got := sanitizeName("z̶̶̶a⃝"); got != "za" {
+		t.Fatalf("got %q: stacked combining marks (zalgo) kept", got)
+	}
+}

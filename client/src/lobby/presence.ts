@@ -3,7 +3,7 @@ import { LobbyMsg, MAX_NAME_BYTES, PRESENCE_LEN, ROSTER_STRIDE } from "../net/lo
 import { serverBase } from "../net/server-url";
 import { displayName } from "../profile/display-name";
 import { profileStore } from "../profile/store";
-import { Snap } from "../snapshot";
+import { Extra, Snap } from "../snapshot";
 import { isOnline } from "./online-state";
 import type { App } from "./flow";
 import type { RemotePlayers } from "./remote-players";
@@ -14,13 +14,18 @@ import type { RemotePlayers } from "./remote-players";
 // bounds them (cmd/server/lobby_proto.go). Self-contained: a 100 ms timer
 // opens the socket in the lobby and closes it everywhere else.
 const SEND_MS = 100;
-const RETRY_MS = 5000;
+const RETRY_MIN_MS = 2000;
+const RETRY_MAX_MS = 60000;
+const NAME_RUNES = 16; // the server keeps 16 runes; cut on runes, never mid UTF-8
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 const MIN_FACING_SPEED = 0.2;
 const HEADER = 8;
 
 export function startPresence(app: App, remotes: RemotePlayers): void {
   let ws: WebSocket | null = null;
   let retryAt = 0;
+  let backoff = RETRY_MIN_MS;
   let sentName = "";
   let facing = 0;
   const buf = new Uint8Array(PRESENCE_LEN);
@@ -41,7 +46,13 @@ export function startPresence(app: App, remotes: RemotePlayers): void {
     const s = new WebSocket(`${serverBase()}/lobby`);
     s.binaryType = "arraybuffer";
     s.onmessage = (m: MessageEvent<ArrayBuffer>) => receive(remotes, new DataView(m.data));
-    s.onclose = () => { ws = null; remotes.clear(); retryAt = performance.now() + RETRY_MS; };
+    s.onopen = () => { backoff = RETRY_MIN_MS; };
+    s.onclose = () => { // server down or full: back off (with jitter so clients don't reconnect in sync)
+      ws = null;
+      remotes.clear();
+      retryAt = performance.now() + backoff * (0.5 + Math.random());
+      backoff = Math.min(RETRY_MAX_MS, backoff * 2);
+    };
     ws = s;
     sentName = "";
   };
@@ -49,7 +60,7 @@ export function startPresence(app: App, remotes: RemotePlayers): void {
   const sendName = (s: WebSocket): void => {
     const name = displayName(profileStore().get().name) || t("Jugador", "Player");
     if (name === sentName) return;
-    const bytes = new TextEncoder().encode(name).subarray(0, MAX_NAME_BYTES);
+    const bytes = encoder.encode([...name].slice(0, NAME_RUNES).join("")).subarray(0, MAX_NAME_BYTES);
     const msg = new Uint8Array(HEADER + bytes.length);
     msg[0] = LobbyMsg.Name;
     msg[1] = 1;
@@ -59,13 +70,14 @@ export function startPresence(app: App, remotes: RemotePlayers): void {
   };
 
   window.setInterval(() => {
-    const here = app.inLobby && app.engine.loaded && !isOnline();
+    // Hidden tab: timers slow to ~1 Hz, so leave instead of stuttering for others.
+    const here = app.inLobby && app.engine.loaded && !isOnline() && !document.hidden;
     if (!here) { close(); return; }
     if (!ws && performance.now() >= retryAt) open();
     if (ws?.readyState !== WebSocket.OPEN) return;
     const c = app.engine.peek().curr;
-    const vx = c[Snap.P0VelX];
-    const vz = c[Snap.P0VelX + 1]; // VelZ follows VelX (snapshot layout)
+    const vx = c[Snap.P0VelX + Extra.VelX];
+    const vz = c[Snap.P0VelX + Extra.VelZ];
     if (Math.hypot(vx, vz) > MIN_FACING_SPEED) facing = Math.atan2(vx, vz);
     view.setFloat64(HEADER, c[Snap.P0X], true);
     view.setFloat64(HEADER + 8, c[Snap.P0Y], true);
@@ -89,7 +101,7 @@ function receive(remotes: RemotePlayers, v: DataView): void {
       break;
     }
     case LobbyMsg.PlayerName:
-      remotes.name(f(0), new TextDecoder().decode(new Uint8Array(v.buffer, HEADER + 8)));
+      remotes.name(f(0), decoder.decode(new Uint8Array(v.buffer, HEADER + 8)));
       break;
     case LobbyMsg.Gone:
       remotes.remove(f(0));

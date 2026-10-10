@@ -89,13 +89,16 @@ type rateWindow struct {
 }
 
 // allow records one message at now and reports whether the window still has room.
-func (w *rateWindow) allow(now time.Time) bool {
+func (w *rateWindow) allow(now time.Time) bool { return w.allowN(now, maxMsgsPerWindow) }
+
+// allowN is allow with a caller-chosen cap per window (the lobby needs far fewer).
+func (w *rateWindow) allowN(now time.Time, max int) bool {
 	if now.Sub(w.start) >= msgWindow {
 		w.start = now
 		w.n = 0
 	}
 	w.n++
-	return w.n <= maxMsgsPerWindow
+	return w.n <= max
 }
 
 // ipv6Prefix is the block one subscriber usually controls: rotating addresses
