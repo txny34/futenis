@@ -215,6 +215,9 @@ func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, done <-chan str
 			return
 		case <-t.C:
 		}
+		if !r.isStarted() {
+			lastSeen.Store(time.Now().UnixNano()) // queue/lobby wait never counts as idle
+		}
 		left := h.idle - time.Since(time.Unix(0, lastSeen.Load()))
 		if left <= 0 && r.isStarted() {
 			p.close(closeIdle, "idle")

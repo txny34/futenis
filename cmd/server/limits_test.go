@@ -138,6 +138,25 @@ func TestHubWaitingHostNotIdle(t *testing.T) {
 	}
 }
 
+// A host that waited silently (hidden tab) longer than the idle timeout gets a
+// full idle window once the rival arrives, not an instant kick.
+func TestHubIdleClockStartsWithMatch(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv := newTestHubWith(func(h *hub) { h.idle = 200 * time.Millisecond; h.wait = 5 * time.Second })
+	defer srv.Close()
+	c1 := dial(ctx, t, srv)
+	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	time.Sleep(400 * time.Millisecond) // silent wait: twice the idle timeout
+	c2 := dial(ctx, t, srv)
+	go keepAlive(ctx, c2)
+	joined := time.Now()
+	expectClose(ctx, t, c1, closeIdle)
+	if time.Since(joined) < 150*time.Millisecond {
+		t.Fatalf("host kicked %v after the match started: waiting time counted as idle", time.Since(joined))
+	}
+}
+
 func TestHubNoRival(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
