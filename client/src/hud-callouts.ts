@@ -43,6 +43,8 @@ export class Callouts {
 
   constructor() {
     this.root.id = "banner";
+    this.root.setAttribute("role", "status");
+    this.root.setAttribute("aria-live", "polite");
     this.root.hidden = true;
   }
 
@@ -59,6 +61,11 @@ export class Callouts {
     else if (m.winner === humanTeam && m.streak >= STREAK_CALL) {
       this.show({ text: `¡RACHA DE ${m.streak}!`, prio: STREAK_PRIO, tone: STREAK_TONE }, nowMs);
     }
+  }
+
+  /** Free-form banner (training medals). */
+  announce(text: string, prio: number, tone: string, nowMs: number): void {
+    this.show({ text, prio, tone }, nowMs);
   }
 
   update(nowMs: number): void {

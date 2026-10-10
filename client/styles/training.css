@@ -89,3 +89,14 @@
   20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -110%) scale(1); }
 }
+
+/* Desafíos (ui/challenges-card.ts) */
+.fx-chal { margin-top: 16px; }
+.fx-chal__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; }
+.fx-chal__item { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline; padding: 6px 0; }
+.fx-chal__goals { color: var(--fx-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.fx-chal__medal { min-width: 56px; text-align: right; font-weight: 600; color: var(--fx-muted); }
+.fx-chal__medal--0 { color: var(--fx-bronze); }
+.fx-chal__medal--1 { color: var(--fx-silver); }
+.fx-chal__medal--2 { color: var(--fx-gold); }
+@media (max-width: 720px) { .fx-chal__list { grid-template-columns: 1fr; } }

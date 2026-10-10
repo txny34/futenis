@@ -21,6 +21,7 @@ const SERVE_HINT = "Click: soltar · picá detrás de la línea · soltá para s
 const HUMAN_TEAM = 0;
 const HUMAN_SLOT = 0; // mirrors loop.HUMAN_SLOT (single local human)
 const UNSET = -1;
+const MEDAL_PRIO = 75;
 const MS_PER_S = 1000;
 const DEFAULT_DASH_COOLDOWN_S = 0.8; // replaced by the live Config value via setDashCooldown
 
@@ -105,6 +106,9 @@ export class Hud {
   moment(m: Readonly<HypeMoment>, nowMs: number): void {
     if (this.lastMode !== Mode.Playground) this.banner.onMoment(m, HUMAN_TEAM, nowMs);
   }
+
+  /** Training challenge medal (profile/challenges.ts). */
+  medal(text: string, nowMs: number): void { this.banner.announce(text, MEDAL_PRIO, "gold", nowMs); }
 
   /** Floating hit text for the human's kick at normalized screen point (x, y). */
   hitPopup(quality: number, x: number, y: number, dir: number, nowMs: number): void {
