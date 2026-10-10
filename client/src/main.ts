@@ -5,6 +5,7 @@ import { captureErrors } from "./report/errors";
 import { buildReport } from "./report/report";
 import { LONG_RALLY } from "./feel/hype";
 import { ChallengeSession, MEDALS } from "./profile/challenges";
+import { applyThemeCss } from "./env/theme";
 import { setHintKeys } from "./ui/key-hints";
 import { mountDevPanel, isDevMode } from "./dev/panel";
 import { Engine } from "./engine";
@@ -143,6 +144,7 @@ function onMedal(app: App, e: SimEvent): void {
 
 function boot(): void {
   captureErrors();
+  applyThemeCss(document.documentElement); // --hud-* for overlays outside #hud (VS card, menus)
   const hud = new Hud(requireElement("hud"));
   const menu = new MenuUI(requireElement("ui"));
   const view = new CourtView(requireElement("app"));

@@ -69,6 +69,8 @@ function gamePanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
     toggle("Vibración de cámara", s.game.cameraShake, (cameraShake) => set({ cameraShake })),
     slider({ label: "Escala del HUD", min: HUD_SCALE_MIN, max: HUD_SCALE_MAX, step: HUD_STEP,
       value: s.game.hudScale, format: (v) => fmtPct(v * PERCENT), onInput: (hudScale) => set({ hudScale }) }),
+    toggle("Modo daltónico", s.game.colorblind, (colorblind) => set({ colorblind })),
+    el("p", "fx-note", "Modo daltónico: calidad del golpe, equipos y avisos con colores distinguibles. Se aplica al recargar la página."),
   ];
 }
 
