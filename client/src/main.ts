@@ -1,5 +1,7 @@
 import { Sound } from "./audio/sound";
 import { Tutorial, tutorialDone } from "./tutorial/tutorial";
+import { captureErrors } from "./report/errors";
+import { buildReport } from "./report/report";
 import { mountDevPanel, isDevMode } from "./dev/panel";
 import { Engine } from "./engine";
 import { Hud } from "./hud";
@@ -116,11 +118,13 @@ function lobbyMenu(app: () => App, menu: MenuUI): void {
       { label: "Tutorial", run: () => safeStart(app(), tutorialOptions()) },
       { label: "Entrenamiento", run: () => menu.openTraining((t) => safeStart(app(), lobbyOptions("playground", false, t))) },
       { label: "Ajustes", run: () => menu.openSettings() },
+      { label: "Reportar un bug", run: () => menu.openReport() },
     ],
   }));
 }
 
 function boot(): void {
+  captureErrors();
   const hud = new Hud(requireElement("hud"));
   const menu = new MenuUI(requireElement("ui"));
   const view = new CourtView(requireElement("app"));
@@ -141,6 +145,9 @@ function boot(): void {
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);
   app.loop = loop;
   wire(app, menu);
+  menu.setReport((note) => buildReport({
+    note, snap: app.engine.loaded ? app.engine.peek().curr : null, inLobby: app.inLobby, settings: menu.settings,
+  }));
   lobbyMenu(get, menu);
   enterLobby(app); // lobby decor + bar now; the sim spawns the player once wasm loads
   loop.start();

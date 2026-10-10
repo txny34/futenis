@@ -7,13 +7,14 @@ export function panel(title: string, ...children: HTMLElement[]): HTMLElement {
   return p;
 }
 
-export interface PauseActions { resume: () => void; settings: () => void; quit: () => void }
+export interface PauseActions { resume: () => void; settings: () => void; report: () => void; quit: () => void }
 
 export function pauseMenu(a: PauseActions): HTMLElement {
   const nav = el("nav", "fx-stack", "", { "aria-label": "Pausa" });
   nav.append(
     button("Reanudar", a.resume, "fx-btn fx-btn--hero"),
     button("Ajustes", a.settings),
+    button("Reportar un bug", a.report),
     button("Volver al lobby", a.quit, "fx-btn fx-btn--ghost"),
   );
   return panel("Pausa", nav);
