@@ -127,7 +127,7 @@ function lobbyBar(app: () => App): BottomBar {
 
 function playModal(app: () => App): PlayModal {
   return new PlayModal(document.body, (p, kind) => {
-    if (kind === "online") startOnline(app(), p.mode);
+    if (kind === "online") startOnline(app(), p.mode, p.ranked);
     else safeStart(app(), lobbyOptions(p.mode, false)); // bots: casual only, ELO is online ranked
   });
 }

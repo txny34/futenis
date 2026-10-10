@@ -1,6 +1,9 @@
 import { t } from "../i18n/t";
 import { NetStatus, RemoteEngine } from "../net/remote-engine";
 import { serverBase } from "../net/server-url";
+import { accessToken, authUser } from "../auth/auth";
+import { syncRatings } from "../auth/ratings";
+import { rankOf } from "../profile/rank";
 import { recorder } from "../profile/recorder";
 import type { QueueMode } from "../ui/play-modal/play-modal";
 import { arm, enterLobby, landingAllowed, type App } from "./flow";
@@ -22,6 +25,7 @@ function statusText(s: NetStatus): string {
     case "versión distinta, recargá": return t("Hay una versión nueva: recargá la página", "New version available: reload the page");
     case "desconectado por inactividad": return t("Desconectado por inactividad", "Disconnected due to inactivity");
     case "demasiados mensajes": return t("Desconectado: demasiados mensajes", "Disconnected: too many messages");
+    case "iniciá sesión": return t("Las clasificatorias necesitan una cuenta: iniciá sesión", "Ranked needs an account: sign in");
     default: return t("Desconectado del servidor", "Disconnected from the server");
   }
 }
@@ -44,13 +48,33 @@ function onStatus(app: App, remote: RemoteEngine, s: NetStatus, ping: number): v
   }, BACK_MS);
 }
 
-export function startOnline(app: App, mode: QueueMode): void {
+/** RESULT from the server: show the ELO change and refresh the profile from Supabase. */
+function onRanked(app: App, mode: QueueMode, before: number, after: number): void {
+  const d = after - before;
+  const sign = d >= 0 ? "+" : "";
+  app.hud.medal(`ELO ${mode}: ${before} → ${after} (${sign}${d}) · ${rankOf(after).label}`, performance.now());
+  const u = authUser();
+  if (u) void syncRatings(u.id);
+}
+
+let lastQueue: { mode: QueueMode; ranked: boolean } | null = null;
+
+/** Revancha after an online match: back into the same queue (ranked stays ranked). */
+export function requeue(app: App): void {
+  if (lastQueue) startOnline(app, lastQueue.mode, lastQueue.ranked);
+}
+
+export function startOnline(app: App, mode: QueueMode, ranked = false): void {
   if (!app.loop) return;
   leaveOnline(app);
   endReplay(app);
   cancelIntro();
   recorder().end();
-  const remote = new RemoteEngine(`${serverBase()}/ws?queue=${mode}`, 0);
+  const token = ranked ? accessToken() : null;
+  if (ranked && !token) return; // the play modal only offers ranked when signed in
+  lastQueue = { mode, ranked };
+  const remote = new RemoteEngine(`${serverBase()}/ws?queue=${ranked ? `ranked${mode}` : mode}`, 0, token ?? "");
+  remote.onResult = (before, after) => onRanked(app, mode, before, after);
   remote.onStatus = (s, ping) => onStatus(app, remote, s, ping);
   setRemote(remote);
   app.mode = mode;

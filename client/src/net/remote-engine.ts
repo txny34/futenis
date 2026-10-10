@@ -22,18 +22,30 @@ export type NetStatus =
   | "versión distinta, recargá"
   | "desconectado por inactividad"
   | "nadie se unió a la sala"
-  | "demasiados mensajes";
+  | "demasiados mensajes"
+  | "iniciá sesión";
+
+function authMessage(token: string): Uint8Array<ArrayBuffer> {
+  const body = new TextEncoder().encode(token);
+  const msg = new Uint8Array(new ArrayBuffer(HEADER + body.length));
+  writeHeader(new DataView(msg.buffer), Msg.Auth);
+  msg.set(body, HEADER);
+  return msg;
+}
 
 // Server close codes (cmd/server/limits.go).
 const CLOSE_STATUS: Readonly<Record<number, NetStatus | undefined>> = {
   4003: "desconectado por inactividad",
   4004: "demasiados mensajes",
   4005: "nadie se unió a la sala",
+  4006: "iniciá sesión",
 };
 
 /** StepEngine backed by the online server: inputs go up, server frames come down (optionally delayed). */
 export class RemoteEngine implements StepEngine {
   onStatus: (s: NetStatus, pingMs: number) => void = () => undefined;
+  /** Ranked: the server's ELO before/after the match (cmd/server/ranked.go RESULT). */
+  onResult: (before: number, after: number) => void = () => undefined;
   private ws: WebSocket | null = null;
   private status: NetStatus = "conectando";
   private ping = 0;
@@ -52,7 +64,8 @@ export class RemoteEngine implements StepEngine {
   private lastInputAt = -Infinity;
   private pending = 0; // events accumulated since the last step
 
-  constructor(private readonly url: string, lagMs: number) {
+  /** auth: Supabase session token, sent as the first message (ranked queues only). */
+  constructor(private readonly url: string, lagMs: number, private readonly auth = "") {
     this.up = new LagQueue(QUEUE_CAP, INPUT_MSG_LEN, lagMs / 2);
     this.down = new LagQueue(QUEUE_CAP, FRAME_BYTES, lagMs / 2);
     this.control = new LagQueue(CONTROL_CAP, CONTROL_BYTES, lagMs / 2);
@@ -73,6 +86,7 @@ export class RemoteEngine implements StepEngine {
     this.setStatus("conectando");
     const ws = new WebSocket(this.url);
     ws.binaryType = "arraybuffer";
+    ws.onopen = () => { if (this.auth) ws.send(authMessage(this.auth)); };
     ws.onmessage = (m: MessageEvent<ArrayBuffer>) => {
       const b = new Uint8Array(m.data);
       (b[0] === Msg.Frame ? this.down : this.control).push(b, performance.now());
@@ -137,6 +151,9 @@ export class RemoteEngine implements StepEngine {
         break;
       case Msg.PeerLeft:
         this.setStatus("el rival se fue");
+        break;
+      case Msg.Result:
+        if (len >= CONTROL_BYTES) this.onResult(f64At(view, 0), f64At(view, 1));
         break;
       case Msg.Pong:
         if (len < PING_MSG_LEN) break;
