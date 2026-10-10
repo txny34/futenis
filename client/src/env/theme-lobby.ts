@@ -30,6 +30,9 @@ export interface LobbyDecorTheme {
   readonly hemiGround: number;
   /** NPC looks: shirt colors (shorts/skin/hair/boots reuse crowd tokens). */
   readonly npcShirts: readonly number[];
+  /** Shared online lobby: name tag over other players (CSS colors for the canvas). */
+  readonly nameTagText: string;
+  readonly nameTagStroke: string;
   /** Zona 2 · Salón de la fama (lobby/zone2): calm boards, podium medals, statue. */
   readonly hall: HallTheme;
 }
@@ -73,6 +76,8 @@ export const LOBBY_DECOR: LobbyDecorTheme = {
   hemiSky: 0x6a3dd8,
   hemiGround: 0x0a1a3a,
   npcShirts: [0x7a4dff, 0x19c6a0, 0xffb020, 0x3b7bff, 0xff4fa3],
+  nameTagText: "#eef6ff",
+  nameTagStroke: "#0b0f26",
   hall: {
     boardBg: "#0b0f26",
     boardTitle: "#ffd36b",
