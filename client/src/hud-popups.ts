@@ -1,3 +1,5 @@
+import { t } from "./i18n/t";
+
 // Floating hit text ("¡PERFECTO!" / "¡BIEN!" / "FALLIDO") that rises from the contact
 // point and drifts toward the shot direction while fading. Small pool of
 // DOM nodes; position/drift go through CSS custom properties.
@@ -6,9 +8,9 @@ const LIFE_MS = 900;
 const DRIFT_PX = 70;
 const ANIM_CLASS = "is-live";
 
-export const POPUP_PERFECT = "¡PERFECTO!";
-export const POPUP_GOOD = "¡BIEN!";
-export const POPUP_MISS = "FALLIDO";
+export const POPUP_PERFECT = t("¡PERFECTO!", "PERFECT!");
+export const POPUP_GOOD = t("¡BIEN!", "GOOD!");
+export const POPUP_MISS = t("FALLIDO", "MISSED");
 
 interface Popup { readonly el: HTMLDivElement; until: number }
 

@@ -1,6 +1,7 @@
 import { el } from "../dom";
 import { modeArt } from "./art/index";
 import { ballIcon, trophyIcon } from "./art/trophy";
+import { t } from "../../i18n/t";
 
 // The four mode cards of "Elegí un modo": two casual, two ranked.
 export type QueueMode = "1v1" | "2v2";
@@ -16,12 +17,12 @@ interface CardDef extends PlayPick {
 }
 
 export const CASUAL_CARDS: readonly CardDef[] = [
-  { mode: "1v1", ranked: false, title: "1v1 · CASUAL", sub: "Sin ELO en juego" },
-  { mode: "2v2", ranked: false, title: "2v2 · CASUAL", sub: "Vos + bot contra dos bots" },
+  { mode: "1v1", ranked: false, title: t("1v1 · CASUAL", "1v1 · CASUAL"), sub: t("Sin ELO en juego", "No ELO at stake") },
+  { mode: "2v2", ranked: false, title: t("2v2 · CASUAL", "2v2 · CASUAL"), sub: t("Vos + bot contra dos bots", "You + bot vs two bots") },
 ];
 export const RANKED_CARDS: readonly CardDef[] = [
-  { mode: "1v1", ranked: true, title: "1v1 · CLASIFICACIÓN", sub: "Suma ELO · 1.5x XP" },
-  { mode: "2v2", ranked: true, title: "2v2 · CLASIFICACIÓN", sub: "Suma ELO · 1.5x XP" },
+  { mode: "1v1", ranked: true, title: t("1v1 · CLASIFICACIÓN", "1v1 · RANKED"), sub: t("Suma ELO · 1.5x XP", "Earns ELO · 1.5x XP") },
+  { mode: "2v2", ranked: true, title: t("2v2 · CLASIFICACIÓN", "2v2 · RANKED"), sub: t("Suma ELO · 1.5x XP", "Earns ELO · 1.5x XP") },
 ];
 
 export const samePick = (a: PlayPick | null, b: PlayPick): boolean => a !== null && a.mode === b.mode && a.ranked === b.ranked;

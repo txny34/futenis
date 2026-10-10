@@ -1,5 +1,6 @@
 import { HypeMoment, LONG_RALLY, STREAK_CALL } from "./feel/hype";
 import { ShotKind, ShotKindId } from "./feel/shots";
+import { t } from "./i18n/t";
 import { EventKind, SimEvent } from "./snapshot";
 
 // Big centered banner (top third) for shot names and padel moments. A new
@@ -13,27 +14,27 @@ const OUT_CLASS = "is-out";
 interface Callout { readonly text: string; readonly prio: number; readonly tone: string }
 
 const SHOT_CALLS: Readonly<Record<number, Callout>> = {
-  [ShotKind.Chilena]: { text: "¡CHILENA!", prio: 50, tone: "gold" },
-  [ShotKind.Cabezazo]: { text: "¡CABEZAZO!", prio: 45, tone: "cyan" },
-  [ShotKind.Remate]: { text: "¡REMATE!", prio: 45, tone: "hot" },
-  [ShotKind.Volea]: { text: "¡VOLEA!", prio: 30, tone: "cyan" },
-  [ShotKind.Globo]: { text: "¡GLOBO!", prio: 30, tone: "cyan" },
+  [ShotKind.Chilena]: { text: t("¡CHILENA!", "BICYCLE KICK!"), prio: 50, tone: "gold" },
+  [ShotKind.Cabezazo]: { text: t("¡CABEZAZO!", "HEADER!"), prio: 45, tone: "cyan" },
+  [ShotKind.Remate]: { text: t("¡REMATE!", "SMASH!"), prio: 45, tone: "hot" },
+  [ShotKind.Volea]: { text: t("¡VOLEA!", "VOLLEY!"), prio: 30, tone: "cyan" },
+  [ShotKind.Globo]: { text: t("¡GLOBO!", "LOB!"), prio: 30, tone: "cyan" },
 };
 
 const EVENT_CALLS: Readonly<Record<number, Callout>> = {
-  [EventKind.SetWon]: { text: "¡SET!", prio: 90, tone: "gold" },
-  [EventKind.Ace]: { text: "¡ACE!", prio: 85, tone: "gold" },
-  [EventKind.GameWon]: { text: "¡JUEGO!", prio: 80, tone: "gold" },
-  [EventKind.BreakPoint]: { text: "BOLA DE RUPTURA", prio: 60, tone: "hot" },
-  [EventKind.GamePoint]: { text: "PUNTO DE JUEGO", prio: 60, tone: "cyan" },
-  [EventKind.HitNet]: { text: "¡RED!", prio: 40, tone: "hot" },
+  [EventKind.SetWon]: { text: t("¡SET!", "SET!"), prio: 90, tone: "gold" },
+  [EventKind.Ace]: { text: t("¡ACE!", "ACE!"), prio: 85, tone: "gold" },
+  [EventKind.GameWon]: { text: t("¡JUEGO!", "GAME!"), prio: 80, tone: "gold" },
+  [EventKind.BreakPoint]: { text: t("BOLA DE RUPTURA", "BREAK POINT"), prio: 60, tone: "hot" },
+  [EventKind.GamePoint]: { text: t("PUNTO DE JUEGO", "GAME POINT"), prio: 60, tone: "cyan" },
+  [EventKind.HitNet]: { text: t("¡RED!", "NET!"), prio: 40, tone: "hot" },
 };
 
-const PUNTAZO: Callout = { text: "¡PUNTAZO!", prio: 55, tone: "gold" };
+const PUNTAZO: Callout = { text: t("¡PUNTAZO!", "WHAT A POINT!"), prio: 55, tone: "gold" };
 const STREAK_TONE = "hot";
 const STREAK_PRIO = 52; // moments sit under PUNTO DE JUEGO / BOLA DE RUPTURA (60): score info wins
 
-const RIVAL_POINT: Callout = { text: "PUNTO RIVAL", prio: 20, tone: "hot" };
+const RIVAL_POINT: Callout = { text: t("PUNTO RIVAL", "OPPONENT'S POINT"), prio: 20, tone: "hot" };
 
 export class Callouts {
   readonly root = document.createElement("div");
@@ -59,7 +60,8 @@ export class Callouts {
   onMoment(m: Readonly<HypeMoment>, humanTeam: number, nowMs: number): void {
     if (m.touches >= LONG_RALLY) this.show(PUNTAZO, nowMs);
     else if (m.winner === humanTeam && m.streak >= STREAK_CALL) {
-      this.show({ text: `¡RACHA DE ${m.streak}!`, prio: STREAK_PRIO, tone: STREAK_TONE }, nowMs);
+      const text = t(`¡RACHA DE ${m.streak}!`, `STREAK OF ${m.streak}!`);
+      this.show({ text, prio: STREAK_PRIO, tone: STREAK_TONE }, nowMs);
     }
   }
 

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { THEME } from "../../env/theme";
 import { FONT_STACK, canvasTexture } from "./util";
+import { t } from "../../i18n/t";
 
 // Posters/banners on the side walls: canvas textures drawn once at load.
 const W = 384;
@@ -14,8 +15,12 @@ const POSTER_DIM = 0.4;
 
 interface PosterSpec { readonly title: string; readonly sub: string }
 const SPECS: readonly PosterSpec[] = [
-  { title: "1v1", sub: "CONTRA EL BOT" }, { title: "2v2", sub: "EN EQUIPO" }, { title: "ENTRENÁ", sub: "LANZAPELOTAS" },
-  { title: "UN TOQUE", sub: "POR EQUIPO" }, { title: "PAREDES", sub: "SON TUYAS" }, { title: "ARENA", sub: "NOCTURNA NEÓN" },
+  { title: "1v1", sub: t("CONTRA EL BOT", "VS THE BOT") },
+  { title: "2v2", sub: t("EN EQUIPO", "AS A TEAM") },
+  { title: t("ENTRENÁ", "TRAIN"), sub: t("LANZAPELOTAS", "BALL MACHINE") },
+  { title: t("UN TOQUE", "ONE TOUCH"), sub: t("POR EQUIPO", "PER TEAM") },
+  { title: t("PAREDES", "WALLS"), sub: t("SON TUYAS", "ARE YOURS") },
+  { title: "ARENA", sub: t("NOCTURNA NEÓN", "NEON NIGHT") },
 ];
 
 function draw(ctx: CanvasRenderingContext2D, spec: PosterSpec, i: number): void {

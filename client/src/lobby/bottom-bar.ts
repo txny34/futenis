@@ -2,15 +2,20 @@ import { missions } from "../profile/missions";
 import { button, el } from "../ui/dom";
 import { icon, IconName } from "./icons";
 import { MissionsPanel } from "./missions-panel";
+import { t } from "../i18n/t";
 
 // Lobby bottom bar (docs/design/lobby.md §7 + "Perfil local y misiones"):
 // dock [Equipo · Estilos · Misiones]  JUGAR  [Regalo · Tienda · Mercancía]. JUGAR opens
 // "Elegí un modo" (ui/play-modal); Entrenamiento and Ajustes live in the Esc lobby menu. DOM only,
 // touched on clicks and mode/mission changes, never per frame.
-const SOON_TEXT = "Próximamente";
+const SOON_TEXT = t("Próximamente", "Coming soon");
 const SOON_MS = 1800;
-const LEFT: ReadonlyArray<readonly [IconName, string]> = [["team", "Equipo"], ["styles", "Estilos"], ["missions", "Misiones"]];
-const RIGHT: ReadonlyArray<readonly [IconName, string]> = [["gift", "Regalo"], ["shop", "Tienda"], ["merch", "Mercancía"]];
+const LEFT: ReadonlyArray<readonly [IconName, string]> = [
+  ["team", t("Equipo", "Team")], ["styles", t("Estilos", "Styles")], ["missions", t("Misiones", "Missions")],
+];
+const RIGHT: ReadonlyArray<readonly [IconName, string]> = [
+  ["gift", t("Regalo", "Gift")], ["shop", t("Tienda", "Shop")], ["merch", t("Mercancía", "Merch")],
+];
 
 export interface BarActions {
   play: () => void;
@@ -26,7 +31,7 @@ export class BottomBar {
   constructor(parent: HTMLElement, a: BarActions) {
     this.panel = new MissionsPanel(parent);
     const bar = el("nav", "fx-lobby__bar", "", { "aria-label": "Lobby" });
-    bar.append(...LEFT.map(([i, l]) => this.dockButton(i, l)), button("JUGAR", a.play, "fx-lobby__play"));
+    bar.append(...LEFT.map(([i, l]) => this.dockButton(i, l)), button(t("JUGAR", "PLAY"), a.play, "fx-lobby__play"));
     bar.append(...RIGHT.map(([i, l]) => this.dockButton(i, l)));
     this.toast.hidden = true;
     this.root.append(this.toast, bar);

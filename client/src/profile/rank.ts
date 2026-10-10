@@ -1,3 +1,5 @@
+import { t } from "../i18n/t";
+
 // Visible ranks from ELO (backlog "Retención": Bronce → Leyenda). Pure.
 // Each tier but Leyenda has divisions III (low) → I (high), 50 ELO apiece:
 // <800 Bronce III · 900 Plata III · 1000 Plata I · 1050 Oro III · 1499 Diamante I · 1500 Leyenda.
@@ -6,12 +8,12 @@ export type TierId = "bronze" | "silver" | "gold" | "platinum" | "diamond" | "le
 interface Tier { readonly id: TierId; readonly name: string; readonly min: number }
 
 const TIERS: readonly Tier[] = [
-  { id: "bronze", name: "Bronce", min: 0 },
-  { id: "silver", name: "Plata", min: 900 },
-  { id: "gold", name: "Oro", min: 1050 },
-  { id: "platinum", name: "Platino", min: 1200 },
-  { id: "diamond", name: "Diamante", min: 1350 },
-  { id: "legend", name: "Leyenda", min: 1500 },
+  { id: "bronze", name: t("Bronce", "Bronze"), min: 0 },
+  { id: "silver", name: t("Plata", "Silver"), min: 900 },
+  { id: "gold", name: t("Oro", "Gold"), min: 1050 },
+  { id: "platinum", name: t("Platino", "Platinum"), min: 1200 },
+  { id: "diamond", name: t("Diamante", "Diamond"), min: 1350 },
+  { id: "legend", name: t("Leyenda", "Legend"), min: 1500 },
 ];
 const DIVISIONS = ["III", "II", "I"] as const;
 const BRONZE_FLOOR = 750; // bronze spans 750..900 for its divisions (lower ratings stay Bronce III)
@@ -43,5 +45,8 @@ export function rankChange(before: number, after: number): RankNote | null {
   const b = rankOf(after);
   if (a.order === b.order) return null;
   const up = b.order > a.order;
-  return { text: up ? `¡Subiste a ${b.label}!` : `Bajaste a ${b.label}`, up };
+  return {
+    text: up ? t(`¡Subiste a ${b.label}!`, `Promoted to ${b.label}!`) : t(`Bajaste a ${b.label}`, `Dropped to ${b.label}`),
+    up,
+  };
 }

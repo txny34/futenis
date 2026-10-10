@@ -7,20 +7,28 @@ import { CallTracker } from "./hud-calls";
 import { Popups, POPUP_GOOD, POPUP_MISS, POPUP_PERFECT } from "./hud-popups";
 import { Scoreboard } from "./hud-score";
 import { TrainingHud } from "./hud-training";
+import { t } from "./i18n/t";
 import { keyHint, moveHint } from "./ui/key-hints";
 import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
 
-const NAMES = ["Local", "Visita"] as const; // team colors come from the theme, so no color names
+const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const; // team colors come from the theme, so no color names
 const helpText = (): string =>
-  `${moveHint()} mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · ${keyHint("jump")} salto · ` +
-  `${keyHint("dash")} dash · ${keyHint("free")} mouse libre · Esc pausa · ` +
-  "Mando: stick izq mover, der cámara, RT golpe, LT lob, A salto, LB/RB dash";
+  t(
+    `${moveHint()} mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · ${keyHint("jump")} salto · ${keyHint("dash")} dash · ${keyHint("free")} mouse libre · Esc pausa · Mando: stick izq mover, der cámara, RT golpe, LT lob, A salto, LB/RB dash`,
+    `${moveHint()} move · Mouse camera · Wheel zoom · Click strike · Right-click lob · ${keyHint("jump")} jump · ${keyHint("dash")} dash · ${keyHint("free")} free mouse · Esc pause · Gamepad: left stick move, right camera, RT strike, LT lob, A jump, LB/RB dash`,
+  );
 const lobbyHelp = (): string =>
-  `${moveHint()} mover · Mouse cámara · ${keyHint("jump")} salto · ${keyHint("free")} mouse libre · Esc menú`;
+  t(
+    `${moveHint()} mover · Mouse cámara · ${keyHint("jump")} salto · ${keyHint("free")} mouse libre · Esc menú`,
+    `${moveHint()} move · Mouse camera · ${keyHint("jump")} jump · ${keyHint("free")} free mouse · Esc menu`,
+  );
 const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
-const PLAYGROUND_HELP = ` · ${LAUNCH_KEY} lanzar bola`;
+const PLAYGROUND_HELP = t(` · ${LAUNCH_KEY} lanzar bola`, ` · ${LAUNCH_KEY} launch ball`);
 const CALL_MS = 1800;
-const SERVE_HINT = "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado";
+const SERVE_HINT = t(
+  "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado",
+  "Click: release · bounce behind the line · release to serve into the cross box",
+);
 const HUMAN_TEAM = 0;
 const HUMAN_SLOT = 0; // mirrors loop.HUMAN_SLOT (single local human)
 const UNSET = -1;
@@ -57,7 +65,7 @@ export class Hud {
     this.fps.hidden = true;
     this.call.hidden = true;
     this.hint.hidden = true;
-    this.replayTag.textContent = "REPETICIÓN · Esc → menú para salir";
+    this.replayTag.textContent = t("REPETICIÓN · Esc → menú para salir", "REPLAY · Esc → menu to exit");
     this.replayTag.hidden = true;
     this.hint.textContent = SERVE_HINT;
     applyThemeCss(root);
@@ -159,10 +167,12 @@ export class Hud {
 
 function message(phase: number, server: number): string {
   switch (phase) {
-    case Phase.Serve:
-      return `Saca ${server === 0 ? NAMES[0] : NAMES[1]}`;
+    case Phase.Serve: {
+      const name = server === 0 ? NAMES[0] : NAMES[1];
+      return t(`Saca ${name}`, `${name} serving`);
+    }
     case Phase.Point:
-      return "¡Punto!";
+      return t("¡Punto!", "Point!");
     default:
       return ""; // GameOver: the result screen takes over
   }

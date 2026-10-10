@@ -137,13 +137,16 @@ func TestHubBadMessage(t *testing.T) {
 	srv := newTestHub(make(chan time.Time))
 	defer srv.Close()
 	for _, tc := range []struct {
-		typ websocket.MessageType
-		b   []byte
+		room string
+		typ  websocket.MessageType
+		b    []byte
 	}{
-		{websocket.MessageBinary, []byte{1, 2, 3}},
-		{websocket.MessageText, inputMsg([inputFloats]float64{})},
+		// One room per case: the previous peer's server-side leave may not have
+		// run yet when the next one dials, so a shared room could WELCOME it.
+		{"BADA", websocket.MessageBinary, []byte{1, 2, 3}},
+		{"BADB", websocket.MessageText, inputMsg([inputFloats]float64{})},
 	} {
-		c := dial(ctx, t, srv)
+		c := dialRoom(ctx, t, srv, tc.room)
 		readMsg(ctx, t, c, msgWaiting, headerLen)
 		if err := c.Write(ctx, tc.typ, tc.b); err != nil {
 			t.Fatal(err)

@@ -1,5 +1,6 @@
 import { addXp } from "./progress";
 import { profileWriter } from "./store";
+import { t } from "../i18n/t";
 
 // Misiones locales: 4 diarias (reset a medianoche local) y 3 semanales (reset el lunes).
 // Progreso desde los mismos eventos que el perfil (profile/recorder.ts).
@@ -10,15 +11,15 @@ export interface MissionDef { id: string; title: string; metric: Metric; goal: n
 export interface MissionView { def: MissionDef; progress: number; claimed: boolean; claimable: boolean }
 
 export const DAILY: readonly MissionDef[] = [
-  { id: "d-win", title: "Ganá 1 partido", metric: "win", goal: 1, xp: 60 },
-  { id: "d-perfect", title: "10 golpes perfectos", metric: "perfect", goal: 10, xp: 50 },
-  { id: "d-train", title: "Completá 2 entrenamientos", metric: "training", goal: 2, xp: 50 },
-  { id: "d-streak", title: "Racha de 5 en el lanzapelotas", metric: "trainStreak", goal: 5, xp: 40, max: true },
+  { id: "d-win", title: t("Ganá 1 partido", "Win 1 match"), metric: "win", goal: 1, xp: 60 },
+  { id: "d-perfect", title: t("10 golpes perfectos", "10 perfect strikes"), metric: "perfect", goal: 10, xp: 50 },
+  { id: "d-train", title: t("Completá 2 entrenamientos", "Complete 2 training sessions"), metric: "training", goal: 2, xp: 50 },
+  { id: "d-streak", title: t("Racha de 5 en el lanzapelotas", "Streak of 5 on the ball machine"), metric: "trainStreak", goal: 5, xp: 40, max: true },
 ];
 export const WEEKLY: readonly MissionDef[] = [
-  { id: "w-win", title: "Ganá 5 partidos", metric: "win", goal: 5, xp: 250 },
-  { id: "w-match", title: "Jugá 10 partidos", metric: "match", goal: 10, xp: 200 },
-  { id: "w-perfect", title: "50 golpes perfectos", metric: "perfect", goal: 50, xp: 200 },
+  { id: "w-win", title: t("Ganá 5 partidos", "Win 5 matches"), metric: "win", goal: 5, xp: 250 },
+  { id: "w-match", title: t("Jugá 10 partidos", "Play 10 matches"), metric: "match", goal: 10, xp: 200 },
+  { id: "w-perfect", title: t("50 golpes perfectos", "50 perfect strikes"), metric: "perfect", goal: 50, xp: 200 },
 ];
 
 const KEY = "futenis.missions.v1";

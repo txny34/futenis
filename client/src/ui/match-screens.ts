@@ -1,9 +1,10 @@
 /** Match-flow overlays: VS intro before the first serve and the VICTORIA/DERROTA result. */
 import type { RankNote } from "../profile/rank";
 import { button, el } from "./dom";
+import { t } from "../i18n/t";
 
 export const VS_INTRO_MS = 3200; // backlog: under 4 s, skippable
-const TEAM_NAMES = ["Local", "Visita"] as const;
+const TEAM_NAMES = [t("Local", "Home"), t("Visita", "Away")] as const;
 const LEAVE_CLASS = "is-leaving";
 const LEAVE_MS = 300;
 
@@ -42,20 +43,20 @@ export class MatchScreens {
   showIntro(members: number, subtitle: string, labels: IntroLabels): void {
     const vs = el("div", "fx-vs", "", { role: "status", "aria-live": "polite" });
     vs.append(team(0, members, labels.left), el("span", "fx-vs__vs", "VS"), team(1, members, labels.right));
-    this.mount(vs, el("p", "fx-vs__sub", subtitle), el("p", "fx-vs__skip", "Click o tecla para saltar"));
+    this.mount(vs, el("p", "fx-vs__sub", subtitle), el("p", "fx-vs__skip", t("Click o tecla para saltar", "Click or press a key to skip")));
     this.leaveTimer = window.setTimeout(() => this.leave(), VS_INTRO_MS - LEAVE_MS);
   }
 
   showResult(r: ResultInfo, a: ResultActions): void {
     const card = el("section", `fx-result fx-result--${r.won ? "win" : "lose"}`, "", { role: "dialog", "aria-modal": "true" });
     const actions = el("div", "fx-actions");
-    actions.append(button("Revancha", a.rematch, "fx-btn fx-btn--hero"));
-    if (a.replay) actions.append(button("Ver repetición", a.replay, "fx-btn"));
-    actions.append(button("Volver al lobby", a.lobby, "fx-btn fx-btn--ghost"));
+    actions.append(button(t("Revancha", "Rematch"), a.rematch, "fx-btn fx-btn--hero"));
+    if (a.replay) actions.append(button(t("Ver repetición", "Watch replay"), a.replay, "fx-btn"));
+    actions.append(button(t("Volver al lobby", "Back to lobby"), a.lobby, "fx-btn fx-btn--ghost"));
     card.append(
-      el("h2", "fx-result__title", r.won ? "VICTORIA" : "DERROTA"),
+      el("h2", "fx-result__title", r.won ? t("VICTORIA", "VICTORY") : t("DERROTA", "DEFEAT")),
       el("p", "fx-result__score", `${TEAM_NAMES[0]} ${r.games0} – ${r.games1} ${TEAM_NAMES[1]}`),
-      el("p", "fx-result__label", "Juegos"),
+      el("p", "fx-result__label", t("Juegos", "Games")),
       ...(r.rankNote ? [el("p", `fx-result__rank${r.rankNote.up ? "" : " fx-result__rank--down"}`, r.rankNote.text, { role: "status" })] : []),
       actions,
     );

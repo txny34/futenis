@@ -1,5 +1,6 @@
 import { button, el } from "./dom";
 import { panel } from "./screens";
+import { t } from "../i18n/t";
 
 // "Reportar un bug": the player describes it, then copies or downloads the
 // report (no backend yet, so nothing is sent from here).
@@ -10,24 +11,24 @@ const MAX_NOTE = 2000;
 
 export function reportView(build: (note: string) => string, back: () => void): HTMLElement {
   const note = el("textarea", "fx-report__note", "", {
-    rows: "5", maxlength: String(MAX_NOTE), "aria-label": "Qué pasó",
-    placeholder: "Qué pasó, qué esperabas y cómo repetirlo",
+    rows: "5", maxlength: String(MAX_NOTE), "aria-label": t("Qué pasó", "What happened"),
+    placeholder: t("Qué pasó, qué esperabas y cómo repetirlo", "What happened, what you expected, and how to repeat it"),
   });
   const status = el("p", "fx-report__status", "", { role: "status" });
-  const copy = button("Copiar reporte", () => copyReport(build(note.value), status), "fx-btn fx-btn--hero");
-  const save = button("Descargar .txt", () => download(build(note.value)));
+  const copy = button(t("Copiar reporte", "Copy report"), () => copyReport(build(note.value), status), "fx-btn fx-btn--hero");
+  const save = button(t("Descargar .txt", "Download .txt"), () => download(build(note.value)));
   const actions = el("div", "fx-stack");
-  actions.append(copy, save, button("Volver", back, "fx-btn fx-btn--ghost"));
-  const hint = el("p", "fx-report__hint", "Incluye navegador, modo, ajustes y errores recientes. Sin datos personales.");
-  return panel("Reportar un bug", note, hint, status, actions);
+  actions.append(copy, save, button(t("Volver", "Back"), back, "fx-btn fx-btn--ghost"));
+  const hint = el("p", "fx-report__hint", t("Incluye navegador, modo, ajustes y errores recientes. Sin datos personales.", "Includes browser, mode, settings and recent errors. No personal data."));
+  return panel(t("Reportar un bug", "Report a bug"), note, hint, status, actions);
 }
 
 function copyReport(text: string, status: HTMLElement): void {
-  const fail = (): void => flash(status, "No se pudo copiar: usá Descargar.");
+  const fail = (): void => flash(status, t("No se pudo copiar: usá Descargar.", "Couldn't copy: use Download instead."));
   // navigator.clipboard is undefined outside secure contexts (plain http on a LAN IP)
   const clip = (navigator as { clipboard?: Clipboard }).clipboard;
   if (!clip) { fail(); return; }
-  clip.writeText(text).then(() => flash(status, "Copiado. Pegalo donde nos reportes."), fail);
+  clip.writeText(text).then(() => flash(status, t("Copiado. Pegalo donde nos reportes.", "Copied. Paste it wherever you report it to us.")), fail);
 }
 
 function flash(status: HTMLElement, text: string): void {

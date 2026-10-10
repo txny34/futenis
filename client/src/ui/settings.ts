@@ -1,4 +1,5 @@
 /** Player settings: types, defaults, validation and localStorage persistence. */
+import { defaultLang, type Lang, LANGS } from "../i18n/lang";
 import { DEFAULT_KEYS, type KeyBinds, validateKeys } from "./keybinds";
 
 export type Quality = "low" | "med" | "high";
@@ -11,7 +12,7 @@ export interface AudioSettings { master: number; sfx: number; music: number }
 export type LandingMarker = "always" | "easy" | "never";
 export interface GameplaySettings {
   showAimCircle: boolean; cameraShake: boolean; dynamicCamera: boolean; hudScale: number; landingMarker: LandingMarker;
-  colorblind: boolean;
+  colorblind: boolean; lang: Lang;
 }
 
 export interface Settings {
@@ -39,7 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   controls: { mouseSensitivity: 1, keys: DEFAULT_KEYS },
   video: { quality: "high", shadows: true, fpsCap: 0, showFps: false },
   audio: { master: 80, sfx: 80, music: 60 },
-  game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1, landingMarker: "easy", colorblind: false },
+  game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1, landingMarker: "easy", colorblind: false, lang: defaultLang() },
 };
 
 type Rec = Record<string, unknown>;
@@ -97,6 +98,7 @@ export function validateSettings(raw: unknown): Settings {
       hudScale: num(g.hudScale, HUD_SCALE_MIN, HUD_SCALE_MAX, d.game.hudScale),
       landingMarker: oneOf(g.landingMarker, LANDING_MARKERS, d.game.landingMarker),
       colorblind: bool(g.colorblind, d.game.colorblind),
+      lang: oneOf(g.lang, LANGS, d.game.lang),
     },
   };
 }

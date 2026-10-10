@@ -1,9 +1,10 @@
 import { PART_NAMES, EventKind, Quality, SimEvent } from "../snapshot";
+import { t } from "../i18n/t";
 
 // Desafíos de Entrenamiento (backlog "Aprender y mejorar"): per-session goals
 // with bronze/silver/gold medals; the best medal per challenge persists locally.
 // Pure reader of the event stream, like the profile recorder.
-export const MEDALS = ["Bronce", "Plata", "Oro"] as const;
+export const MEDALS = [t("Bronce", "Bronze"), t("Plata", "Silver"), t("Oro", "Gold")] as const;
 export type MedalIdx = 0 | 1 | 2;
 
 type Metric = "streak" | "perfect" | "headPerfect" | "chilena";
@@ -11,10 +12,10 @@ type Metric = "streak" | "perfect" | "headPerfect" | "chilena";
 export interface ChallengeDef { readonly id: string; readonly title: string; readonly metric: Metric; readonly tiers: readonly [number, number, number] }
 
 export const CHALLENGES: readonly ChallengeDef[] = [
-  { id: "c-streak", title: "Racha en el lanzapelotas", metric: "streak", tiers: [5, 10, 20] },
-  { id: "c-perfect", title: "Golpes perfectos en una sesión", metric: "perfect", tiers: [5, 15, 30] },
-  { id: "c-head", title: "Perfects de cabeza", metric: "headPerfect", tiers: [2, 5, 10] },
-  { id: "c-chilena", title: "Chilenas", metric: "chilena", tiers: [1, 3, 5] },
+  { id: "c-streak", title: t("Racha en el lanzapelotas", "Streak on the ball machine"), metric: "streak", tiers: [5, 10, 20] },
+  { id: "c-perfect", title: t("Golpes perfectos en una sesión", "Perfect strikes in one session"), metric: "perfect", tiers: [5, 15, 30] },
+  { id: "c-head", title: t("Perfects de cabeza", "Header perfects"), metric: "headPerfect", tiers: [2, 5, 10] },
+  { id: "c-chilena", title: t("Chilenas", "Bicycle kicks"), metric: "chilena", tiers: [1, 3, 5] },
 ];
 
 const KEY = "futenis.challenges.v1";

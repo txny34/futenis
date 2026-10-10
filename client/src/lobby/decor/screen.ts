@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { THEME } from "../../env/theme";
 import { FONT_STACK, NEON_BOOST } from "./util";
+import { t } from "../../i18n/t";
 
 // Giant scoreboard above the center arch. Canvas texture redrawn at REDRAW_HZ
 // only (cheap upload); every string is precomputed, so redraws allocate no JS
@@ -15,7 +16,10 @@ const REDRAW_HZ = 12;
 const TICKER_SPEED = 55; // px/s
 const FRAME_W = 0.25;
 const MAX_SCORE = 99;
-const TICKER = "★ PISÁ UN PAD PARA JUGAR  ·  1v1 CONTRA EL BOT  ·  2v2  ·  ENTRENAMIENTO CON LANZAPELOTAS  ·  UN TOQUE POR EQUIPO  ";
+const TICKER = t(
+  "★ PISÁ UN PAD PARA JUGAR  ·  1v1 CONTRA EL BOT  ·  2v2  ·  ENTRENAMIENTO CON LANZAPELOTAS  ·  UN TOQUE POR EQUIPO  ",
+  "★ STEP ON A PAD TO PLAY  ·  1v1 VS THE BOT  ·  2v2  ·  TRAINING WITH BALL MACHINE  ·  ONE TOUCH PER TEAM  ",
+);
 const D = THEME.lobbyDecor;
 const NUMS: readonly string[] = Array.from({ length: MAX_SCORE + 1 }, (_, i) => String(i));
 
@@ -70,7 +74,7 @@ export class Scoreboard {
     c.textBaseline = "middle";
     c.font = `54px ${FONT_STACK}`;
     c.fillStyle = D.screenText;
-    c.fillText("ARENA · EN VIVO", W / 2, 58);
+    c.fillText(t("ARENA · EN VIVO", "ARENA · LIVE"), W / 2, 58);
     c.font = `170px ${FONT_STACK}`;
     c.fillStyle = D.screenAccentA;
     c.fillText(NUMS[this.scoreA], W * 0.27, 200);

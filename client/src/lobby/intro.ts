@@ -1,13 +1,17 @@
+import { displayName } from "../profile/display-name";
 import { profileStore } from "../profile/store";
 import type { Difficulty, GameMode } from "../ui/types";
 import { type IntroLabels, VS_INTRO_MS } from "../ui/match-screens";
 import type { App } from "./flow";
+import { t } from "../i18n/t";
 
 // Match intro (backlog "Animación de entrada"): VS card with who plays,
 // camera sweep into the shoulder view, skippable with any game key or click.
-const INTRO_SUBTITLE = "Un set a 3 juegos";
+const INTRO_SUBTITLE = t("Un set a 3 juegos", "One set to 3 games");
 const MS_PER_S = 1000;
-const BOT_LABEL: Readonly<Record<Difficulty, string>> = { easy: "Fácil", normal: "Normal", hard: "Difícil", pro: "Pro" };
+const BOT_LABEL: Readonly<Record<Difficulty, string>> = {
+  easy: t("Fácil", "Easy"), normal: "Normal", hard: t("Difícil", "Hard"), pro: "Pro",
+};
 // Esc keeps opening pause; modifiers/system keys (alt-tab, screenshots) never skip.
 const NO_SKIP_KEYS = new Set(["Escape", "AltLeft", "AltRight", "ControlLeft", "ControlRight", "ShiftLeft", "ShiftRight",
   "MetaLeft", "MetaRight", "Tab", "PrintScreen"]);
@@ -18,8 +22,8 @@ function labels(mode: Exclude<GameMode, "playground">, difficulty: Difficulty): 
   const p = profileStore().get();
   const bot = BOT_LABEL[difficulty];
   return mode === "1v1"
-    ? { left: `${p.name} · ${p.elo["1v1"]} ELO`, right: `Bot · ${bot}` }
-    : { left: `${p.name} + bot · ${p.elo["2v2"]} ELO`, right: `Bots · ${bot}` };
+    ? { left: `${displayName(p.name)} · ${p.elo["1v1"]} ELO`, right: `Bot · ${bot}` }
+    : { left: `${displayName(p.name)} + bot · ${p.elo["2v2"]} ELO`, right: `Bots · ${bot}` };
 }
 
 const reducedMotion = (): boolean => window.matchMedia("(prefers-reduced-motion: reduce)").matches;

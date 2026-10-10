@@ -1,16 +1,17 @@
+import { t } from "./i18n/t";
 import { EventKind, SimEvent } from "./snapshot";
 
 // Referee calls from the event stream. EvPoint carries no reason, so the
 // reason is inferred from the rally events that preceded it (client-side
 // heuristic; a sim-side reason field would make this exact).
-const TEAM_NAMES = ["Local", "Visita"] as const;
-const REASON_OUT = "pelota afuera";
-const REASON_NET = "red";
-const REASON_WALL = "pared antes del pique";
-const REASON_DOUBLE_BOUNCE = "doble pique";
-const CALL_FAULT = "Falta";
-const CALL_DOUBLE_FAULT = "Doble falta";
-const CALL_LET = "Let — se repite el saque";
+const TEAM_NAMES = [t("Local", "Home"), t("Visita", "Away")] as const;
+const REASON_OUT = t("pelota afuera", "ball out");
+const REASON_NET = t("red", "net");
+const REASON_WALL = t("pared antes del pique", "wall before the bounce");
+const REASON_DOUBLE_BOUNCE = t("doble pique", "double bounce");
+const CALL_FAULT = t("Falta", "Fault");
+const CALL_DOUBLE_FAULT = t("Doble falta", "Double fault");
+const CALL_LET = t("Let — se repite el saque", "Let — serve again");
 const FAULTS_PER_SERVE = 2;
 
 export class CallTracker {
@@ -62,7 +63,7 @@ export class CallTracker {
     this.wallBeforeBounce = false;
     this.lastKind = 0;
     const name = TEAM_NAMES[winner === 1 ? 1 : 0];
-    return reason ? `Punto ${name} — ${reason}` : `Punto ${name}`;
+    return reason ? t(`Punto ${name} — ${reason}`, `Point ${name} — ${reason}`) : t(`Punto ${name}`, `Point ${name}`);
   }
 
   private reason(): string {

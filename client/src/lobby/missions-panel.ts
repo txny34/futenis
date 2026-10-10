@@ -1,14 +1,20 @@
 import { MissionView, missions, Period } from "../profile/missions";
 import { el } from "../ui/dom";
+import { t } from "../i18n/t";
 
 // Panel "Misiones diarias" (izquierda, plegable) con pestañas Día/Sem. Se
 // reconstruye solo cuando cambian las misiones o la pestaña, nunca por frame.
-const TABS: ReadonlyArray<readonly [Period, string]> = [["day", "Día"], ["week", "Sem."]];
-const TITLE: Readonly<Record<Period, string>> = { day: "Misiones diarias", week: "Misiones semanales" };
-const FOOT: Readonly<Record<Period, string>> = { day: "Nuevas misiones a medianoche", week: "Nuevas misiones el lunes" };
+const TABS: ReadonlyArray<readonly [Period, string]> = [["day", t("Día", "Day")], ["week", t("Sem.", "Wk.")]];
+const TITLE: Readonly<Record<Period, string>> = {
+  day: t("Misiones diarias", "Daily missions"), week: t("Misiones semanales", "Weekly missions"),
+};
+const FOOT: Readonly<Record<Period, string>> = {
+  day: t("Nuevas misiones a medianoche", "New missions at midnight"),
+  week: t("Nuevas misiones el lunes", "New missions on Monday"),
+};
 
 export class MissionsPanel {
-  readonly root = el("aside", "fx-missions", "", { "aria-label": "Misiones" });
+  readonly root = el("aside", "fx-missions", "", { "aria-label": t("Misiones", "Missions") });
   private readonly title = el("b", "fx-missions__title");
   private readonly list = el("ul", "fx-missions__list");
   private readonly foot = el("p", "fx-missions__foot");

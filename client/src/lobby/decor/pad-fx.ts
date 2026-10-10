@@ -3,6 +3,7 @@ import { THEME } from "../../env/theme";
 import { LOBBY_PAD_COUNT, LOBBY_PAD_RADIUS, padX, padZ } from "../pads";
 import { padLabel } from "./pad-label";
 import { NEON_BOOST, rand } from "./util";
+import { t } from "../../i18n/t";
 
 // Pad dressing: a low plinth ring, an animated dashed rim (shader), a light
 // beam rising from each pad and one Points system of motes rising inside the
@@ -21,7 +22,11 @@ const LABEL_Y = 4.0;
 const LABEL_BOB = 0.04;
 const LABEL_HZ = 0.15;
 const LABEL_HEAT_SCALE = 0.08;
-const LABELS: ReadonlyArray<readonly [string, string]> = [["ENTRENÁ", "LANZAPELOTAS"], ["1v1", "CONTRA EL BOT"], ["2v2", "CONTRA BOTS"]];
+const LABELS: ReadonlyArray<readonly [string, string]> = [
+  [t("ENTRENÁ", "TRAIN"), t("LANZAPELOTAS", "BALL MACHINE")],
+  ["1v1", t("CONTRA EL BOT", "VS THE BOT")],
+  ["2v2", t("CONTRA BOTS", "VS BOTS")],
+];
 
 const RIM_VERT = "varying vec2 vP; void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
 const RIM_FRAG = `uniform float uTime; uniform float uHeat; uniform vec3 uColor; varying vec2 vP;

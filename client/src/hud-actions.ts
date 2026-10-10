@@ -1,3 +1,4 @@
+import { t } from "./i18n/t";
 import { keyHint } from "./ui/key-hints";
 import type { KeyAction } from "./ui/keybinds";
 import { Extra, FLAG_LOB, PLAYER_DASH, PLAYER_EXTRA } from "./snapshot";
@@ -29,9 +30,9 @@ const ICONS: Readonly<Record<ActionId, string>> = {
 
 const ACTIONS: readonly ActionDef[] = [
   { id: "dash", label: "Dash", key: "Q", bind: "dash", icon: ICONS.dash, ring: true },
-  { id: "strike", label: "Golpe", key: "Click", icon: ICONS.strike, ring: true },
-  { id: "lob", label: "Globo", key: "Click der", icon: ICONS.lob, ring: false },
-  { id: "jump", label: "Salto", key: "Espacio", bind: "jump", icon: ICONS.jump, ring: false },
+  { id: "strike", label: t("Golpe", "Strike"), key: "Click", icon: ICONS.strike, ring: true },
+  { id: "lob", label: t("Globo", "Lob"), key: t("Click der", "Right click"), icon: ICONS.lob, ring: false },
+  { id: "jump", label: t("Salto", "Jump"), key: t("Espacio", "Space"), bind: "jump", icon: ICONS.jump, ring: false },
 ];
 
 interface Slot {

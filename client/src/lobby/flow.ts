@@ -22,10 +22,11 @@ import { botLevelFor } from "./bot-level";
 import type { ProfileCard } from "./profile-card";
 import type { PlayModal } from "../ui/play-modal/play-modal";
 import { PAD_MODES } from "./pads";
+import { t } from "../i18n/t";
 
 // Lobby <-> match flow (docs/design/lobby.md §6): the sim detects pads, the
 // client decides. Every switch is configure() + reset() on the same wasm.
-const LOADING_TEXT = "Cargando…";
+const LOADING_TEXT = t("Cargando…", "Loading…");
 const MODE_ID: Readonly<Record<GameMode, MatchSetup["mode"]>> = { "1v1": 0, "2v2": 1, playground: 2 };
 const LOBBY_MODE_ID: MatchSetup["mode"] = Mode.Lobby;
 const LOBBY_BOT: Difficulty = "normal"; // the lobby has no bot; any valid id

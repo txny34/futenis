@@ -1,3 +1,4 @@
+import { t } from "../i18n/t";
 import { Mode, Phase, SNAP_LEN, Snap } from "../snapshot";
 import { recentErrors } from "./errors";
 
@@ -12,40 +13,40 @@ export interface ReportContext {
 }
 
 const MODE_NAME: Readonly<Record<number, string | undefined>> = {
-  [Mode.OneVsOne]: "1v1", [Mode.TwoVsTwo]: "2v2", [Mode.Playground]: "entrenamiento", [Mode.Lobby]: "lobby",
+  [Mode.OneVsOne]: "1v1", [Mode.TwoVsTwo]: "2v2", [Mode.Playground]: t("entrenamiento", "training"), [Mode.Lobby]: "lobby",
 };
 const PHASE_NAME: Readonly<Record<number, string | undefined>> = {
-  [Phase.Serve]: "saque", [Phase.Rally]: "rally", [Phase.Point]: "punto", [Phase.GameOver]: "fin",
+  [Phase.Serve]: t("saque", "serve"), [Phase.Rally]: "rally", [Phase.Point]: t("punto", "point"), [Phase.GameOver]: t("fin", "end"),
 };
 
 function gameLines(snap: Float64Array | null, inLobby: boolean): string[] {
-  if (!snap) return ["juego: sin cargar"];
+  if (!snap) return [t("juego: sin cargar", "game: not loaded")];
   const mode = snap[Snap.Mode];
   return [
-    `modo: ${MODE_NAME[mode] ?? mode}${inLobby ? " (lobby)" : ""}`,
-    `fase: ${PHASE_NAME[snap[Snap.Phase]] ?? snap[Snap.Phase]} · tick ${snap[Snap.Tick]}`,
-    `marcador: ${snap[Snap.Score0]}-${snap[Snap.Score1]} · snapLen ${SNAP_LEN}`,
+    `${t("modo", "mode")}: ${MODE_NAME[mode] ?? mode}${inLobby ? " (lobby)" : ""}`,
+    `${t("fase", "phase")}: ${PHASE_NAME[snap[Snap.Phase]] ?? snap[Snap.Phase]} · tick ${snap[Snap.Tick]}`,
+    `${t("marcador", "score")}: ${snap[Snap.Score0]}-${snap[Snap.Score1]} · snapLen ${SNAP_LEN}`,
   ];
 }
 
 export function buildReport(c: Readonly<ReportContext>): string {
   const errors = recentErrors();
   return [
-    "# Reporte de bug — futenis",
+    t("# Reporte de bug — futenis", "# Bug report — futenis"),
     "",
-    c.note.trim() || "(sin descripción)",
+    c.note.trim() || t("(sin descripción)", "(no description)"),
     "",
-    "## Contexto",
-    `fecha: ${new Date().toISOString()}`,
-    `página: ${location.origin}${location.pathname}`,
-    `navegador: ${navigator.userAgent}`,
-    `pantalla: ${screen.width}x${screen.height} @${devicePixelRatio} · ventana ${innerWidth}x${innerHeight}`,
+    t("## Contexto", "## Context"),
+    `${t("fecha", "date")}: ${new Date().toISOString()}`,
+    `${t("página", "page")}: ${location.origin}${location.pathname}`,
+    `${t("navegador", "browser")}: ${navigator.userAgent}`,
+    `${t("pantalla", "screen")}: ${screen.width}x${screen.height} @${devicePixelRatio} · ${t("ventana", "window")} ${innerWidth}x${innerHeight}`,
     ...gameLines(c.snap, c.inLobby),
     "",
-    "## Ajustes",
+    t("## Ajustes", "## Settings"),
     JSON.stringify(c.settings),
     "",
-    `## Errores recientes (${errors.length})`,
-    ...(errors.length ? errors : ["ninguno"]),
+    `${t("## Errores recientes", "## Recent errors")} (${errors.length})`,
+    ...(errors.length ? errors : [t("ninguno", "none")]),
   ].join("\n");
 }
