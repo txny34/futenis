@@ -10,9 +10,9 @@ primary_region = "gru"
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "off" # rooms live in memory: never stop mid-match
+  auto_stop_machines = "stop" # trial: stop when idle (Fly only stops with no open connections)
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 
   [[http_service.checks]]
     grace_period = "5s"
