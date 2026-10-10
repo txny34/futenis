@@ -8,9 +8,9 @@ import (
 	"github.com/txny34/futenis/sim"
 )
 
-// leave frees slot. 1v1, or anyone leaving before the start: the room ends
-// and the others are told. A started 2v2 goes on with the bot in that seat
-// until no person is left.
+// leave frees slot. In 1v1 the room ends and the rival is told. In 2v2 the
+// seat is freed: a waiting room keeps waiting, a started one goes on with the
+// bot in that seat; the room ends when no person is left.
 func (r *room) leave(slot int) {
 	r.mu.Lock()
 	if r.closed {

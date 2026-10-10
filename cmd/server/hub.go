@@ -134,7 +134,6 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	var start bool
 	if queued != "" {
 		code, r, slot, start, humans = h.joinQueue(queued, p, key)
-		defer h.leaveQueue(queued, code, key)
 	} else {
 		r, slot, start, humans = h.join(code, sim.Mode1v1, p)
 	}
@@ -156,15 +155,38 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	if start {
 		h.announce(r)
 	} else {
-		h.armFill(r, humans)
-		noRival := time.AfterFunc(h.wait, func() {
-			if r.expireIfWaiting() {
-				p.close(closeNoRival, "no rival")
-			}
-		})
-		defer noRival.Stop()
+		if queued != "" {
+			defer h.leaveQueue(queued, code, key) // only a seated waiter owns a queue spot
+		}
+		h.armFill(r, humans, queued, code)
+		stop := h.expireAlone(r, p)
+		defer stop()
 	}
 	h.readLoop(ctx, code, slot, r, c)
+}
+
+// expireAlone closes p's room if nobody else shows up within h.wait. While a
+// 2v2 room has enough people for the bot fill it re-checks later instead of
+// giving up, so a waiter whose company left is never stranded. stop cancels it.
+func (h *hub) expireAlone(r *room, p peer) (stop func()) {
+	var mu sync.Mutex
+	var t *time.Timer
+	var check func()
+	check = func() {
+		if r.expireIfWaiting() {
+			p.close(closeNoRival, "no rival")
+			return
+		}
+		if _, started := r.startedAt(); !started && !r.isClosed() {
+			mu.Lock()
+			t.Reset(h.wait)
+			mu.Unlock()
+		}
+	}
+	mu.Lock()
+	t = time.AfterFunc(h.wait, check)
+	mu.Unlock()
+	return func() { mu.Lock(); t.Stop(); mu.Unlock() }
 }
 
 // readLoop applies INPUT/answers PING until the peer disconnects, idles out,
@@ -207,14 +229,18 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 
 // armFill: the second person in a 2v2 room starts the countdown after which
 // bots fill the empty seats.
-func (h *hub) armFill(r *room, humans int) {
+func (h *hub) armFill(r *room, humans int, queued, code string) {
 	if r.mode != sim.Mode2v2 || humans != minHumans2v2 {
 		return
 	}
 	time.AfterFunc(h.fill, func() {
-		if r.startEarly() {
-			h.announce(r)
+		if !r.startEarly() {
+			return
 		}
+		if queued != "" {
+			h.closeQueueRoom(queued, code) // started: no longer the open room
+		}
+		h.announce(r)
 	})
 }
 

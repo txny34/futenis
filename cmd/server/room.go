@@ -32,8 +32,9 @@ type peer interface {
 }
 
 // room is one online match: 1v1 (2 seats) or 2v2 (4 seats). Seat = sim slot;
-// team = slot % 2. Every client gets its own view (game.ViewOut). In 2v2 an
-// empty seat is played by the bot, also when someone leaves mid-match.
+// team = slot in 1v1, slot/2 in 2v2. Every client gets its own view
+// (game.ViewOut). In 2v2 an empty seat is played by the bot, also when
+// someone leaves mid-match.
 type room struct {
 	mu      sync.Mutex
 	mode    sim.Mode

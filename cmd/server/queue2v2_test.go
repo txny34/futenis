@@ -96,3 +96,23 @@ func TestQueue2v2LeaverIsReplacedByBot(t *testing.T) {
 	tick <- time.Time{}
 	readMsg(ctx, t, a, msgFrame, frameMsgLen) // the match goes on for a
 }
+
+// The second person leaves during the fill countdown: the one left waiting is
+// still closed by the no-rival timeout instead of waiting forever.
+func TestQueue2v2WaiterNotStrandedAfterFillFails(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv := newTestHubWith(func(h *hub) {
+		h.proxied = true
+		h.fill = 100 * time.Millisecond
+		h.wait = 60 * time.Millisecond // fires while 2 are in: must not be lost
+	})
+	defer srv.Close()
+	a := dial2v2(ctx, t, srv, "10.2.4.1")
+	readMsg(ctx, t, a, msgWaiting, headerLen)
+	b := dial2v2(ctx, t, srv, "10.2.4.2")
+	readMsg(ctx, t, b, msgWaiting, headerLen)
+	time.Sleep(80 * time.Millisecond) // a's no-rival timer fired with 2 people in
+	b.Close(websocket.StatusNormalClosure, "")
+	expectClose(ctx, t, a, closeNoRival)
+}
