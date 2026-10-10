@@ -21,7 +21,7 @@ type ratingStore interface {
 }
 
 // supabaseRatings talks to PostgREST: table public.ratings(user_id uuid pk,
-// elo_1v1 int, elo_2v2 int, games int, updated_at timestamptz).
+// elo_1v1 int, elo_2v2 int, updated_at timestamptz).
 type supabaseRatings struct {
 	base   string // https://<ref>.supabase.co/rest/v1
 	key    string // secret API key (Fly secret SUPABASE_SECRET_KEY), never logged

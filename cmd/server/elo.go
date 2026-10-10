@@ -8,6 +8,7 @@ const (
 	eloK       = 32
 	eloDefault = 1000
 	eloFloor   = 100
+	eloCeiling = 5000 // matches the table check constraint (supabase/migrations)
 )
 
 // eloDelta is team a's rating change against team b.
@@ -35,7 +36,7 @@ func applyElo(ratings map[string]int, teams [2][]string, winner int) map[string]
 	next := make(map[string]int, len(teams[0])+len(teams[1]))
 	for team, ids := range teams {
 		for _, id := range ids {
-			next[id] = max(eloFloor, ratingOf(ratings, id)+deltas[team])
+			next[id] = min(eloCeiling, max(eloFloor, ratingOf(ratings, id)+deltas[team]))
 		}
 	}
 	return next

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"strings"
@@ -22,6 +23,7 @@ const (
 	jwksRefresh  = time.Hour
 	jwksMinFetch = time.Minute // unknown kid: refetch at most this often
 	authAudience = "authenticated"
+	maxJWKSBytes = 64 << 10
 )
 
 var errBadToken = errors.New("auth: invalid token")
@@ -145,7 +147,7 @@ func (v *verifier) fetchLocked() error {
 	}
 	defer res.Body.Close()
 	var set struct{ Keys []jwk }
-	if res.StatusCode != http.StatusOK || json.NewDecoder(res.Body).Decode(&set) != nil {
+	if res.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(res.Body, maxJWKSBytes)).Decode(&set) != nil {
 		return fmt.Errorf("auth: jwks status %d", res.StatusCode)
 	}
 	keys := map[string]*ecdsa.PublicKey{}

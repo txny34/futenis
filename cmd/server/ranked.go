@@ -60,6 +60,10 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 		teams[team] = append(teams[team], users[i])
 	}
 	ids := append(append([]string{}, teams[0]...), teams[1]...)
+	if !distinct(ids) {
+		h.logger.Printf("ranked %s: duplicate or missing player, result not rated", mode)
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), ratingsTimeout)
 	defer cancel()
 	before, err := h.ratings.load(ctx, mode, ids)
@@ -101,4 +105,35 @@ func gameOverWinner(out []float64) (int, bool) {
 		return 1, true
 	}
 	return 0, true
+}
+
+// claimRanked reserves the account's single ranked connection (queue through
+// match end). It fails while another one is live: no self-matching, no
+// parallel matches whose rating writes could overwrite each other.
+func (h *hub) claimRanked(uid string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.active[uid] {
+		return false
+	}
+	h.active[uid] = true
+	return true
+}
+
+func (h *hub) releaseRanked(uid string) {
+	h.mu.Lock()
+	delete(h.active, uid)
+	h.mu.Unlock()
+}
+
+// distinct reports whether every id appears once (defense in depth for reports).
+func distinct(ids []string) bool {
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if id == "" || seen[id] {
+			return false
+		}
+		seen[id] = true
+	}
+	return true
 }

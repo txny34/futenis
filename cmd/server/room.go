@@ -49,6 +49,7 @@ type room struct {
 
 	ranked   bool                                           // ranked queue: no bot fill, ELO at game over
 	users    [sim.MaxPlayers]string                         // verified account per seat (ranked only)
+	nets     [sim.MaxPlayers]string                         // client limit key per seat (ranked only)
 	onOver   func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
 	reported bool                                           // ranked result already sent (game over or forfeit)
 }
@@ -72,11 +73,20 @@ func (r *room) teamOf(slot int) int {
 	return slot
 }
 
-// markRanked records slot's verified account; the room becomes ranked.
-func (r *room) markRanked(slot int, user string) {
+// markRanked records slot's verified account and network (limit key); the
+// room becomes ranked. It refuses an account or a network already seated:
+// nobody plays against themselves, and two accounts from one network can't
+// trade wins.
+func (r *room) markRanked(slot int, user, network string) bool {
 	r.mu.Lock()
-	r.ranked, r.users[slot] = true, user
-	r.mu.Unlock()
+	defer r.mu.Unlock()
+	for i := range r.users {
+		if i != slot && (r.users[i] == user || (r.nets[i] != "" && r.nets[i] == network)) {
+			return false
+		}
+	}
+	r.ranked, r.users[slot], r.nets[slot] = true, user, network
+	return true
 }
 
 func newRoom(mode sim.Mode) *room {

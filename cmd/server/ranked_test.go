@@ -124,8 +124,8 @@ func TestRankedLeaverForfeits(t *testing.T) {
 	r := newRoom(sim.Mode1v1)
 	r.join(&fakePeer{})
 	r.join(&fakePeer{})
-	r.markRanked(0, userA)
-	r.markRanked(1, userB)
+	r.markRanked(0, userA, "net-a")
+	r.markRanked(1, userB, "net-b")
 	got := make(chan int, 2)
 	r.onOver = func(w int, _ [sim.MaxPlayers]string) { got <- w }
 	r.leave(0) // userA quits
@@ -148,12 +148,57 @@ func TestRanked2v2LeaverEndsMatch(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		r.join(&fakePeer{})
 	}
-	for i := 0; i < 4; i++ {
-		r.markRanked(i, userA)
+	for i, u := range []string{userA, userB, userA + "c", userA + "d"} {
+		r.markRanked(i, u, u)
 	}
 	r.onOver = func(int, [sim.MaxPlayers]string) {}
 	r.leave(2)
 	if !r.isClosed() {
 		t.Fatal("ranked 2v2 kept going with a bot")
+	}
+}
+
+// Two simultaneous connections of one account: the second is refused while the
+// first is active, so nobody can be matched against themselves.
+func TestRankedOneActiveConnectionPerAccount(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, iss, _ := newRankedHub(t)
+	tok := tokenFor(t, iss, userA)
+	a := dialRanked(ctx, t, srv, "10.4.0.1", tok)
+	b := dialRanked(ctx, t, srv, "10.4.0.2", tok) // same account, same instant
+	got := 0
+	for _, c := range []*websocket.Conn{a, b} {
+		_, m, err := c.Read(ctx)
+		if err == nil && m[0] == msgWaiting {
+			got++
+		} else if websocket.CloseStatus(err) != closeFull {
+			t.Fatalf("unexpected: %v", err)
+		}
+	}
+	if got != 1 {
+		t.Fatalf("%d connections of one account were seated", got)
+	}
+}
+
+func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
+	r := newRoom(sim.Mode1v1)
+	r.join(&fakePeer{})
+	r.join(&fakePeer{})
+	if !r.markRanked(0, userA, "10.0.0.1") {
+		t.Fatal("first seat refused")
+	}
+	if r.markRanked(1, userA, "10.0.0.2") {
+		t.Fatal("same account on both seats accepted")
+	}
+	if r.markRanked(1, userB, "10.0.0.1") {
+		t.Fatal("two accounts from one network accepted")
+	}
+}
+
+func TestApplyEloCeiling(t *testing.T) {
+	next := applyElo(map[string]int{"a": eloCeiling, "b": eloCeiling}, [2][]string{{"a"}, {"b"}}, 0)
+	if next["a"] > eloCeiling {
+		t.Fatalf("rating %d above the table's limit", next["a"])
 	}
 }
