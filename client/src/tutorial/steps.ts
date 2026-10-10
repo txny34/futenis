@@ -1,13 +1,15 @@
 import { LOB_VY_RATIO } from "../feel/shots";
 import { HUMAN_SLOT } from "../loop";
 import { EventKind, Quality, SimEvent } from "../snapshot";
+import { keyHint, moveHint } from "../ui/key-hints";
 
 // Tutorial (~2 min) over the ball machine: each step completes from the sim
 // event stream only (the client never decides rules, it just watches).
 
 export interface TutorialStep {
   readonly title: string;
-  readonly text: string;
+  /** Built when shown: key names follow Ajustes > Controles. */
+  readonly text: () => string;
   /** Matching events needed to complete the step. */
   readonly count: number;
   readonly match: (e: SimEvent) => boolean;
@@ -19,16 +21,16 @@ const kick = (e: SimEvent): boolean => e.kind === EventKind.Kick && mine(e);
 const lob = (e: SimEvent): boolean => kick(e) && e.vy > 0 && e.vy > Math.hypot(e.vx, e.vz) * LOB_VY_RATIO;
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
-  { title: "Golpe", text: "Movete con WASD y pateá la pelota con click izquierdo (RT).", count: 1, match: kick },
+  { title: "Golpe", text: () => `Movete con ${moveHint()} y pateá la pelota con click izquierdo (RT).`, count: 1, match: kick },
   {
-    title: "Devolución", text: "Devolvé 3 pelotas a la cancha rival. Apuntá con el mouse (stick derecho).",
+    title: "Devolución", text: () => "Devolvé 3 pelotas a la cancha rival. Apuntá con el mouse (stick derecho).",
     count: 3, match: (e) => e.kind === EventKind.ReturnOK,
   },
-  { title: "Salto", text: "Saltá con Espacio (A): llegás a pelotas altas.", count: 1, match: (e) => e.kind === EventKind.Jump && mine(e) },
-  { title: "Dash", text: "Hacé un dash con Q (LB/RB): gasta energía, mirá la barra.", count: 1, match: (e) => e.kind === EventKind.Dash && mine(e) },
-  { title: "Globo", text: "Tirá un globo con click derecho (LT): alto y por encima del rival.", count: 1, match: lob },
+  { title: "Salto", text: () => `Saltá con ${keyHint("jump")} (A): llegás a pelotas altas.`, count: 1, match: (e) => e.kind === EventKind.Jump && mine(e) },
+  { title: "Dash", text: () => `Hacé un dash con ${keyHint("dash")} (LB/RB): gasta energía, mirá la barra.`, count: 1, match: (e) => e.kind === EventKind.Dash && mine(e) },
+  { title: "Globo", text: () => "Tirá un globo con click derecho (LT): alto y por encima del rival.", count: 1, match: lob },
   {
-    title: "Perfect", text: "Pegale justo cuando el anillo se cierra: ¡PERFECT! es punto ganador.",
+    title: "Perfect", text: () => "Pegale justo cuando el anillo se cierra: ¡PERFECT! es punto ganador.",
     count: 1, match: (e) => kick(e) && e.quality === Quality.Perfect,
   },
 ];

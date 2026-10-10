@@ -150,3 +150,5 @@
 .fx-report__note:focus-visible { outline: 2px solid var(--fx-ball); outline-offset: 2px; }
 .fx-report__hint { margin: 8px 0 0; color: var(--fx-muted); font-size: 13px; }
 .fx-report__status { min-height: 1.4em; margin: 8px 0 12px; color: var(--fx-ball); }
+.fx-kbd--btn { cursor: pointer; color: inherit; border-top: 0; border-left: 0; border-right: 0; min-width: 64px; }
+.fx-kbd--btn:hover, .fx-kbd--btn:focus-visible { outline: 2px solid var(--fx-ball); outline-offset: 2px; }

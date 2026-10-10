@@ -69,7 +69,7 @@ export class Tutorial {
     const n = TUTORIAL_STEPS.length;
     this.head.textContent = step ? `TUTORIAL ${p.step + 1}/${n}` : "TUTORIAL";
     this.title.textContent = step ? step.title : DONE_TITLE;
-    this.text.textContent = step ? withCount(step.text, p.hits, step.count) : DONE_TEXT;
+    this.text.textContent = step ? withCount(step.text(), p.hits, step.count) : DONE_TEXT;
     this.root.classList.toggle("is-done", !step);
     const pips = this.pips.children;
     for (let i = 0; i < pips.length; i++) {

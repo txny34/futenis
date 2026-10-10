@@ -7,13 +7,16 @@ import { CallTracker } from "./hud-calls";
 import { Popups, POPUP_GOOD, POPUP_MISS, POPUP_PERFECT } from "./hud-popups";
 import { Scoreboard } from "./hud-score";
 import { TrainingHud } from "./hud-training";
+import { keyHint, moveHint } from "./ui/key-hints";
 import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
 
 const NAMES = ["Local", "Visita"] as const; // team colors come from the theme, so no color names
-const HELP_TEXT =
-  "WASD mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · Espacio salto · " +
-  "Q dash · Ctrl mouse libre · Esc pausa · Mando: stick izq mover, der cámara, RT golpe, LT lob, A salto, LB/RB dash";
-const LOBBY_HELP = "WASD mover · Mouse cámara · Espacio salto · Ctrl mouse libre · Esc menú";
+const helpText = (): string =>
+  `${moveHint()} mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · ${keyHint("jump")} salto · ` +
+  `${keyHint("dash")} dash · ${keyHint("free")} mouse libre · Esc pausa · ` +
+  "Mando: stick izq mover, der cámara, RT golpe, LT lob, A salto, LB/RB dash";
+const lobbyHelp = (): string =>
+  `${moveHint()} mover · Mouse cámara · ${keyHint("jump")} salto · ${keyHint("free")} mouse libre · Esc menú`;
 const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
 const PLAYGROUND_HELP = ` · ${LAUNCH_KEY} lanzar bola`;
 const CALL_MS = 1800;
@@ -49,7 +52,7 @@ export class Hud {
   private dashCooldownMs = DEFAULT_DASH_COOLDOWN_S * MS_PER_S;
 
   constructor(private readonly root: HTMLElement) {
-    this.help.textContent = HELP_TEXT;
+    this.help.textContent = helpText();
     this.fps.hidden = true;
     this.call.hidden = true;
     this.hint.hidden = true;
@@ -136,10 +139,16 @@ export class Hud {
     this.root.classList.toggle("is-lobby", mode === Mode.Lobby); // lobby.md §7: no scoreboard/streak
     this.msg.textContent = playground ? "" : message(phase, server); // RACHA owns the top in Entrenamiento
     this.hint.hidden = playground || phase !== Phase.Serve || server !== HUMAN_TEAM;
-    this.help.textContent = mode === Mode.Lobby ? LOBBY_HELP : playground ? HELP_TEXT + PLAYGROUND_HELP : HELP_TEXT;
+    this.help.textContent = mode === Mode.Lobby ? lobbyHelp() : playground ? helpText() + PLAYGROUND_HELP : helpText();
   }
 
   error(text: string): void { this.err.textContent = text; }
+
+  /** Key binds changed (Ajustes): relabel the action chips; help is rebuilt on the next update. */
+  refreshKeys(): void {
+    this.actions.refreshKeys();
+    this.lastMode = UNSET;
+  }
 }
 
 function message(phase: number, server: number): string {
