@@ -5,4 +5,4 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 : "${FUTENIS_SERVER:?set FUTENIS_SERVER to the online server URL (wss://...)}"
 FUTENIS_SERVER="$FUTENIS_SERVER" go run ./cmd/dev -check
-vercel deploy client "$@"
+vercel deploy --cwd client "$@"
