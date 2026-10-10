@@ -8,7 +8,7 @@ import { extraOverlayOpen, registerOverlay } from "../ui/overlays";
 import { errText, safeStart, tutorialOptions, type App } from "./flow";
 import { TutorialPrompt } from "./tutorial-prompt";
 import { startPresence } from "./presence";
-import { joinFromUrl, startFriendRoom } from "./online-flow";
+import { joinFromUrl, retryLinkJoin, startFriendRoom } from "./online-flow";
 
 // First visit = lobby + "Iniciá sesión" (Discord / Google / invitado) + an optional
 // "¿Primera vez?" tutorial card. Ranked asks for an account again.
@@ -28,10 +28,10 @@ export function setupAccount(app: App): Account {
   startPresence(app, app.view.lobby.remote); // shared online lobby
   app.play.onFriend(() => startFriendRoom(app));
   joinFromUrl(app); // opened from a friend's link (?room=CODE)
-  login.onOpenChange(() => {
-    if (!app.inLobby) return;
-    app.controls.enabled = !app.menu.isOpen && !app.play.isOpen && !extraOverlayOpen();
+  login.onOpenChange((open) => { // also mid-session (a friend's link opened behind the login)
+    app.controls.enabled = !app.menu.isOpen && !app.play.isOpen && !extraOverlayOpen() && !app.state.paused && !app.replaying;
     app.controls.releaseAll();
+    if (!open) retryLinkJoin();
   });
   app.play.onNeedAccount(() => login.open(t("Las clasificatorias necesitan una cuenta.", "Ranked needs an account.")));
   onAuthChange((u) => {

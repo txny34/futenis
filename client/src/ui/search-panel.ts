@@ -52,9 +52,15 @@ export class SearchPanel {
 
   private copyLink(): void {
     const text = this.link.textContent ?? "";
-    void navigator.clipboard?.writeText(text).then(() => {
-      this.copy.textContent = t("¡Copiado!", "Copied!");
+    const done = (label: string): void => {
+      this.copy.textContent = label;
       window.setTimeout(() => { this.copy.textContent = t("Copiar link", "Copy link"); }, COPIED_MS);
-    });
+    };
+    const manual = (): void => { // no clipboard (insecure origin) or denied: select it for Ctrl+C
+      getSelection()?.selectAllChildren(this.link);
+      done(t("Copialo a mano", "Copy it by hand"));
+    };
+    if (!navigator.clipboard) { manual(); return; }
+    navigator.clipboard.writeText(text).then(() => done(t("¡Copiado!", "Copied!")), manual);
   }
 }

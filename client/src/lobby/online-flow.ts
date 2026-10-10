@@ -11,7 +11,8 @@ import type { QueueMode } from "../ui/play-modal/play-modal";
 import { arm, enterLobby, landingAllowed, type App } from "./flow";
 import { cancelIntro } from "./intro";
 import { endReplay } from "./replay-state";
-import { isCurrent, leaveOnline, onLeaveOnline, onlineOver, setRemote } from "./online-state";
+import { extraOverlayOpen } from "../ui/overlays";
+import { isCurrent, isOnline, leaveOnline, onLeaveOnline, onlineOver, setRemote } from "./online-state";
 
 // Online casual match from "Elegí un modo": the server pairs whoever is queued
 // (cmd/server/queue.go) and the loop renders its frames instead of the local sim.
@@ -36,6 +37,7 @@ const LIVE: ReadonlySet<NetStatus> = new Set<NetStatus>(["conectando", "esperand
 const BACK_MS = 2500; // time to read why the session ended before the lobby
 const NOTE_MS = 5000;
 const JOIN_POLL_MS = 200;
+const CLICK_TO_PLAY = t("Hacé clic en la cancha para jugar", "Click the court to play");
 
 let panel: SearchPanel | null = null;
 let shareLink = ""; // private room: the link shown while waiting
@@ -55,7 +57,8 @@ function onStatus(app: App, remote: RemoteEngine, s: NetStatus, ping: number): v
   const waiting = s === "conectando" || s === "esperando rival";
   if (waiting) searchPanel(app).show(statusText(s), shareLink);
   else panel?.hide();
-  const text = s === "jugando" ? `${ping} ms` : waiting ? "" : statusText(s);
+  const unlocked = s === "jugando" && !app.controls.isLocked; // pointer free since the search panel
+  const text = unlocked ? CLICK_TO_PLAY : s === "jugando" ? `${ping} ms` : waiting ? "" : statusText(s);
   app.hud.error(text);
   if (LIVE.has(s)) return;
   window.setTimeout(() => {
@@ -77,9 +80,12 @@ function onRanked(app: App, mode: QueueMode, before: number, after: number): voi
 
 let lastQueue: { mode: QueueMode; ranked: boolean } | null = null;
 
-/** Revancha after an online match: back into the same queue (ranked stays ranked). */
+/** Revancha after an online match: back into the same queue (ranked stays
+ * ranked), or the same private room for a friend match. */
 export function requeue(app: App): void {
   if (lastQueue) startOnline(app, lastQueue.mode, lastQueue.ranked);
+  else if (friendCode) startFriendRoom(app, friendCode, shareLink !== "");
+  else enterLobby(app);
 }
 
 export function startOnline(app: App, mode: QueueMode, ranked = false): void {
@@ -90,24 +96,48 @@ export function startOnline(app: App, mode: QueueMode, ranked = false): void {
   connect(app, mode, `${serverBase()}/ws?queue=${ranked ? `ranked${mode}` : mode}`, token ?? "");
 }
 
-/** "Jugar con un amigo": a private 1v1 room; the friend opens the link. */
-export function startFriendRoom(app: App, code = randomRoomCode()): void {
-  lastQueue = null; // Revancha after a friend match: back to the lobby menu
-  shareLink = roomLink(code);
+let friendCode = ""; // last private room: Revancha meets the same friend there again
+
+/** "Jugar con un amigo": a private 1v1 room. The host sees the link to share;
+ * the friend who opened it (host = false) just waits. */
+export function startFriendRoom(app: App, code = randomRoomCode(), host = true): void {
+  lastQueue = null;
+  friendCode = code;
+  shareLink = host ? roomLink(code) : "";
   connect(app, "1v1", `${serverBase()}/ws?room=${code}`, "");
 }
 
-/** Boot with ?room=CODE (a friend's link): join that room once the game is up. */
+/** Boot with ?room=CODE (a friend's link): join that room once the game is up
+ * and no dialog (login) is open. Given up as soon as the player starts
+ * something else (a match, the tutorial), so it never hijacks a later lobby
+ * visit. No wall-clock deadline: background tabs throttle timers heavily. */
 export function joinFromUrl(app: App): void {
-  const code = parseRoomCode(new URLSearchParams(location.search).get("room"));
+  const params = new URLSearchParams(location.search);
+  const code = parseRoomCode(params.get("room"));
   if (!code) return;
-  history.replaceState(null, "", location.pathname); // a reload must not rejoin
+  params.delete("room"); // a reload must not rejoin; other params (?dev=1) stay
+  const rest = params.toString();
+  history.replaceState(null, "", `${location.pathname}${rest ? `?${rest}` : ""}${location.hash}`);
+  let done = false;
   const tryJoin = (): void => {
-    if (app.engine.loaded && app.inLobby) startFriendRoom(app, code);
-    else window.setTimeout(tryJoin, JOIN_POLL_MS);
+    if (done) return;
+    if (isOnline() || (app.engine.loaded && !app.inLobby)) { done = true; return; }
+    if (app.engine.loaded && !app.menu.isOpen && !app.play.isOpen && !extraOverlayOpen()) {
+      done = true;
+      startFriendRoom(app, code, false);
+    } else {
+      window.setTimeout(tryJoin, JOIN_POLL_MS);
+    }
   };
+  pendingJoin = tryJoin; // also run on events: background tabs throttle the timer
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) tryJoin(); });
   tryJoin();
 }
+
+let pendingJoin: () => void = () => undefined;
+
+/** A dialog closed (e.g. the login): a friend's link waiting for it joins now. */
+export function retryLinkJoin(): void { pendingJoin(); }
 
 function connect(app: App, mode: QueueMode, url: string, token: string): void {
   if (!app.loop) return;
