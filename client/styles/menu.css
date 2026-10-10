@@ -139,3 +139,12 @@
   .fx-card { padding: 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, .45), 5px 5px 0 var(--fx-ball); }
   .fx-slider input { width: 130px; }
 }
+
+/* Reportar un bug (ui/report-view.ts) */
+.fx-report__note {
+  width: min(520px, 100%); box-sizing: border-box; padding: 10px 12px; border-radius: 10px; resize: vertical;
+  background: rgba(233, 241, 255, .06); border: 1px solid rgba(233, 241, 255, .18); color: var(--fx-line); font: 15px/1.4 var(--fx-body);
+}
+.fx-report__note:focus-visible { outline: 2px solid var(--fx-ball); outline-offset: 2px; }
+.fx-report__hint { margin: 8px 0 0; color: var(--fx-muted); font-size: 13px; }
+.fx-report__status { min-height: 1.4em; margin: 8px 0 12px; color: var(--fx-ball); }

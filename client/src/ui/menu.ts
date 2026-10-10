@@ -5,16 +5,17 @@ import { panel, pauseMenu } from "./screens";
 import { lobbyMenu, LobbyMenuModel } from "./lobby-menu";
 import { loadSettings, saveSettings, Settings } from "./settings";
 import { settingsView } from "./settings-view";
+import { reportView } from "./report-view";
 import { trainingView } from "./training-view";
 import type { TrainingSettings } from "./training-settings";
 
 export type { Difficulty, GameMode, MatchOptions } from "./types";
 export type { Settings } from "./settings";
 
-type Screen = "setup" | "settings" | "pause" | "lobby" | "hidden";
+type Screen = "setup" | "settings" | "report" | "pause" | "lobby" | "hidden";
 type Listener<T> = (v: T) => void;
 
-const NAV_SELECTOR = "button:not(:disabled), input, [tabindex='0']";
+const NAV_SELECTOR = "textarea, button:not(:disabled), input, [tabindex='0']";
 const KEY_NEXT = new Set(["ArrowDown"]);
 const KEY_PREV = new Set(["ArrowUp"]);
 const ESC_DEBOUNCE_MS = 150; // one Esc can both drop pointer lock and arrive as keydown
@@ -25,6 +26,8 @@ export class MenuUI {
   private inGame = false;
   private lobbyModel: (() => LobbyMenuModel) | null = null;
   private settingsBack: Screen = "hidden";
+  private reportText: ((note: string) => string) | null = null;
+  private reportBack: Screen = "hidden";
   private openedAt = -Infinity; // last pause/lobby-menu open, for the Esc debounce
   private readonly openCbs: Listener<boolean>[] = [];
   private readonly settingsCbs: Listener<Settings>[] = [];
@@ -70,6 +73,15 @@ export class MenuUI {
     const back: Screen = this.screen === "lobby" ? "lobby" : "hidden";
     this.mount("setup", trainingView((t) => { this.hide(); onStart(t); }, () => this.render(back)));
   }
+  /** Builds the bug report text (main.ts owns the game context). */
+  setReport(build: (note: string) => string): void { this.reportText = build; }
+  /** "Reportar un bug" from the lobby menu or pause: "Volver" returns there. */
+  openReport(): void {
+    const build = this.reportText;
+    if (!build) return;
+    this.reportBack = this.screen === "pause" || this.screen === "lobby" ? this.screen : "hidden";
+    this.mount("report", reportView(build, () => this.back()));
+  }
   showPause(): void {
     if (!this.inGame) return;
     this.openedAt = performance.now();
@@ -97,7 +109,7 @@ export class MenuUI {
   private build(screen: Screen): HTMLElement | null {
     switch (screen) {
       case "pause": return pauseMenu({
-        resume: () => this.resume(), settings: () => this.render("settings"), quit: () => this.quit(),
+        resume: () => this.resume(), settings: () => this.render("settings"), report: () => this.openReport(), quit: () => this.quit(),
       });
       case "settings": return this.settingsScreen();
       case "lobby": return this.lobbyModel ? lobbyMenu(this.lobbyModel(), () => this.hide()) : null;
@@ -127,12 +139,20 @@ export class MenuUI {
   private back(): void {
     if (this.screen === "pause") this.resume();
     else if (this.screen === "settings") this.render(this.inGame ? "pause" : this.settingsBack);
+    else if (this.screen === "report") this.backFromReport();
     else this.hide(); // setup, lobby menu
+  }
+
+  /** Pause reopens through render (already paused); a stray state falls back to resume. */
+  private backFromReport(): void {
+    if (this.reportBack === "hidden" && this.inGame) this.resume();
+    else this.render(this.reportBack);
   }
 
   private onKey(e: KeyboardEvent): void {
     if (e.code === "Escape") {
       e.preventDefault();
+      if (e.target instanceof HTMLTextAreaElement) { e.target.blur(); return; } // first Esc keeps the draft
       if ((this.screen === "lobby" || this.screen === "pause") && performance.now() - this.openedAt < ESC_DEBOUNCE_MS) return;
       if (this.isOpen) this.back();
       else if (this.inGame) this.showPause();
@@ -145,6 +165,7 @@ export class MenuUI {
   private moveFocus(e: KeyboardEvent): void {
     const target = e.target;
     if (target instanceof HTMLInputElement && target.type !== "checkbox") return; // sliders/radios use arrows
+    if (target instanceof HTMLTextAreaElement) return; // arrows move the caret
     const items = Array.from(this.layer.querySelectorAll<HTMLElement>(NAV_SELECTOR));
     if (items.length === 0) return;
     e.preventDefault();
