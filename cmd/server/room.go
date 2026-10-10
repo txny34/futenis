@@ -68,6 +68,25 @@ func (r *room) join(p peer) (slot int, start bool) {
 	return slot, start
 }
 
+func (r *room) isStarted() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.started
+}
+
+// expireIfWaiting closes the room iff the match never started, atomically
+// with join (a rival arriving now is rejected instead of meeting a dead host).
+func (r *room) expireIfWaiting() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.started || r.closed {
+		return false
+	}
+	r.closed = true
+	close(r.stop)
+	return true
+}
+
 func (r *room) isClosed() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

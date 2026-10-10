@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -29,10 +30,14 @@ type hub struct {
 	ticker   func() (<-chan time.Time, func()) // injectable for tests
 	logger   *log.Logger
 	maxRooms int
+	conns    *connLimiter
+	idle     time.Duration // injectable for tests
+	wait     time.Duration
 }
 
 func newHub(origins []string, logger *log.Logger) *hub {
-	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms}
+	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
+		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -81,6 +86,12 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "bad room code", http.StatusBadRequest)
 		return
 	}
+	ip := clientIP(req)
+	if !h.conns.acquire(ip) {
+		http.Error(w, "too many connections", http.StatusTooManyRequests)
+		return
+	}
+	defer h.conns.release(ip)
 	c, err := websocket.Accept(w, req, &websocket.AcceptOptions{OriginPatterns: h.origins})
 	if err != nil {
 		return // Accept already wrote the HTTP error
@@ -118,11 +129,39 @@ func (h *hub) serve(ctx context.Context, code string, c *websocket.Conn) {
 	defer func() { r.leave(slot); h.forget(code, r); c.CloseNow() }()
 	if start {
 		h.announce(r)
+	} else {
+		noRival := time.AfterFunc(h.wait, func() {
+			if r.expireIfWaiting() {
+				p.close(closeNoRival, "no rival")
+			}
+		})
+		defer noRival.Stop()
 	}
+	h.readLoop(ctx, code, slot, r, c)
+}
+
+// readLoop applies INPUT/answers PING until the peer disconnects, idles out,
+// floods or sends garbage.
+func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *websocket.Conn) {
+	p := wsPeer{c}
+	// Idle only counts once the match runs: a waiting host often hides the tab
+	// to share the link (no rAF, no PING); the no-rival timeout covers that.
+	var lastSeen atomic.Int64
+	lastSeen.Store(time.Now().UnixNano())
+	done := make(chan struct{})
+	defer close(done)
+	go h.watchIdle(r, p, &lastSeen, done)
+	var rate rateWindow
 	pong := make([]byte, pingMsgLen)
 	for {
 		typ, b, err := c.Read(ctx)
 		if err != nil {
+			return
+		}
+		lastSeen.Store(time.Now().UnixNano())
+		if !rate.allow(time.Now()) {
+			h.logger.Printf("room %s slot %d: rate limit", code, slot)
+			p.close(closeRate, "rate limit")
 			return
 		}
 		if typ == websocket.MessageBinary && isPing(b) {
@@ -148,4 +187,23 @@ func (h *hub) announce(r *room) {
 	sendTo(p1, encodeWelcome(1))
 	tick, stop := h.ticker()
 	go func() { defer stop(); r.run(tick) }()
+}
+
+// watchIdle closes p once the match runs and nothing arrived for h.idle.
+func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, done <-chan struct{}) {
+	t := time.NewTimer(h.idle)
+	defer t.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-t.C:
+		}
+		left := h.idle - time.Since(time.Unix(0, lastSeen.Load()))
+		if left <= 0 && r.isStarted() {
+			p.close(closeIdle, "idle")
+			return
+		}
+		t.Reset(max(left, h.idle/4))
+	}
 }

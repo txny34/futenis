@@ -19,7 +19,17 @@ export type NetStatus =
   | "jugando"
   | "el rival se fue"
   | "desconectado"
-  | "versión distinta, recargá";
+  | "versión distinta, recargá"
+  | "desconectado por inactividad"
+  | "nadie se unió a la sala"
+  | "demasiados mensajes";
+
+// Server close codes (cmd/server/limits.go).
+const CLOSE_STATUS: Readonly<Record<number, NetStatus | undefined>> = {
+  4003: "desconectado por inactividad",
+  4004: "demasiados mensajes",
+  4005: "nadie se unió a la sala",
+};
 
 /** StepEngine backed by the online server: inputs go up, server frames come down (optionally delayed). */
 export class RemoteEngine implements StepEngine {
@@ -67,7 +77,10 @@ export class RemoteEngine implements StepEngine {
       const b = new Uint8Array(m.data);
       (b[0] === Msg.Frame ? this.down : this.control).push(b, performance.now());
     };
-    ws.onclose = () => { if (this.status === "jugando" || this.status === "esperando rival" || this.status === "conectando") this.setStatus("desconectado"); };
+    ws.onclose = (e: CloseEvent) => {
+      if (this.status !== "jugando" && this.status !== "esperando rival" && this.status !== "conectando") return;
+      this.setStatus(CLOSE_STATUS[e.code] ?? "desconectado");
+    };
     this.ws = ws;
   }
 
