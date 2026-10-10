@@ -50,6 +50,17 @@ el buffer de golpe, red por eventos de toque en vez de frames completos, 2v2, re
 
 ## 7. Antes de exponerlo públicamente (revisión de seguridad del spike)
 
+Hecho (`cmd/server/limits.go`): conexiones globales (`2 × maxRooms`) y 4 por IP (HTTP 429), máximo de salas,
+cierre 4003 por inactividad (20 s sin INPUT/PING con el partido en curso: una pestaña oculta deja de mandar, así que también es el AFK; el host esperando no cuenta),
+4004 por rate limit (> 242 mensajes por ventana fija de 1 s), 4005 si el host sigue solo a los 5 min. La IP es la del socket TCP: detrás
+de un proxy hay que confiar en `X-Forwarded-For`, decisión que va con el hosting.
+
+Pendiente:
+
+- Rate de accept por IP / backoff (hoy el cupo se toma antes del handshake). Detrás de un proxy, sin
+  `X-Forwarded-For` confiable, el límite por IP colapsa a 4 conexiones en total.
+- Rechazos de capacidad (429, sala llena, server lleno) llegan al navegador como 1006 "desconectado".
+
 - Límites: conexiones globales y por IP, cantidad máxima de salas, timeout del host esperando rival, deadline de
   lectura por inactividad y rate limit de INPUT/PING por conexión.
 - TLS: `wss://` detrás de un proxy (el cliente ya usa `wss` cuando la página es https).
