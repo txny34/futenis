@@ -28,6 +28,7 @@ export class PlayModal {
   private readonly profile = new ProfileSummary();
   private readonly openCbs: Array<(open: boolean) => void> = [];
   private needAccount: () => void = () => undefined;
+  private friend: () => void = () => undefined;
   private pick: PlayPick | null = null;
   private toastTimer = 0;
 
@@ -47,6 +48,7 @@ export class PlayModal {
     const right = el("nav", "fx-play__right", "", { "aria-label": t("Más", "More") });
     right.append(
       this.swap,
+      button(t("Jugar con un amigo", "Play with a friend"), () => { this.close(); this.friend(); }, "fx-play__side"),
       button(t("Historial", "History"), () => this.showSheet(t("Historial", "History"), historyPanel()), "fx-play__side"),
       button(t("Información", "Info"), () => this.showSheet(t("Información", "Info"), infoPanel()), "fx-play__side"),
       button(t("Recompensas", "Rewards"), () => this.soon(), "fx-play__side"),
@@ -69,6 +71,8 @@ export class PlayModal {
   onOpenChange(cb: (open: boolean) => void): void { this.openCbs.push(cb); }
   /** Ranked picked without an account: the caller shows "Iniciá sesión". */
   onNeedAccount(cb: () => void): void { this.needAccount = cb; }
+  /** "Jugar con un amigo": the caller opens a private room. */
+  onFriend(cb: () => void): void { this.friend = cb; }
 
   /** preselect: the pad's card; JUGAR opens with nothing selected. Always opens online. */
   open(preselect: PlayPick | null = null): void {
