@@ -1,7 +1,7 @@
 /** Match-flow overlays: VS intro before the first serve and the VICTORIA/DERROTA result. */
 import { button, el } from "./dom";
 
-export const VS_INTRO_MS = 2000;
+export const VS_INTRO_MS = 3200; // backlog: under 4 s, skippable
 const TEAM_NAMES = ["Local", "Visita"] as const;
 const LEAVE_CLASS = "is-leaving";
 const LEAVE_MS = 300;
@@ -14,11 +14,14 @@ export interface ResultInfo {
 
 export interface ResultActions { rematch: () => void; lobby: () => void }
 
-function team(i: 0 | 1, members: number): HTMLElement {
+/** VS card line under each team name, e.g. "Invitado · 1000 ELO". */
+export interface IntroLabels { readonly left: string; readonly right: string }
+
+function team(i: 0 | 1, members: number, label: string): HTMLElement {
   const t = el("div", `fx-vs__team fx-vs__team--${i}`);
   const sils = el("div", "fx-vs__sils", "", { "aria-hidden": "true" });
   for (let k = 0; k < members; k++) sils.append(el("span", "fx-sil"));
-  t.append(sils, el("span", "fx-vs__name", TEAM_NAMES[i]));
+  t.append(sils, el("span", "fx-vs__name", TEAM_NAMES[i]), el("span", "fx-vs__who", label));
   return t;
 }
 
@@ -33,10 +36,10 @@ export class MatchScreens {
   }
 
   /** members: players per team (1 in 1v1, 2 in 2v2). Fades out by itself after VS_INTRO_MS. */
-  showIntro(members: number, subtitle: string): void {
-    const vs = el("div", "fx-vs");
-    vs.append(team(0, members), el("span", "fx-vs__vs", "VS"), team(1, members));
-    this.mount(vs, el("p", "fx-vs__sub", subtitle));
+  showIntro(members: number, subtitle: string, labels: IntroLabels): void {
+    const vs = el("div", "fx-vs", "", { role: "status", "aria-live": "polite" });
+    vs.append(team(0, members, labels.left), el("span", "fx-vs__vs", "VS"), team(1, members, labels.right));
+    this.mount(vs, el("p", "fx-vs__sub", subtitle), el("p", "fx-vs__skip", "Click o tecla para saltar"));
     this.leaveTimer = window.setTimeout(() => this.leave(), VS_INTRO_MS - LEAVE_MS);
   }
 
