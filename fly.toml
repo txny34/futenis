@@ -1,4 +1,7 @@
 # Fly.io app for the online server (cmd/server). São Paulo: lowest RTT to the Río de la Plata.
+# ONE machine only: rooms, the matchmaking queue and the IP limits live in memory.
+# Deploy with `flyctl deploy --ha=false` (a plain deploy creates 2 machines and
+# players on different machines never meet).
 app = "futenis-server"
 primary_region = "gru"
 

@@ -116,6 +116,11 @@ func (b *builder) buildWasm(ctx context.Context) error {
 }
 
 func (b *builder) bundleTS() error {
+	server := os.Getenv("FUTENIS_SERVER")
+	sourcemap := api.SourceMapInline
+	if server != "" {
+		sourcemap = api.SourceMapNone // deployed build: do not ship the TS sources
+	}
 	result := api.Build(api.BuildOptions{
 		EntryPointsAdvanced: []api.EntryPoint{
 			{InputPath: filepath.Join(b.root, "client", "src", "main.ts"), OutputPath: "main"},
@@ -127,10 +132,10 @@ func (b *builder) bundleTS() error {
 		Write:     true,
 		Format:    api.FormatESModule,
 		Target:    api.ES2020,
-		Sourcemap: api.SourceMapInline,
+		Sourcemap: sourcemap,
 		External:  []string{"three", "three/*"}, // provided by the import map
-		// Online server base URL for deployed builds (e.g. wss://x.onrender.com); empty = same host :8091.
-		Define:   map[string]string{"__FUTENIS_SERVER__": strconv.Quote(os.Getenv("FUTENIS_SERVER"))},
+		// Online server base URL for deployed builds (e.g. wss://futenis-server.fly.dev); empty = same host :8091.
+		Define:   map[string]string{"__FUTENIS_SERVER__": strconv.Quote(server)},
 		LogLevel: api.LogLevelSilent,
 	})
 	if len(result.Errors) == 0 {
