@@ -1,5 +1,6 @@
 import { Sound } from "../audio/sound";
 import type { Engine, MatchSetup } from "../engine";
+import type { ChallengeSession } from "../profile/challenges";
 import type { Tutorial } from "../tutorial/tutorial";
 import { recorder } from "../profile/recorder";
 import { profileStore } from "../profile/store";
@@ -43,6 +44,7 @@ export interface App {
   hud: Hud;
   sound: Sound;
   tutorial: Tutorial;
+  challenges: ChallengeSession;
   controls: Controls;
   state: LoopState;
   bar: BottomBar;
@@ -104,6 +106,7 @@ export function enterLobby(app: App): void {
   app.state.showLanding = false;
   app.hud.setTrainingOnDemand(false);
   app.tutorial.stop();
+  app.challenges.end();
   cancelIntro();
   arm(app, true);
 }
@@ -129,6 +132,8 @@ export function startMatch(app: App, o: MatchOptions): void {
   arm(app, false);
   if (o.tutorial) app.tutorial.start();
   else app.tutorial.stop();
+  if (o.mode === "playground" && !o.tutorial) app.challenges.begin();
+  else app.challenges.end();
   app.controls.lock();
   if (o.mode !== "playground") {
     playIntro(app, o.mode, TEAM_SIZE[o.mode], o.difficulty);

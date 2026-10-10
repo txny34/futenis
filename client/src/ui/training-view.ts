@@ -1,4 +1,5 @@
 /** Entrenamiento setup panel: PISTA / GOLPE / SESIÓN cards + Volver / Empezar. Pure builder. */
+import { challengesCard } from "./challenges-card";
 import { applyThemeCss } from "../env/theme";
 import { button, Choice, el, segmented, slider } from "./dom";
 import { range2 } from "./range2";
@@ -110,7 +111,7 @@ export function trainingView(onStart: (t: TrainingSettings) => void, onBack: () 
   root.append(
     el("h2", "fx-card__title", "Entrenamiento"),
     el("p", "fx-train__sub", "Ajustá la máquina y empezá la sesión."),
-    grid, actions,
+    grid, challengesCard(), actions,
   );
   return root;
 }
