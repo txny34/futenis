@@ -60,7 +60,7 @@ func (l *connLimiter) release(ip string) {
 	}
 }
 
-// clientIP is the TCP peer address, or behind a trusted proxy (Render) the last
+// clientIP is the TCP peer address, or behind a trusted proxy (Fly.io) the last
 // X-Forwarded-For entry: the one the proxy appended, which clients cannot spoof.
 func clientIP(req *http.Request, trustProxy bool) string {
 	if trustProxy {
