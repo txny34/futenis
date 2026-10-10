@@ -37,6 +37,7 @@ export class Hud {
   private readonly crosshair = el("crosshair");
   private readonly call = el("call");
   private readonly hint = el("hint");
+  private readonly replayTag = el("replay");
   private readonly calls = new CallTracker();
   private readonly board = new Scoreboard();
   private readonly banner = new Callouts();
@@ -56,13 +57,15 @@ export class Hud {
     this.fps.hidden = true;
     this.call.hidden = true;
     this.hint.hidden = true;
+    this.replayTag.textContent = "REPETICIÓN · Esc → menú para salir";
+    this.replayTag.hidden = true;
     this.hint.textContent = SERVE_HINT;
     applyThemeCss(root);
     this.crosshair.hidden = true;
     this.actions = new ActionBar();
     root.append(
       this.board.score, this.board.shots, this.msg, this.banner.root, this.call, this.hint,
-      this.popups.root, this.training.root, this.training.pop, this.crosshair, this.actions.root, this.fps, this.help, this.err,
+      this.popups.root, this.replayTag, this.training.root, this.training.pop, this.crosshair, this.actions.root, this.fps, this.help, this.err,
     );
   }
 
@@ -109,6 +112,9 @@ export class Hud {
   moment(m: Readonly<HypeMoment>, nowMs: number): void {
     if (this.lastMode !== Mode.Playground) this.banner.onMoment(m, HUMAN_TEAM, nowMs);
   }
+
+  /** "REPETICIÓN" tag while a replay plays (lobby/replay-flow.ts). */
+  setReplay(on: boolean): void { this.replayTag.hidden = !on; }
 
   /** Training challenge medal (profile/challenges.ts). */
   medal(text: string, nowMs: number): void { this.banner.announce(text, MEDAL_PRIO, "gold", nowMs); }

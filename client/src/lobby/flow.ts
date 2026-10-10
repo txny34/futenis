@@ -1,15 +1,16 @@
 import { Sound } from "../audio/sound";
 import type { Engine, MatchSetup } from "../engine";
 import type { ChallengeSession } from "../profile/challenges";
+import type { Tape } from "../replay/tape";
+import { endReplay } from "./replay-state";
 import type { Tutorial } from "../tutorial/tutorial";
-import { rankChange } from "../profile/rank";
 import { recorder } from "../profile/recorder";
 import { profileStore } from "../profile/store";
 import type { Hud } from "../hud";
 import type { Controls } from "../input";
-import type { GameLoop, LoopState, MatchResult } from "../loop";
+import type { GameLoop, LoopState } from "../loop";
 import type { CourtView } from "../render";
-import { EventKind, Mode, Snap } from "../snapshot";
+import { EventKind, Mode } from "../snapshot";
 import { applyTraining } from "../train-config";
 import { MatchScreens } from "../ui/match-screens";
 import { cancelIntro, playIntro } from "./intro";
@@ -31,7 +32,6 @@ const LOBBY_BOT: Difficulty = "normal"; // the lobby has no bot; any valid id
 const DIFFICULTY_ID: Readonly<Record<Difficulty, number>> = { easy: 0, normal: 1, hard: 2, pro: 3 };
 // Single local human on slot 0 in every mode: rivals/partner are AI (filled inside wasm).
 const HUMAN_MASK = 1;
-const HUMAN_TEAM = 0;
 const CFG_DASH_COOLDOWN = 49; // sim/config_layout.go cfgDashCooldownTime
 const TEAM_SIZE: Readonly<Record<GameMode, number>> = { "1v1": 1, "2v2": 2, playground: 1 };
 const YAW_LOBBY = -Math.PI / 2; // spawn faces -Z, toward the pads
@@ -46,6 +46,9 @@ export interface App {
   sound: Sound;
   tutorial: Tutorial;
   challenges: ChallengeSession;
+  /** Last real match (replay tape) and whether it is playing back now. */
+  tape: Tape;
+  replaying: boolean;
   controls: Controls;
   state: LoopState;
   bar: BottomBar;
@@ -74,7 +77,7 @@ function setup(mode: MatchSetup["mode"], difficulty: Difficulty, pointsToWin: nu
 }
 
 /** Shared tail of entering any mode: fresh loop, live controls, HUD reset. */
-function arm(app: App, lobby: boolean): void {
+export function arm(app: App, lobby: boolean): void {
   app.engine.reset();
   app.inLobby = lobby;
   app.state.running = true;
@@ -109,7 +112,15 @@ export function enterLobby(app: App): void {
   app.tutorial.stop();
   app.challenges.end();
   cancelIntro();
+  endReplay(app);
   arm(app, true);
+}
+
+/** Fresh sim for o's mode/bots (match start and replay). */
+export function configureMatch(app: App, o: MatchOptions): void {
+  app.engine.clearInputs();
+  app.engine.configure(setup(MODE_ID[o.mode], o.difficulty, o.pointsToWin));
+  app.mode = o.mode;
 }
 
 export function startMatch(app: App, o: MatchOptions): void {
@@ -119,11 +130,11 @@ export function startMatch(app: App, o: MatchOptions): void {
     return;
   }
   app.hud.error("");
-  app.engine.clearInputs();
-  app.engine.configure(setup(MODE_ID[o.mode], o.difficulty, o.pointsToWin));
+  endReplay(app);
+  configureMatch(app, o);
   const training = o.training ?? DEFAULT_TRAINING; // ball machine: live Config, kept by reset()
   if (o.mode === "playground") applyTraining(app.engine, training);
-  app.mode = o.mode;
+  app.tape.clear(app.engine.getConfig());
   app.last = o;
   recorder().end();
   recorder().begin(o.mode === "playground" ? "training" : o.mode, o.difficulty, o.ranked);
@@ -179,18 +190,4 @@ function openPadSetup(app: App, mode: GameMode): void {
   if (app.menu.isOpen || app.play.isOpen) return;
   if (mode === "playground") app.menu.openTraining((t) => safeStart(app, lobbyOptions("playground", false, t)));
   else app.play.open({ mode, ranked: false });
-}
-
-export function showResult(app: App, r: Readonly<MatchResult>, snap: Float64Array): void {
-  app.controls.enabled = false;
-  app.controls.releaseAll();
-  const winner = r.winner >= 0 ? r.winner : snap[Snap.Sets0] >= snap[Snap.Sets1] ? 0 : 1;
-  const elo = recorder().matchOver(winner === HUMAN_TEAM, r.games0, r.games1);
-  const rankNote = elo ? rankChange(elo.before, elo.after) : null;
-  app.screens.showResult({ won: winner === HUMAN_TEAM, games0: r.games0, games1: r.games1, rankNote }, {
-    rematch: () => { if (app.last) safeStart(app, app.last); },
-    lobby: () => {
-      try { enterLobby(app); } catch (err) { app.hud.error(errText(err)); }
-    },
-  });
 }
