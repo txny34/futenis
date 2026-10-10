@@ -1,0 +1,26 @@
+# Fly.io app for the online server (cmd/server). São Paulo: lowest RTT to the Río de la Plata.
+app = "futenis-server"
+primary_region = "gru"
+
+[env]
+  FUTENIS_ORIGINS = "futenis.vercel.app"
+  FUTENIS_TRUST_PROXY = "1"
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off" # rooms live in memory: never stop mid-match
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "5s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "2s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

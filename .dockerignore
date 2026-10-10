@@ -1,0 +1,6 @@
+.git
+.claude
+client
+docs
+scripts
+*.wasm
