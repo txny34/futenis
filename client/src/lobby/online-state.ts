@@ -7,6 +7,9 @@ let remote: RemoteEngine | null = null;
 let over = false;
 
 export const isOnline = (): boolean => remote !== null;
+const leaveCbs: Array<() => void> = [];
+/** Runs whenever the online session ends (lobby, local match, new session). */
+export function onLeaveOnline(cb: () => void): void { leaveCbs.push(cb); }
 /** True once the online match reached its result screen (later disconnects are moot). */
 export const onlineOver = (): boolean => over;
 export function markOnlineOver(): void { over = true; }
@@ -21,4 +24,5 @@ export function leaveOnline(app: App): void {
   remote = null;
   app.loop?.setEngine(app.engine);
   app.hud.error("");
+  for (const cb of leaveCbs) cb();
 }

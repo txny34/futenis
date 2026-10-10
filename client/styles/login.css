@@ -25,3 +25,17 @@
 .fx-tutprompt__close {
   position: absolute; top: 6px; right: 8px; background: none; border: 0; color: var(--fx-muted); font-size: 16px; cursor: pointer;
 }
+
+/* "Buscando rival…" panel (ui/search-panel.ts). */
+.fx-search {
+  position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 25; width: min(420px, calc(100% - 32px));
+  display: grid; gap: 10px; justify-items: center; padding: 18px 20px; border-radius: var(--fx-radius);
+  background: var(--fx-card); border: 2px solid var(--fx-teal); color: var(--fx-line); font-family: var(--fx-body); text-align: center;
+}
+.fx-search[hidden], .fx-search__share[hidden] { display: none; }
+.fx-search__title { font: 400 22px var(--fx-display); color: var(--fx-ball); }
+.fx-search__clock { color: var(--fx-muted); font-variant-numeric: tabular-nums; }
+.fx-search__share { display: grid; gap: 8px; justify-items: center; width: 100%; }
+.fx-search__hint { color: var(--fx-muted); font-size: 14px; }
+.fx-search__link { max-width: 100%; overflow-wrap: anywhere; padding: 6px 10px; border-radius: 8px; background: rgba(233, 241, 255, .08); }
+.fx-search__copy, .fx-search__cancel { font-size: 16px; padding: 10px 16px; text-align: center; }
