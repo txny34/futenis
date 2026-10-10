@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -128,7 +129,9 @@ func (b *builder) bundleTS() error {
 		Target:    api.ES2020,
 		Sourcemap: api.SourceMapInline,
 		External:  []string{"three", "three/*"}, // provided by the import map
-		LogLevel:  api.LogLevelSilent,
+		// Online server base URL for deployed builds (e.g. wss://x.onrender.com); empty = same host :8091.
+		Define:   map[string]string{"__FUTENIS_SERVER__": strconv.Quote(os.Getenv("FUTENIS_SERVER"))},
+		LogLevel: api.LogLevelSilent,
 	})
 	if len(result.Errors) == 0 {
 		return nil

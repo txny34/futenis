@@ -7,10 +7,16 @@ import { NetStatus, RemoteEngine } from "./net/remote-engine";
 import { CourtView } from "./render";
 
 const SERVER_PORT = 8091;
+declare const __FUTENIS_SERVER__: string; // injected by cmd/dev's esbuild Define (FUTENIS_SERVER)
 const CODE_LEN = 5;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MAX_LAG_MS = 1000;
 const ROOM_RE = /^[A-Z0-9]{3,12}$/;
+
+function serverBase(): string {
+  if (__FUTENIS_SERVER__) return __FUTENIS_SERVER__;
+  return `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:${SERVER_PORT}`;
+}
 
 function requireElement(id: string): HTMLElement {
   const e = document.getElementById(id);
@@ -66,7 +72,7 @@ function boot(): void {
   controls.onZoom = (d) => view.rig.zoom(d);
   controls.onLockChange = (locked) => hud.setCrosshair(locked);
   const state: LoopState = { running: true, paused: false, fpsCap: 0, cameraShake: true, holdUntil: 0, showLanding: true };
-  const engine = new RemoteEngine(`${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:${SERVER_PORT}/ws?room=${room}`, lag);
+  const engine = new RemoteEngine(`${serverBase()}/ws?room=${room}`, lag);
   const lagText = lag > 0 ? ` · ${t("lag simulado", "simulated lag")} ${lag} ms` : "";
   engine.onStatus = (s, ping) => {
     net.textContent = `${t("Sala", "Room")} ${room} · ${statusText(s)}${s === "jugando" ? ` · ${ping} ms` : ""}${lagText}`;
