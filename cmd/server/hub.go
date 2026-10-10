@@ -34,6 +34,9 @@ type hub struct {
 	conns    *connLimiter
 	idle     time.Duration // injectable for tests
 	wait     time.Duration
+
+	queueSeq  int    // matchmaking room counter (queue.go)
+	queueCode string // room waiting for a second queued player, "" if none
 }
 
 func newHub(origins []string, logger *log.Logger) *hub {
@@ -82,8 +85,13 @@ func (p wsPeer) send(b []byte) error {
 func (p wsPeer) close(code int, reason string) { _ = p.c.Close(websocket.StatusCode(code), reason) }
 
 func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	code := req.URL.Query().Get("room")
-	if !roomCode.MatchString(code) {
+	q := req.URL.Query()
+	code, queued := q.Get("room"), q.Has("queue")
+	if queued && q.Get("queue") != queueMode {
+		http.Error(w, "bad queue", http.StatusBadRequest)
+		return
+	}
+	if !queued && !roomCode.MatchString(code) {
 		http.Error(w, "bad room code", http.StatusBadRequest)
 		return
 	}
@@ -98,7 +106,7 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return // Accept already wrote the HTTP error
 	}
 	c.SetReadLimit(readLimit)
-	h.serve(req.Context(), code, c)
+	h.serve(req.Context(), code, queued, c)
 }
 
 // join finds or creates the room for code and joins p, retrying once if the
@@ -116,9 +124,16 @@ func (h *hub) join(code string, p peer) (r *room, slot int, start bool) {
 }
 
 // serve joins the room and runs the read loop until the peer disconnects.
-func (h *hub) serve(ctx context.Context, code string, c *websocket.Conn) {
+func (h *hub) serve(ctx context.Context, code string, queued bool, c *websocket.Conn) {
 	p := wsPeer{c}
-	r, slot, start := h.join(code, p)
+	var r *room
+	var slot int
+	var start bool
+	if queued {
+		code, r, slot, start = h.joinQueue(p)
+	} else {
+		r, slot, start = h.join(code, p)
+	}
 	if r == nil {
 		p.close(closeBusy, "server full")
 		return
