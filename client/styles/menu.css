@@ -15,6 +15,9 @@
   --fx-gold-light: #fff1b8;
   --fx-bronze: #e0915a;
   --fx-silver: #cfd8e6;
+  --fx-platinum: #7fe0d0;
+  --fx-diamond: #8fb8ff;
+  --fx-legend: #ff8be0;
   --fx-gold-deep: #a8690c;
   --fx-gold-ink: #2e1c00;
   --fx-teal: #33e1d2;
@@ -152,3 +155,11 @@
 .fx-report__status { min-height: 1.4em; margin: 8px 0 12px; color: var(--fx-ball); }
 .fx-kbd--btn { cursor: pointer; color: inherit; border-top: 0; border-left: 0; border-right: 0; min-width: 64px; }
 .fx-kbd--btn:hover, .fx-kbd--btn:focus-visible { outline: 2px solid var(--fx-ball); outline-offset: 2px; }
+
+/* Ranks (profile/rank.ts): tier tint on the profile chips + result note */
+.fx-profile__elo[data-tier="bronze"] { color: var(--fx-bronze); }
+.fx-profile__elo[data-tier="silver"] { color: var(--fx-silver); }
+.fx-profile__elo[data-tier="gold"] { color: var(--fx-gold); }
+.fx-profile__elo[data-tier="platinum"] { color: var(--fx-platinum); }
+.fx-profile__elo[data-tier="diamond"] { color: var(--fx-diamond); }
+.fx-profile__elo[data-tier="legend"] { color: var(--fx-legend); }

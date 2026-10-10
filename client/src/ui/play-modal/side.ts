@@ -1,3 +1,4 @@
+import { rankOf } from "../../profile/rank";
 import { profileStore } from "../../profile/store";
 import { el } from "../dom";
 
@@ -33,7 +34,7 @@ export class ProfileSummary {
     this.level.textContent = String(s.level);
     this.name.textContent = s.name;
     this.record.textContent = `Nivel ${s.level} · ${s.wins}G ${s.losses}P`;
-    this.elo1.textContent = String(s.elo["1v1"]);
-    this.elo2.textContent = String(s.elo["2v2"]);
+    this.elo1.textContent = `${rankOf(s.elo["1v1"]).label} · ${s.elo["1v1"]}`;
+    this.elo2.textContent = `${rankOf(s.elo["2v2"]).label} · ${s.elo["2v2"]}`;
   }
 }

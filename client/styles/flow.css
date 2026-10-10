@@ -44,3 +44,5 @@
 .fx-vs__who { font-size: 14px; letter-spacing: .08em; opacity: .85; }
 .fx-vs__skip { position: absolute; bottom: 110px; margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; opacity: .55; }
 .fx-vs__who { max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-result__rank { margin: 4px 0 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--hud-gold); }
+.fx-result__rank--down { color: var(--hud-muted); }

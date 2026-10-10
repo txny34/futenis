@@ -2,6 +2,7 @@ import { Sound } from "../audio/sound";
 import type { Engine, MatchSetup } from "../engine";
 import type { ChallengeSession } from "../profile/challenges";
 import type { Tutorial } from "../tutorial/tutorial";
+import { rankChange } from "../profile/rank";
 import { recorder } from "../profile/recorder";
 import { profileStore } from "../profile/store";
 import type { Hud } from "../hud";
@@ -184,8 +185,9 @@ export function showResult(app: App, r: Readonly<MatchResult>, snap: Float64Arra
   app.controls.enabled = false;
   app.controls.releaseAll();
   const winner = r.winner >= 0 ? r.winner : snap[Snap.Sets0] >= snap[Snap.Sets1] ? 0 : 1;
-  recorder().matchOver(winner === HUMAN_TEAM, r.games0, r.games1);
-  app.screens.showResult({ won: winner === HUMAN_TEAM, games0: r.games0, games1: r.games1 }, {
+  const elo = recorder().matchOver(winner === HUMAN_TEAM, r.games0, r.games1);
+  const rankNote = elo ? rankChange(elo.before, elo.after) : null;
+  app.screens.showResult({ won: winner === HUMAN_TEAM, games0: r.games0, games1: r.games1, rankNote }, {
     rematch: () => { if (app.last) safeStart(app, app.last); },
     lobby: () => {
       try { enterLobby(app); } catch (err) { app.hud.error(errText(err)); }
