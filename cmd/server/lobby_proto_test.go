@@ -34,7 +34,7 @@ func TestDecodePresenceClampsToLobby(t *testing.T) {
 func TestSanitizeName(t *testing.T) {
 	for in, want := range map[string]string{
 		"  txny44 ":                  "txny44",
-		"a\x00b\nc\u202ed":                "abcd", // control and bidi-override runes dropped
+		"a\x00b\nc\u202ed":           "abcd", // control and bidi-override runes dropped
 		"ñandú ⚽":                    "ñandú ⚽",
 		"abcdefghijklmnopqrstuvwxyz": "abcdefghijklmnop",
 		"\xff\xfe":                   "",
