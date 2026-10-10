@@ -27,6 +27,7 @@ type hub struct {
 	mu       sync.Mutex
 	rooms    map[string]*room
 	origins  []string
+	proxied  bool                              // trust X-Forwarded-For (behind the hosting proxy)
 	ticker   func() (<-chan time.Time, func()) // injectable for tests
 	logger   *log.Logger
 	maxRooms int
@@ -86,7 +87,7 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "bad room code", http.StatusBadRequest)
 		return
 	}
-	ip := clientIP(req)
+	ip := clientIP(req, h.proxied)
 	if !h.conns.acquire(ip) {
 		http.Error(w, "too many connections", http.StatusTooManyRequests)
 		return

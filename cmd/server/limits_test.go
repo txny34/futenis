@@ -63,8 +63,29 @@ func TestRateWindow(t *testing.T) {
 
 func TestClientIP(t *testing.T) {
 	for addr, want := range map[string]string{"1.2.3.4:5": "1.2.3.4", "[::1]:80": "::1", "weird": "weird"} {
-		if got := clientIP(&http.Request{RemoteAddr: addr}); got != want {
+		if got := clientIP(&http.Request{RemoteAddr: addr}, false); got != want {
 			t.Errorf("%q: got %q want %q", addr, got, want)
+		}
+	}
+}
+
+func TestClientIPTrustProxy(t *testing.T) {
+	for xff, want := range map[string]string{
+		"":                   "10.0.0.1",
+		"9.9.9.9":            "9.9.9.9",
+		"6.6.6.6, 9.9.9.9":   "9.9.9.9", // client-spoofed entries come first; the proxy appends the real one
+		"6.6.6.6,  9.9.9.9 ": "9.9.9.9",
+		"6.6.6.6, ":          "10.0.0.1",
+	} {
+		req := &http.Request{RemoteAddr: "10.0.0.1:443", Header: http.Header{}}
+		if xff != "" {
+			req.Header.Set("X-Forwarded-For", xff)
+		}
+		if got := clientIP(req, true); got != want {
+			t.Errorf("%q: got %q want %q", xff, got, want)
+		}
+		if got := clientIP(req, false); got != "10.0.0.1" {
+			t.Errorf("untrusted %q: got %q", xff, got)
 		}
 	}
 }

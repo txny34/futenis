@@ -2,7 +2,10 @@
 // (docs/design/online-spike.md): WebSocket rooms at /ws?room=CODE running the
 // same native sim as the browser.
 //
-// Usage: go run ./cmd/server [-addr 127.0.0.1:8091] [-origins localhost:8090]
+// Usage: go run ./cmd/server [-addr 127.0.0.1:8091] [-origins localhost:8090] [-trust-proxy]
+//
+// Hosting (Render): PORT overrides -addr (listening on all interfaces),
+// FUTENIS_ORIGINS overrides -origins and FUTENIS_TRUST_PROXY=1 sets -trust-proxy.
 package main
 
 import (
@@ -25,11 +28,16 @@ const (
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8091", "listen address (use :8091 to expose on the LAN)")
 	origins := flag.String("origins", "localhost:8090,127.0.0.1:8090", "comma-separated allowed browser origins (host:port)")
+	trustProxy := flag.Bool("trust-proxy", false, "client IP from X-Forwarded-For (only behind a proxy that sets it)")
 	flag.Parse()
+	applyEnv(addr, origins, trustProxy)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	mux := http.NewServeMux()
-	mux.Handle("/ws", newHub(strings.Split(*origins, ","), log.Default()))
+	h := newHub(strings.Split(*origins, ","), log.Default())
+	h.proxied = *trustProxy
+	mux.Handle("/ws", h)
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: readHeaderTimeout}
 	go func() {
 		<-ctx.Done()
@@ -40,5 +48,18 @@ func main() {
 	log.Printf("futenis online server on ws://%s/ws", *addr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server: %v", err)
+	}
+}
+
+// applyEnv lets the hosting platform configure the server without flags.
+func applyEnv(addr, origins *string, trustProxy *bool) {
+	if p := os.Getenv("PORT"); p != "" {
+		*addr = ":" + p
+	}
+	if o := os.Getenv("FUTENIS_ORIGINS"); o != "" {
+		*origins = o
+	}
+	if os.Getenv("FUTENIS_TRUST_PROXY") == "1" {
+		*trustProxy = true
 	}
 }

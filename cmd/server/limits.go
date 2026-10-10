@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -59,9 +60,15 @@ func (l *connLimiter) release(ip string) {
 	}
 }
 
-// clientIP is the TCP peer address. Behind a proxy every client shares the
-// proxy's IP: trusting X-Forwarded-For comes with the hosting decision.
-func clientIP(req *http.Request) string {
+// clientIP is the TCP peer address, or behind a trusted proxy (Render) the last
+// X-Forwarded-For entry: the one the proxy appended, which clients cannot spoof.
+func clientIP(req *http.Request, trustProxy bool) string {
+	if trustProxy {
+		xff := req.Header.Get("X-Forwarded-For")
+		if ip := strings.TrimSpace(xff[strings.LastIndexByte(xff, ',')+1:]); ip != "" {
+			return ip
+		}
+	}
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		return req.RemoteAddr
