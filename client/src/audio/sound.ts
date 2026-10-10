@@ -26,6 +26,7 @@ const DASH: NoiseSpec = { filter: "bandpass", freq: 1200, q: 0.8, dur: 0.16, gai
 const JUMP: ToneSpec = { freq: 220, endFreq: 330, dur: 0.08, gain: 0.12, type: "sine" };
 const BODY: ToneSpec = { freq: 90, endFreq: 50, dur: 0.1, gain: 0.4, type: "sine" };
 const FEED: NoiseSpec = { filter: "lowpass", freq: 600, q: 2, dur: 0.1, gain: 0.45 };
+const ROAR: NoiseSpec = { filter: "bandpass", freq: 700, q: 0.6, dur: 0.95, gain: 0.3, attack: 0.3 };
 const WHISTLE: ToneSpec = { freq: 2100, endFreq: 1900, dur: 0.28, gain: 0.12, type: "square" };
 const ALERT: ToneSpec = { freq: 880, endFreq: 880, dur: 0.18, gain: 0.12, type: "triangle" };
 const RETURN_OK: ToneSpec = { freq: 660, endFreq: 990, dur: 0.12, gain: 0.14, type: "triangle" };
@@ -55,6 +56,12 @@ export class Sound {
 
   setVolumes(v: Readonly<Volumes>): void {
     this.mixer.setVolumes(v);
+  }
+
+  /** Crowd roar: a swelling band of noise, louder for bigger moments (0..1). */
+  cheer(level: number): void {
+    const l = Math.max(0, Math.min(1, level));
+    noise(this.mixer, { ...ROAR, gain: ROAR.gain * (0.5 + l / 2) });
   }
 
   /** Feed every non-lobby sim event in order. */

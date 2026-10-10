@@ -7,14 +7,15 @@ const SILENT = 0.0001;
 const PAN_MAX = 1;
 
 export interface ToneSpec { freq: number; endFreq: number; dur: number; gain: number; type: OscillatorType }
-export interface NoiseSpec { filter: BiquadFilterType; freq: number; q: number; dur: number; gain: number }
+/** dur must stay under the 1 s shared noise buffer; attack defaults to a click-free 4 ms. */
+export interface NoiseSpec { filter: BiquadFilterType; freq: number; q: number; dur: number; gain: number; attack?: number }
 
-function out(m: Mixer, ctx: AudioContext, pan: number, peak: number, dur: number, at: number): GainNode | null {
+function out(m: Mixer, ctx: AudioContext, pan: number, peak: number, dur: number, at: number, attack = ATTACK_S): GainNode | null {
   const bus = m.sfx;
   if (!bus) return null;
   const g = ctx.createGain();
   g.gain.setValueAtTime(SILENT, at);
-  g.gain.exponentialRampToValueAtTime(Math.max(peak, SILENT), at + ATTACK_S);
+  g.gain.exponentialRampToValueAtTime(Math.max(peak, SILENT), at + attack);
   g.gain.exponentialRampToValueAtTime(SILENT, at + dur);
   const p = ctx.createStereoPanner();
   p.pan.setValueAtTime(Math.max(-PAN_MAX, Math.min(PAN_MAX, pan)), at);
@@ -44,7 +45,7 @@ export function noise(m: Mixer, s: NoiseSpec, pan = 0, delay = 0): void {
   const buf = m.noise;
   if (!ctx || !buf) return;
   const at = ctx.currentTime + delay;
-  const g = out(m, ctx, pan, s.gain, s.dur, at);
+  const g = out(m, ctx, pan, s.gain, s.dur, at, s.attack);
   if (!g) return;
   const src = ctx.createBufferSource();
   src.buffer = buf;

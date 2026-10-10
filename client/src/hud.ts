@@ -1,4 +1,5 @@
 import { applyThemeCss } from "./env/theme";
+import type { HypeMoment } from "./feel/hype";
 import type { ShotKindId } from "./feel/shots";
 import { ActionBar } from "./hud-actions";
 import { Callouts } from "./hud-callouts";
@@ -98,6 +99,11 @@ export class Hud {
     if (this.lastMode !== Mode.Playground || e.kind !== EventKind.Point) this.banner.onEvent(e, shot, HUMAN_TEAM, nowMs);
     this.training.onEvent(e, nowMs);
     if (e.kind === EventKind.Dash && e.player === HUMAN_SLOT) this.dashAt = nowMs;
+  }
+
+  /** Crowd moment (feel/hype.ts); Entrenamiento has no rival, so no moments. */
+  moment(m: Readonly<HypeMoment>, nowMs: number): void {
+    if (this.lastMode !== Mode.Playground) this.banner.onMoment(m, HUMAN_TEAM, nowMs);
   }
 
   /** Floating hit text for the human's kick at normalized screen point (x, y). */

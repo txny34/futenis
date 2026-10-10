@@ -131,6 +131,9 @@ export class CourtView {
     this.post.render(dt);
   }
 
+  /** Crowd excitement 0..1 (feel/hype.ts drives it from the event stream). */
+  cheer(level: number): void { this.arena.cheer(level); }
+
   /** Compiles every program (court + lobby + stadium visible at once) so the first lobby<->match switch never stalls. */
   private prewarm(): void {
     this.lobby.group.visible = true;

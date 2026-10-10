@@ -1,4 +1,5 @@
 import { MAX_STEPS, StepEngine, StepResult } from "./engine";
+import { Hype, HypeMoment, LONG_RALLY } from "./feel/hype";
 import { ShotFeed } from "./feel/shots";
 import { Hud } from "./hud";
 import { Controls } from "./input";
@@ -15,7 +16,9 @@ const POPUP_LIFT_M = 0.8; // popup starts this far above the contact point
 const POPUP_DIR_SPEED = 4; // m/s of lateral (Z) shot speed mapped to full drift
 const SERVE_AIM_MIN_X = 1; // serve aim assist: keep the crosshair target inside the service box depth
 const SERVE_AIM_MAX_X = 6.2; // a bit short of the service line (6.95)
+const RALLY_CHEER = 0.5; // live rally excitement tops out at half a full cheer
 export const HUMAN_SLOT = 0;
+const HUMAN_TEAM = 0; // slot 0 plays for team 0 (online guests get a rotated view)
 
 /** Mutable state the menu/settings drive. Read every frame, never reallocated. */
 export interface LoopState {
@@ -39,6 +42,8 @@ export class GameLoop {
   onMatchOver: ((r: Readonly<MatchResult>, snap: Float64Array) => void) | null = null;
   /** Lobby pad events (EvPadEnter/Leave/Start, lobby.md §4). Fired after the step's other events. */
   onPadEvent: ((kind: number, pad: number) => void) | null = null;
+  /** A point that closed a long rally or extended a streak (crowd roar). */
+  onHype: ((m: Readonly<HypeMoment>) => void) | null = null;
   /** Every non-lobby sim event (profile/recorder.ts: perfects, training streak). */
   onGameEvent: ((e: SimEvent) => void) | null = null;
   private frame: StepResult;
@@ -52,6 +57,7 @@ export class GameLoop {
   private readonly games = new Int32Array(2);
   private readonly result: MatchResult = { winner: -1, games0: 0, games1: 0 };
   private readonly shots = new ShotFeed();
+  private readonly hype = new Hype();
   private readonly point: ScreenPoint = { x: 0, y: 0 };
   private readonly human: HumanView = { slot: HUMAN_SLOT, targetX: 0, targetZ: 0, showOverlays: false, showLanding: false };
 
@@ -75,6 +81,7 @@ export class GameLoop {
     this.overFired = false;
     this.stepped = false; // the engine's snapshot still shows the previous match until the next step
     this.shots.reset();
+    this.hype.reset();
     this.games.fill(0);
     this.result.winner = -1;
   }
@@ -142,9 +149,20 @@ export class GameLoop {
     const shot = this.shots.onEvent(e);
     this.view.players.onEvent(e);
     this.hud.onEvent(e, shot, now);
+    this.feelHype(e, now);
     if (e.kind === EventKind.Feed) this.view.machine.flash();
     if (e.kind === EventKind.Kick) this.onKick(e, now);
     else this.tally(e);
+  }
+
+  private feelHype(e: SimEvent, now: number): void {
+    if (this.frame.curr[Snap.Mode] === Mode.Playground) return; // no crowd moments vs the ball machine
+    const m = this.hype.onEvent(e);
+    if (e.kind === EventKind.Kick) this.view.cheer(this.hype.rally01 * RALLY_CHEER);
+    if (!m || (m.touches < LONG_RALLY && m.winner !== HUMAN_TEAM)) return; // rival streaks stay quiet
+    this.view.cheer(1);
+    this.hud.moment(m, now);
+    this.onHype?.(m);
   }
 
   private tally(e: SimEvent): void {
