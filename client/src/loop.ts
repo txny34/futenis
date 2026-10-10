@@ -1,5 +1,6 @@
-import { MAX_STEPS, StepEngine, StepResult } from "./engine";
+import { HumanInput, MAX_STEPS, StepEngine, StepResult } from "./engine";
 import { Hype, HypeMoment, LONG_RALLY } from "./feel/hype";
+import { MatchResult, MatchTally } from "./feel/tally";
 import { ShotFeed } from "./feel/shots";
 import { Hud } from "./hud";
 import { Controls } from "./input";
@@ -32,9 +33,7 @@ export interface LoopState {
   showLanding: boolean;
 }
 
-/** Final tally of a scored match (reused object). Games are the last set's,
- * counted from EvGameWon: the sim zeroes State.Games when a set closes. */
-export interface MatchResult { winner: number; games0: number; games1: number }
+export type { MatchResult } from "./feel/tally";
 
 /** Fixed-timestep loop: accumulate real time, step the sim at 1/120 s, render interpolated. */
 export class GameLoop {
@@ -44,6 +43,8 @@ export class GameLoop {
   onPadEvent: ((kind: number, pad: number) => void) | null = null;
   /** A point that closed a long rally or extended a streak (crowd roar). */
   onHype: ((m: Readonly<HypeMoment>) => void) | null = null;
+  /** After each step call: tick count + the input sent (replay tape). */
+  onStep: ((n: number, input: Readonly<HumanInput>) => void) | null = null;
   /** Every non-lobby sim event (profile/recorder.ts: perfects, training streak). */
   onGameEvent: ((e: SimEvent) => void) | null = null;
   private frame: StepResult;
@@ -54,15 +55,14 @@ export class GameLoop {
   private hitStopUntil = 0;
   private overFired = false;
   private stepped = false;
-  private readonly games = new Int32Array(2);
-  private readonly result: MatchResult = { winner: -1, games0: 0, games1: 0 };
+  private readonly tally = new MatchTally();
   private readonly shots = new ShotFeed();
   private readonly hype = new Hype();
   private readonly point: ScreenPoint = { x: 0, y: 0 };
   private readonly human: HumanView = { slot: HUMAN_SLOT, targetX: 0, targetZ: 0, showOverlays: false, showLanding: false };
 
   constructor(
-    private readonly engine: StepEngine,
+    private engine: StepEngine,
     private readonly view: CourtView,
     private readonly hud: Hud,
     private readonly controls: Controls,
@@ -77,13 +77,18 @@ export class GameLoop {
     requestAnimationFrame(this.tick);
   }
 
+  /** Swaps the simulation source (live wasm <-> replay). */
+  setEngine(e: StepEngine): void {
+    this.engine = e;
+    this.frame = e.peek();
+  }
+
   rearm(): void {
     this.overFired = false;
     this.stepped = false; // the engine's snapshot still shows the previous match until the next step
     this.shots.reset();
     this.hype.reset();
-    this.games.fill(0);
-    this.result.winner = -1;
+    this.tally.reset();
   }
 
   private readonly tick = (now: number): void => {
@@ -126,6 +131,7 @@ export class GameLoop {
     if (n > 0) {
       this.acc -= n * TICK_S;
       this.frame = this.engine.step(n);
+      this.onStep?.(n, input);
       this.stepped = true;
       for (let i = 0; i < this.frame.eventCount; i++) this.onEvent(this.frame.events[i], now);
     }
@@ -152,7 +158,7 @@ export class GameLoop {
     this.feelHype(e, now);
     if (e.kind === EventKind.Feed) this.view.machine.flash();
     if (e.kind === EventKind.Kick) this.onKick(e, now);
-    else this.tally(e);
+    else this.tally.onEvent(e);
   }
 
   private feelHype(e: SimEvent, now: number): void {
@@ -163,17 +169,6 @@ export class GameLoop {
     this.view.cheer(1);
     this.hud.moment(m, now);
     this.onHype?.(m);
-  }
-
-  private tally(e: SimEvent): void {
-    const side = e.side === 1 ? 1 : 0;
-    if (e.kind === EventKind.GameWon) this.games[side]++;
-    if (e.kind === EventKind.SetWon || e.kind === EventKind.MatchWon || e.kind === EventKind.GameOver) {
-      this.result.games0 = this.games[0];
-      this.result.games1 = this.games[1];
-      if (e.kind !== EventKind.SetWon) this.result.winner = side;
-      else this.games.fill(0);
-    }
   }
 
   private onKick(e: SimEvent, now: number): void {
@@ -192,6 +187,6 @@ export class GameLoop {
     const c = this.frame.curr;
     if (this.overFired || !this.stepped || !this.state.running || c[Snap.Phase] !== Phase.GameOver || c[Snap.Mode] === Mode.Playground) return;
     this.overFired = true;
-    this.onMatchOver?.(this.result, c);
+    this.onMatchOver?.(this.tally.result, c);
   }
 }

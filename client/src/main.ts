@@ -15,7 +15,9 @@ import { GameLoop, LoopState } from "./loop";
 import { BottomBar } from "./lobby/bottom-bar";
 import { ProfileCard } from "./lobby/profile-card";
 import { recorder } from "./profile/recorder";
-import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions, onPadEvent, safeStart, showResult } from "./lobby/flow";
+import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions, onPadEvent, safeStart } from "./lobby/flow";
+import { showResult } from "./lobby/replay-flow";
+import { Tape } from "./replay/tape";
 import { CourtView } from "./render";
 import { MatchScreens } from "./ui/match-screens";
 import { MenuUI, Settings } from "./ui/menu";
@@ -60,7 +62,7 @@ function wire(app: App, menu: MenuUI): void {
   app.play.onOpenChange(() => lobbyOverlay(app));
   menu.onPauseChange((paused) => {
     app.state.paused = paused;
-    app.controls.enabled = !paused && app.state.running;
+    app.controls.enabled = !paused && app.state.running && !app.replaying; // the tape drives a replay
     app.controls.releaseAll();
   });
   menu.onQuit(() => {
@@ -80,10 +82,11 @@ function wire(app: App, menu: MenuUI): void {
   menu.onSettingsChange((s) => applySettings(app, s));
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {
-    if (!app.state.running || app.state.paused) return;
+    if (!app.state.running || app.state.paused || app.replaying) return; // R/B would desync the tape
     if (code === FEED_KEY && app.mode === "playground") app.engine.respawnBall();
     if (code === RESET_KEY && !app.inLobby) {
       app.engine.reset();
+      app.tape.clear(app.engine.getConfig());
       app.loop?.rearm();
       app.hud.resetMatch();
       if (app.mode === "playground" && !app.last?.tutorial) app.challenges.begin(); // the sim's streak restarted too
@@ -155,12 +158,13 @@ function boot(): void {
   let ref: App | null = null;
   const get = (): App => { if (!ref) throw new Error("app no inicializada"); return ref; };
   const app: App = {
-    engine, view, hud, sound: new Sound(), tutorial: new Tutorial(requireElement("hud")), challenges: new ChallengeSession(), controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
+    engine, view, hud, sound: new Sound(), tutorial: new Tutorial(requireElement("hud")), challenges: new ChallengeSession(), tape: new Tape(), replaying: false, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
   };
   ref = app;
   const loop = new GameLoop(engine, view, hud, controls, state);
   loop.onMatchOver = (r, snap) => showResult(app, r, snap);
+  loop.onStep = (n, a) => { if (!app.replaying && !app.inLobby && app.mode !== "playground") app.tape.push(n, a); };
   loop.onGameEvent = (e) => { recorder().onEvent(e); app.sound.onEvent(e); app.tutorial.onEvent(e); onMedal(app, e); };
   loop.onHype = (m) => app.sound.cheer(m.touches >= LONG_RALLY ? 1 : HYPE_STREAK_ROAR);
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);

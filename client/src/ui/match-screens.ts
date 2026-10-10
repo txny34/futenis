@@ -15,7 +15,7 @@ export interface ResultInfo {
   readonly games1: number;
 }
 
-export interface ResultActions { rematch: () => void; lobby: () => void }
+export interface ResultActions { rematch: () => void; lobby: () => void; replay?: () => void }
 
 /** VS card line under each team name, e.g. "Invitado · 1000 ELO". */
 export interface IntroLabels { readonly left: string; readonly right: string }
@@ -49,7 +49,9 @@ export class MatchScreens {
   showResult(r: ResultInfo, a: ResultActions): void {
     const card = el("section", `fx-result fx-result--${r.won ? "win" : "lose"}`, "", { role: "dialog", "aria-modal": "true" });
     const actions = el("div", "fx-actions");
-    actions.append(button("Revancha", a.rematch, "fx-btn fx-btn--hero"), button("Volver al lobby", a.lobby, "fx-btn fx-btn--ghost"));
+    actions.append(button("Revancha", a.rematch, "fx-btn fx-btn--hero"));
+    if (a.replay) actions.append(button("Ver repetición", a.replay, "fx-btn"));
+    actions.append(button("Volver al lobby", a.lobby, "fx-btn fx-btn--ghost"));
     card.append(
       el("h2", "fx-result__title", r.won ? "VICTORIA" : "DERROTA"),
       el("p", "fx-result__score", `${TEAM_NAMES[0]} ${r.games0} – ${r.games1} ${TEAM_NAMES[1]}`),

@@ -125,3 +125,8 @@
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), -260%) scale(1); }
 }
 
+
+/* Replay tag (lobby/replay-flow.ts) */
+#replay { position: absolute; top: 72px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px;
+  background: var(--hud-card); border: 1px solid var(--hud-border); color: var(--hud-text); font-size: 12px; letter-spacing: .14em; }
+#replay[hidden] { display: none; }
