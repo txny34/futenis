@@ -1,77 +1,113 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
 
-// queueMode is the only matchmaking queue so far (1v1 casual); 2v2 comes next.
-const queueMode = "1v1"
+	"github.com/txny34/futenis/sim"
+)
 
-// queueRoom returns the code of the room the next queued player joins, opening
-// a new one when none is waiting. Codes are "mm-" + a counter: roomCode rejects
-// them, so nobody can join a queue room by typing its code. ok is false when key
-// is the one already waiting: one queued connection per client, never self-paired.
-func (h *hub) queueRoom(key string) (code string, ok bool) {
+// Matchmaking: one queue per mode (/ws?queue=1v1 | 2v2). Each queue has at
+// most one room open for joiners. A 2v2 room starts when full, or fillWait
+// after its second person arrives (bots take the empty seats).
+var queueModes = map[string]sim.Mode{"1v1": sim.Mode1v1, "2v2": sim.Mode2v2}
+
+const fillWait = 20 * time.Second
+
+// queue is the open room of one mode and the clients waiting in it (limit
+// keys): one queued connection per client, never matched with itself.
+type queue struct {
+	code   string
+	owners map[string]bool
+}
+
+func (h *hub) queueFor(mode string) *queue {
+	q := h.queues[mode]
+	if q == nil {
+		q = &queue{}
+		h.queues[mode] = q
+	}
+	return q
+}
+
+// queueRoom returns the code the next queued player of mode joins, opening a
+// new room when none is open. Codes are "mm-<mode>-<n>": roomCode rejects them,
+// so nobody can join a queue room by typing its code. ok is false when key is
+// already waiting there.
+func (h *hub) queueRoom(mode, key string) (code string, ok bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if r := h.rooms[h.queueCode]; r == nil || r.isClosed() {
-		h.queueOwner = "" // the waiter left: their slot is free, even for themselves
+	q := h.queueFor(mode)
+	if r := h.rooms[q.code]; q.code != "" && (r == nil || r.isClosed()) {
+		q.code = "" // everyone waiting left
 	}
-	if h.queueCode == "" {
+	if q.code == "" {
 		h.queueSeq++
-		h.queueCode = fmt.Sprintf("mm-%x", h.queueSeq)
-		h.queueOwner = ""
+		q.code, q.owners = fmt.Sprintf("mm-%s-%x", mode, h.queueSeq), map[string]bool{}
 	}
-	return h.queueCode, h.queueOwner == "" || h.queueOwner != key
+	return q.code, !q.owners[key]
 }
 
 // closeQueueRoom stops sending players to code once its match starts or fills.
-func (h *hub) closeQueueRoom(code string) {
+func (h *hub) closeQueueRoom(mode, code string) {
 	h.mu.Lock()
-	if h.queueCode == code {
-		h.queueCode, h.queueOwner = "", ""
+	if q := h.queueFor(mode); q.code == code {
+		q.code, q.owners = "", nil
 	}
 	h.mu.Unlock()
 }
 
-// claimWait records key as the player waiting in code. It fails when the queue
-// moved on while key was joining (code filled, ended and was reopened elsewhere):
-// waiting there would strand the player alone.
-func (h *hub) claimWait(code, key string) bool {
+// claimWait records key as waiting in code. It fails when the queue moved on
+// while key was joining: waiting there would strand the player.
+func (h *hub) claimWait(mode, code, key string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.queueCode == "" {
-		h.queueCode = code
+	q := h.queueFor(mode)
+	if q.code == "" {
+		q.code, q.owners = code, map[string]bool{}
 	}
-	if h.queueCode != code {
+	if q.code != code {
 		return false
 	}
-	h.queueOwner = key
+	q.owners[key] = true
 	return true
 }
 
-// joinQueue pairs p with the waiting player, or makes p the one waiting.
-// Rooms that filled or went stale concurrently are skipped (bounded retries).
-// slot -1 with a non-nil room means "rejected" (already queued or no room found).
-func (h *hub) joinQueue(p peer, key string) (code string, r *room, slot int, start bool) {
+// leaveQueue forgets key as a waiter of code (it may queue again).
+func (h *hub) leaveQueue(mode, code, key string) {
+	h.mu.Lock()
+	if q := h.queueFor(mode); q.code == code {
+		delete(q.owners, key)
+	}
+	h.mu.Unlock()
+}
+
+// joinQueue seats p in mode's open room, or rejects it (slot -1 with a non-nil
+// room: already queued / no room found). Rooms that filled, started or went
+// stale concurrently are skipped (bounded retries).
+func (h *hub) joinQueue(mode string, p peer, key string) (code string, r *room, slot int, start bool, humans int) {
 	for range 3 {
-		code, ok := h.queueRoom(key)
+		code, ok := h.queueRoom(mode, key)
 		if !ok {
-			return code, &room{}, -1, false
+			return code, &room{}, -1, false, 0
 		}
-		if r, slot, start = h.join(code, p); r == nil {
-			return code, nil, -1, false
+		if r, slot, start, humans = h.join(code, queueModes[mode], p); r == nil {
+			return code, nil, -1, false, 0
 		}
 		switch {
 		case slot >= 0 && start:
-			h.closeQueueRoom(code)
-			return code, r, slot, true
-		case slot >= 0 && h.claimWait(code, key):
-			return code, r, slot, false
+			h.closeQueueRoom(mode, code)
+			return code, r, slot, true, humans
+		case slot >= 0 && h.claimWait(mode, code, key):
+			return code, r, slot, false, humans
 		case slot >= 0:
 			r.leave(slot)
-			h.forget(code, r)
+			if r.isClosed() {
+				h.forget(code, r)
+			}
 		default:
-			h.closeQueueRoom(code)
+			h.closeQueueRoom(mode, code)
 		}
 	}
-	return code, &room{}, -1, false
+	return code, &room{}, -1, false, 0
 }

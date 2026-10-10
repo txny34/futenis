@@ -15,7 +15,7 @@ import { isCurrent, leaveOnline, onlineOver, setRemote } from "./online-state";
 function statusText(s: NetStatus): string {
   switch (s) {
     case "conectando": return t("Conectando…", "Connecting…");
-    case "esperando rival": return t("Buscando rival…", "Finding an opponent…");
+    case "esperando rival": return t("Buscando jugadores…", "Finding players…");
     case "jugando": return "";
     case "el rival se fue": return t("El rival se fue", "Your opponent left");
     case "nadie se unió a la sala": return t("No apareció ningún rival. Probá de nuevo.", "No opponent showed up. Try again.");

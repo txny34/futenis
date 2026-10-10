@@ -111,6 +111,20 @@ func applyMatchFormat(cfg *sim.Config, n int) {
 	cfg.SetsToWin = padelSetsToWin
 }
 
+func (ss *session) setHumanMask(mask int) error {
+	if mask < 0 || mask > humanMaskAll {
+		return fmt.Errorf("setHumanMask: %d not in 0..%d", mask, humanMaskAll)
+	}
+	d := ss.drv.bots[0].Difficulty()
+	for i := range ss.drv.bots {
+		if ss.drv.humanMask&(1<<i) != 0 && mask&(1<<i) == 0 {
+			ss.drv.bots[i] = ai.New(d, i) // fresh bot for a seat a person just left
+		}
+	}
+	ss.drv.humanMask = uint8(mask)
+	return nil
+}
+
 // reset restarts the match with the current config and bots.
 func (ss *session) reset() {
 	ss.match = sim.NewMatch(ss.cfg)

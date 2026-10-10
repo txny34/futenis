@@ -76,7 +76,7 @@ func TestQueueRejectsUnknownMode(t *testing.T) {
 
 func TestQueueCodesAreNotJoinableByURL(t *testing.T) {
 	h := newHub([]string{"*"}, nil)
-	if code, _ := h.queueRoom("k"); roomCode.MatchString(code) {
+	if code, _ := h.queueRoom("1v1", "k"); roomCode.MatchString(code) {
 		t.Fatalf("queue code %q passes the URL room filter", code)
 	}
 }
@@ -103,4 +103,20 @@ func TestQueueRejoinAfterLeaving(t *testing.T) {
 	time.Sleep(50 * time.Millisecond) // let the server see the leave
 	again := dialQueue(ctx, t, srv, "10.0.1.1")
 	readMsg(ctx, t, again, msgWaiting, headerLen)
+}
+
+// A rejected duplicate must not erase the original waiter from the queue: a
+// third connection from the same client is still rejected, never self-paired.
+func TestQueueDuplicateRejectionKeepsOwner(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv := newQueueHub()
+	defer srv.Close()
+	a := dialQueue(ctx, t, srv, "10.0.3.1")
+	readMsg(ctx, t, a, msgWaiting, headerLen)
+	b := dialQueue(ctx, t, srv, "10.0.3.1")
+	expectClose(ctx, t, b, closeFull)
+	time.Sleep(50 * time.Millisecond) // the server runs b's cleanup
+	c := dialQueue(ctx, t, srv, "10.0.3.1")
+	expectClose(ctx, t, c, closeFull)
 }

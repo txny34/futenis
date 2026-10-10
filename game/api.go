@@ -29,6 +29,10 @@ func (g *Session) Configure(mode, difficulty, pointsToWin, humanMask int) error 
 // Reset restarts the match with the current config and bots.
 func (g *Session) Reset() { g.s.reset() }
 
+// SetHumanMask changes which slots the clients drive, keeping the match state
+// (online: a player who leaves is replaced by the bot).
+func (g *Session) SetHumanMask(mask int) error { return g.s.setHumanMask(mask) }
+
 // RespawnBall asks the ball machine for a feed (playground only).
 func (g *Session) RespawnBall() error { return g.s.respawnBall() }
 

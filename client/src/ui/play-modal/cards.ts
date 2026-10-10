@@ -20,12 +20,11 @@ export interface CardDef extends PlayPick {
   readonly available: boolean;
 }
 
-const SOON = t("Próximamente", "Coming soon");
 const C1 = t("1v1 · CASUAL", "1v1 · CASUAL");
 const C2 = t("2v2 · CASUAL", "2v2 · CASUAL");
 export const ONLINE_CASUAL: readonly CardDef[] = [
   { mode: "1v1", ranked: false, available: true, title: C1, sub: t("Contra otra persona · sin ELO", "Vs another player · no ELO") },
-  { mode: "2v2", ranked: false, available: false, title: C2, sub: SOON },
+  { mode: "2v2", ranked: false, available: true, title: C2, sub: t("Online · si faltan jugadores, completan bots", "Online · bots fill empty seats") },
 ];
 export const ONLINE_RANKED: readonly CardDef[] = [
   { mode: "1v1", ranked: true, available: false, title: t("1v1 · CLASIFICACIÓN", "1v1 · RANKED"), sub: t("Suma ELO · Próximamente", "Earns ELO · Coming soon") },
