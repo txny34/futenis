@@ -1,0 +1,29 @@
+# Fly.io app for the online server (cmd/server). São Paulo: lowest RTT to the Río de la Plata.
+# ONE machine only: rooms, the matchmaking queue and the IP limits live in memory.
+# Deploy with `flyctl deploy --ha=false` (a plain deploy creates 2 machines and
+# players on different machines never meet).
+app = "futenis-server"
+primary_region = "gru"
+
+[env]
+  FUTENIS_ORIGINS = "futenis.vercel.app"
+  FUTENIS_TRUST_PROXY = "1"
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop" # trial: stop when idle (Fly only stops with no open connections)
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "5s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "2s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

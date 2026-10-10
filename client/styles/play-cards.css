@@ -87,3 +87,5 @@
 .fx-trophy__shine { fill: none; stroke: var(--fx-line); stroke-width: 2; stroke-linecap: round; opacity: .55; }
 
 @media (max-width: 560px) { .fx-play__cards { grid-template-columns: 1fr; } }
+.fx-play__centers { display: contents; }
+.fx-play__center[hidden] { display: none; }

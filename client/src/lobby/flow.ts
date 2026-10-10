@@ -3,6 +3,7 @@ import type { Engine, MatchSetup } from "../engine";
 import type { ChallengeSession } from "../profile/challenges";
 import type { Tape } from "../replay/tape";
 import { endReplay } from "./replay-state";
+import { leaveOnline } from "./online-state";
 import type { Tutorial } from "../tutorial/tutorial";
 import { recorder } from "../profile/recorder";
 import { profileStore } from "../profile/store";
@@ -114,6 +115,7 @@ export function enterLobby(app: App): void {
   app.challenges.end();
   cancelIntro();
   endReplay(app);
+  leaveOnline(app);
   arm(app, true);
 }
 
@@ -132,6 +134,7 @@ export function startMatch(app: App, o: MatchOptions): void {
   }
   app.hud.error("");
   endReplay(app);
+  leaveOnline(app);
   configureMatch(app, o);
   const training = o.training ?? DEFAULT_TRAINING; // ball machine: live Config, kept by reset()
   if (o.mode === "playground") applyTraining(app.engine, training);
@@ -185,10 +188,10 @@ export function onPadEvent(app: App, kind: number, pad: number): void {
 }
 
 /** A pad opens its overlay (controls off, pointer free): Entrenamiento -> training panel,
- * 1v1/2v2 -> "Elegí un modo" with that casual card preselected. The sim re-fires
+ * 1v1/2v2 -> "Elegí un modo" (online) with that ranked card preselected. The sim re-fires
  * EvPadStart only after leaving and re-entering the pad, so closing is safe. */
 function openPadSetup(app: App, mode: GameMode): void {
   if (app.menu.isOpen || app.play.isOpen) return;
   if (mode === "playground") app.menu.openTraining((t) => safeStart(app, lobbyOptions("playground", false, t)));
-  else app.play.open({ mode, ranked: false });
+  else app.play.open({ mode, ranked: true });
 }

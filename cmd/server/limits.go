@@ -3,6 +3,8 @@ package main
 import (
 	"net"
 	"net/http"
+	"net/netip"
+	"strings"
 	"sync"
 	"time"
 )
@@ -59,9 +61,20 @@ func (l *connLimiter) release(ip string) {
 	}
 }
 
-// clientIP is the TCP peer address. Behind a proxy every client shares the
-// proxy's IP: trusting X-Forwarded-For comes with the hosting decision.
-func clientIP(req *http.Request) string {
+// clientIP is the TCP peer address, or behind a trusted proxy (Fly.io) the
+// Fly-Client-IP header, else the last X-Forwarded-For entry: both are set by
+// the proxy, which clients cannot spoof. Only trust them when the server is
+// unreachable except through that proxy.
+func clientIP(req *http.Request, trustProxy bool) string {
+	if trustProxy {
+		if ip := strings.TrimSpace(req.Header.Get("Fly-Client-IP")); ip != "" {
+			return ip
+		}
+		xff := req.Header.Get("X-Forwarded-For")
+		if ip := strings.TrimSpace(xff[strings.LastIndexByte(xff, ',')+1:]); ip != "" {
+			return ip
+		}
+	}
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		return req.RemoteAddr
@@ -83,4 +96,21 @@ func (w *rateWindow) allow(now time.Time) bool {
 	}
 	w.n++
 	return w.n <= maxMsgsPerWindow
+}
+
+// ipv6Prefix is the block one subscriber usually controls: rotating addresses
+// inside it must not multiply the per-IP caps.
+const ipv6Prefix = 64
+
+// limitKey is the per-client bucket for ip: IPv4 as is, IPv6 by its /64.
+func limitKey(ip string) string {
+	a, err := netip.ParseAddr(ip)
+	if err != nil {
+		return ip
+	}
+	a = a.Unmap()
+	if a.Is4() {
+		return a.String()
+	}
+	return netip.PrefixFrom(a, ipv6Prefix).Masked().String()
 }

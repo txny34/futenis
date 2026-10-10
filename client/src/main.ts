@@ -18,6 +18,8 @@ import { ProfileCard } from "./lobby/profile-card";
 import { recorder } from "./profile/recorder";
 import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions, onPadEvent, safeStart } from "./lobby/flow";
 import { showResult } from "./lobby/replay-flow";
+import { startOnline } from "./lobby/online-flow";
+import { isOnline } from "./lobby/online-state";
 import { Tape } from "./replay/tape";
 import { CourtView } from "./render";
 import { MatchScreens } from "./ui/match-screens";
@@ -62,7 +64,7 @@ function wire(app: App, menu: MenuUI): void {
   menu.onOpenChange(() => lobbyOverlay(app));
   app.play.onOpenChange(() => lobbyOverlay(app));
   menu.onPauseChange((paused) => {
-    app.state.paused = paused;
+    app.state.paused = paused && !isOnline(); // the server never pauses: keep stepping, send neutral input
     app.controls.enabled = !paused && app.state.running && !app.replaying; // the tape drives a replay
     app.controls.releaseAll();
   });
@@ -83,7 +85,7 @@ function wire(app: App, menu: MenuUI): void {
   menu.onSettingsChange((s) => applySettings(app, s));
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {
-    if (!app.state.running || app.state.paused || app.replaying) return; // R/B would desync the tape
+    if (!app.state.running || app.state.paused || app.replaying || isOnline()) return; // R/B would desync the tape / the server
     if (code === FEED_KEY && app.mode === "playground") app.engine.respawnBall();
     if (code === RESET_KEY && !app.inLobby) {
       app.engine.reset();
@@ -123,7 +125,10 @@ function lobbyBar(app: () => App): BottomBar {
 }
 
 function playModal(app: () => App): PlayModal {
-  return new PlayModal(document.body, (p) => safeStart(app(), lobbyOptions(p.mode, p.ranked)));
+  return new PlayModal(document.body, (p, kind) => {
+    if (kind === "online") startOnline(app(), p.mode);
+    else safeStart(app(), lobbyOptions(p.mode, false)); // bots: casual only, ELO is online ranked
+  });
 }
 
 /** Esc in the lobby (lobby.md "Menú del lobby"): add future entries to `items`. */
@@ -166,7 +171,7 @@ function boot(): void {
   ref = app;
   const loop = new GameLoop(engine, view, hud, controls, state);
   loop.onMatchOver = (r, snap) => showResult(app, r, snap);
-  loop.onStep = (n, a) => { if (!app.replaying && !app.inLobby && app.mode !== "playground") app.tape.push(n, a); };
+  loop.onStep = (n, a) => { if (!app.replaying && !isOnline() && !app.inLobby && app.mode !== "playground") app.tape.push(n, a); };
   loop.onGameEvent = (e) => { recorder().onEvent(e); app.sound.onEvent(e); app.tutorial.onEvent(e); onMedal(app, e); };
   loop.onHype = (m) => app.sound.cheer(m.touches >= LONG_RALLY ? 1 : HYPE_STREAK_ROAR);
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);

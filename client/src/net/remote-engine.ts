@@ -84,6 +84,13 @@ export class RemoteEngine implements StepEngine {
     this.ws = ws;
   }
 
+  /** Leaves the match for good: no status change, no reconnect. */
+  close(): void {
+    const ws = this.ws;
+    this.ws = null;
+    if (ws) { ws.onclose = null; ws.onmessage = null; ws.close(); }
+  }
+
   peek(): StepResult { this.result.eventCount = 0; return this.result; }
 
   /** Only slot 0 exists for the client (the server rotates the guest's view). */

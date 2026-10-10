@@ -18,8 +18,8 @@ export const LobbyCfg = { HoldTime: 72, HalfX: 73, HalfZ: 74 } as const;
 export const PAD_MODES: readonly GameMode[] = ["playground", "1v1", "2v2"];
 export const PAD_LABELS: readonly string[] = [
   t("Entrenamiento · Lanzapelotas", "Training · Ball machine"),
-  t("1v1 contra el bot", "1v1 vs the bot"),
-  t("2v2 contra bots", "2v2 vs bots"),
+  t("1v1 clasificatoria online", "1v1 online ranked"),
+  t("2v2 clasificatoria online", "2v2 online ranked"),
 ];
 
 export const padX = (i: number): number => LOBBY_PADS[i * 2];

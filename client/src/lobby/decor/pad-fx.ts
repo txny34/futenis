@@ -24,8 +24,8 @@ const LABEL_HZ = 0.15;
 const LABEL_HEAT_SCALE = 0.08;
 const LABELS: ReadonlyArray<readonly [string, string]> = [
   [t("ENTRENÁ", "TRAIN"), t("LANZAPELOTAS", "BALL MACHINE")],
-  ["1v1", t("CONTRA EL BOT", "VS THE BOT")],
-  ["2v2", t("CONTRA BOTS", "VS BOTS")],
+  ["1v1", t("CLASIFICATORIA", "RANKED")],
+  ["2v2", t("CLASIFICATORIA", "RANKED")],
 ];
 
 const RIM_VERT = "varying vec2 vP; void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";

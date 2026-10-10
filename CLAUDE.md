@@ -15,7 +15,8 @@ ai/       Go puro. Bot determinista (4 dificultades, 2v2). Produce sim.PlayerInp
 wasm/     package main (GOOS=js). Único puente sim/ai <-> navegador. Corre el bot en los slots no humanos.
 cmd/dev/  Servidor de desarrollo en Go (estáticos + build con esbuild Go API). Sin Node. Default :8090 (WSL2).
 game/     Go puro. Sesión (modo, config, bots) + formato de frame. Compartido por wasm/ y cmd/server/.
-cmd/server/ Servidor online autoritativo (spike, docs/design/online-spike.md): corre el MISMO sim + ai nativos.
+cmd/server/ Servidor online autoritativo (docs/design/online-spike.md): MISMO sim + ai nativos. Salas por código +
+            cola de matchmaking (`/ws?queue=1v1`, queue.go). UNA sola máquina (estado en memoria).
 client/   TypeScript + three.js. SOLO dibuja, lee input, cámara, HUD, menú, feedback. NUNCA decide reglas.
 docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), character.md (pipeline de personaje).
 ```
@@ -86,11 +87,15 @@ docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), charac
 go run ./cmd/dev          # http://localhost:8090  (?dev=1 = panel de tuning)
                           # http://localhost:8090/character.html = visor del personaje
 go run ./cmd/server       # ws://localhost:8091  ->  http://localhost:8090/online.html?room=ABCDE (2 pestañas; ?lag=150)
+FUTENIS_SERVER=wss://futenis-server.fly.dev bash scripts/deploy/client.sh --prod --yes   # cliente -> futenis.vercel.app
+~/.fly/bin/flyctl deploy --ha=false --remote-only                                       # server -> Fly.io gru (1 máquina)
 go test -short ./...      # rápido;  sin -short incluye soak y harness del bot (lento)
 bash scripts/ci/local.sh  # CI completo local (mismos pasos que ci.yml). OBLIGATORIO antes de cada push. STRESS=20 para flaky
 ```
 
+## En curso: online-first (modal online, matchmaking, 2v2 online, lobby compartido, login Supabase Google/Discord, ranked con ELO en server)
+
 ## Fuera de alcance por ahora (YAGNI)
 
-Online más allá del spike (predicción, 2v2, reconexión), matchmaking, base de datos, pagos, skins comerciales, monedas, habilidades especiales,
+Predicción online y reconexión, pagos, skins comerciales, monedas, habilidades especiales,
 flip en el aire → v3. React, ECS.
