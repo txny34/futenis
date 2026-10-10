@@ -24,6 +24,7 @@ import type { ProfileCard } from "./profile-card";
 import type { PlayModal } from "../ui/play-modal/play-modal";
 import { PAD_MODES } from "./pads";
 import { t } from "../i18n/t";
+import { extraOverlayOpen } from "../ui/overlays";
 
 // Lobby <-> match flow (docs/design/lobby.md §6): the sim detects pads, the
 // client decides. Every switch is configure() + reset() on the same wasm.
@@ -85,7 +86,7 @@ export function arm(app: App, lobby: boolean): void {
   app.state.running = true;
   app.state.paused = false;
   app.controls.releaseAll();
-  app.controls.enabled = !app.menu.isOpen && !app.play.isOpen;
+  app.controls.enabled = !app.menu.isOpen && !app.play.isOpen && !extraOverlayOpen();
   app.loop?.rearm();
   app.hud.resetMatch();
   app.screens.hide();

@@ -2,6 +2,7 @@ import type { SimEvent } from "./snapshot";
 import { Sound } from "./audio/sound";
 import { Tutorial } from "./tutorial/tutorial";
 import { setupAccount, type Account } from "./lobby/account";
+import { extraOverlayOpen } from "./ui/overlays";
 import { LANG, t } from "./i18n/t";
 import { captureErrors } from "./report/errors";
 import { buildReport } from "./report/report";
@@ -57,7 +58,7 @@ function applySettings(app: App, s: Settings): void {
 /** Lobby overlays (Esc menu, "Elegí un modo"): controls off + mouse free while any is up. */
 function lobbyOverlay(app: App): void {
   if (!app.inLobby) return; // in a match the pause callback owns the controls
-  app.controls.enabled = !app.menu.isOpen && !app.play.isOpen;
+  app.controls.enabled = !app.menu.isOpen && !app.play.isOpen && !extraOverlayOpen();
   app.controls.releaseAll();
 }
 
@@ -76,7 +77,7 @@ function wire(app: App, menu: MenuUI): void {
   app.controls.onZoom = (d) => app.view.rig.zoom(d);
   app.controls.onLockChange = (locked) => app.hud.setCrosshair(locked);
   const openPauseOrLobbyMenu = (): void => {
-    if (!app.state.running || menu.isOpen || app.play.isOpen) return;
+    if (!app.state.running || menu.isOpen || app.play.isOpen || extraOverlayOpen()) return;
     if (app.inLobby) menu.openLobbyMenu();
     else menu.showPause();
   };

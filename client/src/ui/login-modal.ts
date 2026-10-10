@@ -6,8 +6,10 @@ import { button, el } from "./dom";
 // "Iniciá sesión": Discord / Google / Jugar como invitado. Shown in the lobby on
 // a first visit and whenever a guest picks something that needs an account.
 export class LoginModal {
-  private readonly root = el("div", "fx-login", "", { role: "dialog", "aria-modal": "true", "aria-label": t("Iniciá sesión", "Sign in") });
-  private readonly reason = el("p", "fx-login__reason");
+  private readonly root = el("div", "fx-login", "", { role: "dialog", "aria-modal": "true", "aria-labelledby": "fx-login-title", "aria-describedby": "fx-login-reason" });
+  private readonly reason = el("p", "fx-login__reason", "", { id: "fx-login-reason", role: "status" });
+  private firstVisit = false;
+  private leaving = false;
   private readonly openCbs: Array<(open: boolean) => void> = [];
 
   constructor(parent: HTMLElement) {
@@ -18,7 +20,7 @@ export class LoginModal {
       this.provider("google", t("Entrar con Google", "Sign in with Google")),
     );
     const guest = button(t("Jugar como invitado", "Play as guest"), () => { chooseGuest(); this.close(); }, "fx-btn fx-btn--ghost fx-login__guest");
-    card.append(el("h2", "fx-card__title", t("Iniciá sesión", "Sign in")), this.reason, providers,
+    card.append(el("h2", "fx-card__title", t("Iniciá sesión", "Sign in"), { id: "fx-login-title" }), this.reason, providers,
       el("p", "fx-login__note", t("Con cuenta: clasificatorias con ELO y tu progreso en cualquier dispositivo.", "With an account: ranked with ELO and your progress on any device.")),
       guest);
     this.root.append(card);
@@ -30,8 +32,9 @@ export class LoginModal {
   get isOpen(): boolean { return !this.root.hidden; }
   onOpenChange(cb: (open: boolean) => void): void { this.openCbs.push(cb); }
 
-  /** reason: why we ask now (e.g. ranked needs an account); empty on a first visit. */
-  open(reason = ""): void {
+  /** reason: why we ask now (ranked, a failed sign-in); firstVisit: Esc means "guest". */
+  open(reason = "", firstVisit = false): void {
+    this.firstVisit = firstVisit;
     this.reason.textContent = reason;
     this.reason.hidden = reason === "";
     if (this.isOpen) return;
@@ -47,14 +50,18 @@ export class LoginModal {
   }
 
   private provider(p: Provider, label: string): HTMLButtonElement {
-    return button(label, () => signIn(p), `fx-btn fx-login__btn fx-login__btn--${p}`);
+    return button(label, () => {
+      if (this.leaving) return; // double click: one redirect
+      this.leaving = true;
+      void signIn(p).finally(() => { this.leaving = false; });
+    }, `fx-btn fx-login__btn fx-login__btn--${p}`);
   }
 
   private onKey(e: KeyboardEvent): void {
     if (!this.isOpen || e.code !== "Escape") return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    chooseGuest(); // Esc = keep playing as a guest
+    if (this.firstVisit) chooseGuest(); // Esc on the first-visit prompt = play as a guest
     this.close();
   }
 }
