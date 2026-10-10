@@ -1,6 +1,7 @@
 import type { SimEvent } from "./snapshot";
 import { Sound } from "./audio/sound";
-import { Tutorial, tutorialDone } from "./tutorial/tutorial";
+import { Tutorial } from "./tutorial/tutorial";
+import { setupAccount, type Account } from "./lobby/account";
 import { LANG, t } from "./i18n/t";
 import { captureErrors } from "./report/errors";
 import { buildReport } from "./report/report";
@@ -113,8 +114,7 @@ async function load(app: App): Promise<void> {
   app.pending = null;
   try {
     if (queued) safeStart(app, queued);
-    else if (!tutorialDone()) safeStart(app, tutorialOptions()); // first visit: learn before the lobby
-    else enterLobby(app);
+    else enterLobby(app); // first visit: lobby + login + optional tutorial card (lobby/account.ts)
   } catch (err) {
     app.hud.error(errText(err));
   }
@@ -132,13 +132,14 @@ function playModal(app: () => App): PlayModal {
 }
 
 /** Esc in the lobby (lobby.md "Menú del lobby"): add future entries to `items`. */
-function lobbyMenu(app: () => App, menu: MenuUI): void {
+function lobbyMenu(app: () => App, menu: MenuUI, account: Account): void {
   menu.setLobbyMenu(() => ({
     items: [
       { label: t("Tutorial", "Tutorial"), run: () => safeStart(app(), tutorialOptions()) },
       { label: t("Entrenamiento", "Training"), run: () => menu.openTraining((cfg) => safeStart(app(), lobbyOptions("playground", false, cfg))) },
       { label: t("Ajustes", "Settings"), run: () => menu.openSettings() },
       { label: t("Reportar un bug", "Report a bug"), run: () => menu.openReport() },
+      account.menuItem(),
     ],
   }));
 }
@@ -180,7 +181,7 @@ function boot(): void {
   menu.setReport((note) => buildReport({
     note, snap: app.engine.loaded ? app.engine.peek().curr : null, inLobby: app.inLobby, settings: menu.settings,
   }));
-  lobbyMenu(get, menu);
+  lobbyMenu(get, menu, setupAccount(app));
   enterLobby(app); // lobby decor + bar now; the sim spawns the player once wasm loads
   loop.start();
   void load(app);
