@@ -4,6 +4,7 @@ import { Snap } from "../snapshot";
 import { LobbyDecor } from "./decor/decor";
 import { PAD_COLORS } from "./decor/pad-fx";
 import { padSign } from "./pad-sign";
+import { RemotePlayers } from "./remote-players";
 import { LOBBY_HALF_X, LOBBY_HALF_Z, LOBBY_PAD_COUNT, LOBBY_PAD_RADIUS, PAD_LABELS, padX, padZ } from "./pads";
 
 // Lobby view (docs/design/lobby.md §7): neon border, 3 pads with a bobbing
@@ -58,11 +59,13 @@ export class LobbyView {
   readonly group = new THREE.Group();
   private readonly pads: Pad[] = [];
   private readonly decor = new LobbyDecor(LOBBY_HALF_X, LOBBY_HALF_Z);
+  /** Other players in the shared online lobby (lobby/presence.ts feeds it). */
+  readonly remote = new RemotePlayers();
   private time = 0;
 
   constructor(scene: THREE.Scene) {
     this.group.visible = false;
-    this.group.add(this.decor.group);
+    this.group.add(this.decor.group, this.remote.group);
     scene.add(this.decor.lights);
     this.buildEdge();
     for (let i = 0; i < LOBBY_PAD_COUNT; i++) this.pads.push(this.buildPad(i));
@@ -92,6 +95,7 @@ export class LobbyView {
       this.decor.setPadHeat(i, p.progress.value);
     }
     this.decor.update(dt);
+    this.remote.update(dt);
   }
 
   private buildEdge(): void {
