@@ -4,6 +4,7 @@ services:
     name: futenis-server
     runtime: go
     plan: free
+    region: virginia # closest Render region to the Río de la Plata
     buildCommand: go build -trimpath -o bin/server ./cmd/server
     startCommand: ./bin/server
     healthCheckPath: /healthz
