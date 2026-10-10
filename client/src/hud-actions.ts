@@ -1,3 +1,5 @@
+import { keyHint } from "./ui/key-hints";
+import type { KeyAction } from "./ui/keybinds";
 import { Extra, FLAG_LOB, PLAYER_DASH, PLAYER_EXTRA } from "./snapshot";
 
 // Bottom-center action bar: round ability buttons with SVG icons, a progress
@@ -13,7 +15,10 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 type ActionId = "dash" | "strike" | "lob" | "jump";
 
-interface ActionDef { readonly id: ActionId; readonly label: string; readonly key: string; readonly icon: string; readonly ring: boolean }
+/** `bind` = remappable keyboard action (label follows Ajustes), else the fixed `key` text. */
+interface ActionDef {
+  readonly id: ActionId; readonly label: string; readonly key: string; readonly bind?: KeyAction; readonly icon: string; readonly ring: boolean;
+}
 
 const ICONS: Readonly<Record<ActionId, string>> = {
   strike: "M32 18 a14 14 0 1 0 0.01 0 Z M14 32 H20 M44 32 H50 M32 14 V8",
@@ -23,14 +28,16 @@ const ICONS: Readonly<Record<ActionId, string>> = {
 };
 
 const ACTIONS: readonly ActionDef[] = [
-  { id: "dash", label: "Dash", key: "Q", icon: ICONS.dash, ring: true },
+  { id: "dash", label: "Dash", key: "Q", bind: "dash", icon: ICONS.dash, ring: true },
   { id: "strike", label: "Golpe", key: "Click", icon: ICONS.strike, ring: true },
   { id: "lob", label: "Globo", key: "Click der", icon: ICONS.lob, ring: false },
-  { id: "jump", label: "Salto", key: "Espacio", icon: ICONS.jump, ring: false },
+  { id: "jump", label: "Salto", key: "Espacio", bind: "jump", icon: ICONS.jump, ring: false },
 ];
 
 interface Slot {
   readonly root: HTMLDivElement;
+  readonly key: HTMLElement;
+  readonly bind: KeyAction | undefined;
   readonly ring: SVGCircleElement | null;
   lastRing: number;
   lastActive: boolean;
@@ -62,9 +69,9 @@ function button(def: ActionDef): Slot {
   label.textContent = def.label;
   const key = document.createElement("kbd");
   key.className = "act__key";
-  key.textContent = def.key;
+  key.textContent = def.bind ? keyHint(def.bind) : def.key;
   root.append(icon, label, key);
-  return { root, ring, lastRing: -1, lastActive: false, lastWarn: false };
+  return { root, key, bind: def.bind, ring, lastRing: -1, lastActive: false, lastWarn: false };
 }
 
 export class ActionBar {
@@ -76,6 +83,10 @@ export class ActionBar {
     const made = ACTIONS.map(button);
     this.slots = { dash: made[0], strike: made[1], lob: made[2], jump: made[3] };
     this.root.append(...made.map((s) => s.root));
+  }
+
+  refreshKeys(): void {
+    for (const s of Object.values(this.slots)) if (s.bind) s.key.textContent = keyHint(s.bind);
   }
 
   /** humanSlot's extras block; called every frame, writes only on change. dashReady: 0..1 cooldown progress. */

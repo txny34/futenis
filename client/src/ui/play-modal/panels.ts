@@ -1,3 +1,4 @@
+import { keyHint, moveHint } from "../key-hints";
 import { loadHistory, MatchRecord } from "../../profile/history";
 import { el } from "../dom";
 
@@ -48,9 +49,10 @@ const RULES: readonly string[] = [
   "Casual: suma XP y victorias. Clasificación: además mueve tu ELO y da 1.5x XP.",
   "El nivel del bot se ajusta solo a tu ELO de esa cola.",
 ];
-const CONTROLS: ReadonlyArray<readonly [string, string]> = [
-  ["WASD", "Moverse"], ["Mouse", "Cámara y mira"], ["Click izq.", "Golpe"], ["Click der.", "Globo"],
-  ["Espacio", "Salto"], ["Q", "Dash"], ["Rueda", "Zoom"], ["Ctrl", "Liberar el mouse"], ["Esc", "Menú / pausa"],
+const controls = (): ReadonlyArray<readonly [string, string]> => [
+  [moveHint(), "Moverse"], ["Mouse", "Cámara y mira"], ["Click izq.", "Golpe"], ["Click der.", "Globo"],
+  [keyHint("jump"), "Salto"], [keyHint("dash"), "Dash"], ["Rueda", "Zoom"], [keyHint("free"), "Liberar el mouse"],
+  ["Esc", "Menú / pausa"],
 ];
 
 export function infoPanel(): HTMLElement {
@@ -58,7 +60,7 @@ export function infoPanel(): HTMLElement {
   const rules = el("ul", "fx-info__rules");
   rules.append(...RULES.map((t) => el("li", "", t)));
   const keys = el("dl", "fx-info__keys");
-  for (const [k, v] of CONTROLS) keys.append(el("dt", "fx-chip", k), el("dd", "", v));
+  for (const [k, v] of controls()) keys.append(el("dt", "fx-chip", k), el("dd", "", v));
   box.append(el("h4", "fx-info__h", "Reglas"), rules, el("h4", "fx-info__h", "Controles"), keys);
   return box;
 }

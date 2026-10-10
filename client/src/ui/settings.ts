@@ -1,9 +1,10 @@
 /** Player settings: types, defaults, validation and localStorage persistence. */
+import { DEFAULT_KEYS, type KeyBinds, validateKeys } from "./keybinds";
 
 export type Quality = "low" | "med" | "high";
 export type FpsCap = 60 | 144 | 240 | 0; // 0 = sin límite
 
-export interface ControlSettings { mouseSensitivity: number }
+export interface ControlSettings { mouseSensitivity: number; keys: KeyBinds }
 export interface VideoSettings { quality: Quality; shadows: boolean; fpsCap: FpsCap; showFps: boolean }
 export interface AudioSettings { master: number; sfx: number; music: number }
 /** "Marcador de pique": siempre / solo en Fácil / nunca. */
@@ -34,7 +35,7 @@ export const FPS_CAPS: readonly FpsCap[] = [60, 144, 240, 0];
 export const LANDING_MARKERS: readonly LandingMarker[] = ["always", "easy", "never"];
 
 export const DEFAULT_SETTINGS: Settings = {
-  controls: { mouseSensitivity: 1 },
+  controls: { mouseSensitivity: 1, keys: DEFAULT_KEYS },
   video: { quality: "high", shadows: true, fpsCap: 0, showFps: false },
   audio: { master: 80, sfx: 80, music: 60 },
   game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1, landingMarker: "easy" },
@@ -73,7 +74,10 @@ export function validateSettings(raw: unknown): Settings {
   const a = section(raw, "audio");
   const g = section(raw, "game");
   return {
-    controls: { mouseSensitivity: num(c.mouseSensitivity, SENS_MIN, SENS_MAX, d.controls.mouseSensitivity) },
+    controls: {
+      mouseSensitivity: num(c.mouseSensitivity, SENS_MIN, SENS_MAX, d.controls.mouseSensitivity),
+      keys: validateKeys(c.keys),
+    },
     video: {
       quality: oneOf(v.quality, QUALITIES, d.video.quality),
       shadows: bool(v.shadows, d.video.shadows),

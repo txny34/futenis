@@ -2,19 +2,12 @@ import * as THREE from "three";
 import type { HumanInput } from "./engine";
 import { clampUnit, GamepadReader, PAD_LOOK_PX_PER_S } from "./gamepad";
 import { Btn } from "./snapshot";
+import { DEFAULT_KEYS, type KeyBinds } from "./ui/keybinds";
 
 // Single human on slot 0, Roblox-style: the mouse (pointer lock) turns the camera, WASD/left
 // stick moves relative to the camera yaw, and the aim is wherever the crosshair (above the
 // screen center, AIM_NDC_Y) hits the floor. Everything is a held LEVEL (PlayerInput v2); the
-// sim detects edges itself. Spin is always 0.
-const KEY_UP = "KeyW";
-const KEY_DOWN = "KeyS";
-const KEY_LEFT = "KeyA";
-const KEY_RIGHT = "KeyD";
-const KEY_JUMP = "Space";
-const KEY_DASH = "KeyQ";
-const KEY_FREE_MOUSE = "ControlLeft";
-const PREVENT_DEFAULT = new Set(["Space", "ArrowUp", "ArrowDown"]);
+// sim detects edges itself. Spin is always 0. Keys are remappable (ui/keybinds.ts; WASD by default).
 const MOUSE_LEFT = 1; // PointerEvent.buttons bit
 const MOUSE_RIGHT = 2;
 const AIM_NDC_Y = 0.25; // crosshair height in NDC = 37.5% from the top (hud.css #crosshair)
@@ -51,6 +44,11 @@ export class Controls {
   private readonly action: HumanInput = { moveX: 0, moveZ: 0, targetX: DEFAULT_TARGET_X, targetZ: 0, buttons: 0, spin: 0 };
   private pressHandler: ((code: string) => void) | null = null;
   private readonly pad = new GamepadReader();
+  private keys: KeyBinds = DEFAULT_KEYS;
+  private bound: ReadonlySet<string> = new Set(Object.values(DEFAULT_KEYS));
+
+  /** Ajustes > Controles (ui/keybinds.ts). Held keys are dropped so nothing sticks. */
+  setKeys(k: KeyBinds): void { if (k !== this.keys) { this.keys = k; this.bound = new Set(Object.values(k)); this.down.clear(); } }
 
   /** False while a menu is open: input is ignored, levels drop to zero and the pointer is released. */
   get enabled(): boolean { return this.on; }
@@ -106,8 +104,8 @@ export class Controls {
     let fz = this.fwd.z;
     const len = Math.hypot(fx, fz);
     if (len < 1e-6) { fx = 1; fz = 0; } else { fx /= len; fz /= len; }
-    const f = clampUnit(this.axis(KEY_DOWN, KEY_UP) + this.pad.forward);
-    const r = clampUnit(this.axis(KEY_LEFT, KEY_RIGHT) + this.pad.right);
+    const f = clampUnit(this.axis(this.keys.down, this.keys.up) + this.pad.forward);
+    const r = clampUnit(this.axis(this.keys.left, this.keys.right) + this.pad.right);
     let mx = fx * f - fz * r; // right = (-fz, fx): yaw 0 -> D = +Z
     let mz = fz * f + fx * r;
     const m = Math.hypot(mx, mz);
@@ -142,8 +140,8 @@ export class Controls {
     const mouse = this.mouseButtons | this.latched;
     if (mouse & MOUSE_LEFT) b |= Btn.Strike;
     if (mouse & MOUSE_RIGHT) b |= Btn.Lob;
-    if (this.down.has(KEY_JUMP)) b |= Btn.Jump;
-    if (this.down.has(KEY_DASH)) b |= Btn.Dash; // held level; the sim detects the press edge itself
+    if (this.down.has(this.keys.jump)) b |= Btn.Jump;
+    if (this.down.has(this.keys.dash)) b |= Btn.Dash; // held level; the sim detects the press edge itself
     return b;
   }
 
@@ -153,9 +151,9 @@ export class Controls {
 
   private onKeyDown(e: KeyboardEvent): void {
     if (!this.on) return;
-    if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
+    if (this.bound.has(e.code)) e.preventDefault(); // Space scroll, Tab focus, arrows... stay in the game
     if (e.repeat) return;
-    if (e.code === KEY_FREE_MOUSE) { this.toggleLock(); return; }
+    if (e.code === this.keys.free) { this.toggleLock(); return; }
     this.down.add(e.code);
     this.pressHandler?.(e.code);
   }

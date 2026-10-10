@@ -5,6 +5,7 @@ import { captureErrors } from "./report/errors";
 import { buildReport } from "./report/report";
 import { LONG_RALLY } from "./feel/hype";
 import { ChallengeSession, MEDALS } from "./profile/challenges";
+import { setHintKeys } from "./ui/key-hints";
 import { mountDevPanel, isDevMode } from "./dev/panel";
 import { Engine } from "./engine";
 import { Hud } from "./hud";
@@ -38,6 +39,9 @@ function applySettings(app: App, s: Settings): void {
   app.state.showLanding = landingAllowed(s, app.last);
   app.view.rig.dynamic = s.game.dynamicCamera;
   app.view.rig.sensitivity = s.controls.mouseSensitivity;
+  app.controls.setKeys(s.controls.keys);
+  setHintKeys(s.controls.keys);
+  app.hud.refreshKeys();
   app.hud.setFpsVisible(s.video.showFps);
   app.hud.setScale(s.game.hudScale);
   app.sound.setVolumes(s.audio);

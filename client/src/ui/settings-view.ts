@@ -1,5 +1,6 @@
 /** "Ajustes" screen: tabbed panels that emit immutable settings updates. */
 import { Choice, el, segmented, slider, toggle } from "./dom";
+import { keybindView } from "./keybind-view";
 import {
   FpsCap, HUD_SCALE_MAX, LandingMarker, HUD_SCALE_MIN, Quality, SENS_MAX, SENS_MIN, Settings, VOLUME_MAX, VOLUME_MIN,
 } from "./settings";
@@ -12,17 +13,6 @@ const TABS: readonly Choice<TabId>[] = [
   { value: "video", label: "Video" },
   { value: "audio", label: "Audio" },
   { value: "game", label: "Juego" },
-];
-
-const BINDINGS: readonly (readonly [string, string])[] = [
-  ["Mover", "W A S D"],
-  ["Cámara / apuntar", "Mouse (mira al centro)"],
-  ["Zoom", "Rueda"],
-  ["Golpe", "Click izq."],
-  ["Globo", "Click der."],
-  ["Salto", "Espacio"],
-  ["Dash", "Q"],
-  ["Mouse libre", "Ctrl"],
 ];
 
 const QUALITY_CHOICES: readonly Choice<Quality>[] = [
@@ -43,19 +33,11 @@ const fmtX = (v: number): string => `${v.toFixed(2)}×`;
 const fmtPct = (v: number): string => `${Math.round(v)}%`;
 
 function controlsPanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
-  const list = el("ul", "fx-binds");
-  for (const [action, key] of BINDINGS) {
-    const li = el("li", "fx-binds__row");
-    li.append(el("span", "", action), el("kbd", "fx-kbd", key));
-    list.append(li);
-  }
-  // TODO(ui): rebinding de teclas (click en una fila → "presioná una tecla").
   return [
     slider({ label: "Sensibilidad del mouse", min: SENS_MIN, max: SENS_MAX, step: SENS_STEP,
       value: s.controls.mouseSensitivity, format: fmtX,
       onInput: (v) => up((p) => ({ ...p, controls: { ...p.controls, mouseSensitivity: v } })) }),
-    el("h3", "fx-sub", "Controles"), list,
-    el("p", "fx-note", "Reasignar teclas: pronto."),
+    ...keybindView(s.controls.keys, (keys) => up((p) => ({ ...p, controls: { ...p.controls, keys } }))),
   ];
 }
 
@@ -75,7 +57,7 @@ function audioPanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
     onInput: (v) => up((p) => ({ ...p, audio: { ...p.audio, [key]: v } })),
   });
   return [vol("General", "master"), vol("Efectos", "sfx"), vol("Música", "music"),
-    el("p", "fx-note", "Todavía no hay sonido — se guarda para cuando llegue.")];
+    el("p", "fx-note", "Todavía no hay música: el volumen se guarda para cuando llegue.")];
 }
 
 function gamePanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
