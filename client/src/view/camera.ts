@@ -26,6 +26,9 @@ const SHAKE_DURATION_S = 0.25;
 const SHAKE_AMPLITUDE = 0.1;
 const SHAKE_FREQ_A = 53;
 const SHAKE_FREQ_B = 71;
+// Match intro sweep: from high over the rival corner down to the shoulder view.
+const INTRO_FROM = { x: 9, y: 8, z: 9 } as const;
+const INTRO_LOOK = { x: 0, y: 0.5, z: 0 } as const;
 
 const damp = (rate: number, dt: number): number => 1 - Math.exp(-rate * dt);
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
@@ -42,10 +45,21 @@ export class CameraRig {
   private readonly target = new THREE.Vector3();
   private shakeLeft = 0;
   private time = 0;
+  private introLeft = 0;
+  private introTotal = 0;
+  private readonly introFrom = new THREE.Vector3(INTRO_FROM.x, INTRO_FROM.y, INTRO_FROM.z);
+  private readonly introLook = new THREE.Vector3(INTRO_LOOK.x, INTRO_LOOK.y, INTRO_LOOK.z);
+  private readonly look3 = new THREE.Vector3();
 
   constructor() { this.applyFixed(); }
 
   shake(): void { this.shakeLeft = SHAKE_DURATION_S; }
+
+  /** Cinematic sweep into the play view over `seconds` (0 ends it). */
+  intro(seconds: number): void {
+    this.introLeft = Math.max(0, seconds);
+    this.introTotal = this.introLeft;
+  }
 
   /** Mouse movement in pixels (pointer lock movementX/Y). */
   look(dx: number, dy: number): void {
@@ -74,6 +88,7 @@ export class CameraRig {
       this.hasTarget = false;
       this.applyFixed();
     }
+    this.applyIntro(dt);
     this.applyShake(dt);
   }
 
@@ -107,6 +122,18 @@ export class CameraRig {
   private applyFixed(): void {
     this.camera.position.set(FIXED_POS.x, FIXED_POS.y, FIXED_POS.z);
     this.camera.lookAt(FIXED_LOOK.x, FIXED_LOOK.y, FIXED_LOOK.z);
+  }
+
+  /** Blends from the intro pose to the pose update() just computed (ease-in-out). */
+  private applyIntro(dt: number): void {
+    if (this.introLeft <= 0) return;
+    this.introLeft = Math.max(0, this.introLeft - dt);
+    const u = 1 - this.introLeft / this.introTotal;
+    const k = u * u * (3 - 2 * u);
+    const look = this.hasTarget ? this.target : this.look3.set(FIXED_LOOK.x, FIXED_LOOK.y, FIXED_LOOK.z);
+    this.look3.lerpVectors(this.introLook, look, k);
+    this.camera.position.lerpVectors(this.introFrom, this.camera.position, k);
+    this.camera.lookAt(this.look3);
   }
 
   private applyShake(dt: number): void {

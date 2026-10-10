@@ -9,7 +9,8 @@ import type { GameLoop, LoopState, MatchResult } from "../loop";
 import type { CourtView } from "../render";
 import { EventKind, Mode, Snap } from "../snapshot";
 import { applyTraining } from "../train-config";
-import { MatchScreens, VS_INTRO_MS } from "../ui/match-screens";
+import { MatchScreens } from "../ui/match-screens";
+import { cancelIntro, playIntro } from "./intro";
 import type { Difficulty, GameMode, MatchOptions, MenuUI, Settings } from "../ui/menu";
 import { DEFAULT_TRAINING, loadTraining } from "../ui/training-settings";
 import { DEFAULT_POINTS } from "../ui/types";
@@ -31,7 +32,6 @@ const HUMAN_MASK = 1;
 const HUMAN_TEAM = 0;
 const CFG_DASH_COOLDOWN = 49; // sim/config_layout.go cfgDashCooldownTime
 const TEAM_SIZE: Readonly<Record<GameMode, number>> = { "1v1": 1, "2v2": 2, playground: 1 };
-const INTRO_SUBTITLE = "Un set a 3 juegos";
 const YAW_LOBBY = -Math.PI / 2; // spawn faces -Z, toward the pads
 const YAW_COURT = 0; // behind the human, toward the rival (+X)
 
@@ -104,6 +104,7 @@ export function enterLobby(app: App): void {
   app.state.showLanding = false;
   app.hud.setTrainingOnDemand(false);
   app.tutorial.stop();
+  cancelIntro();
   arm(app, true);
 }
 
@@ -130,9 +131,9 @@ export function startMatch(app: App, o: MatchOptions): void {
   else app.tutorial.stop();
   app.controls.lock();
   if (o.mode !== "playground") {
-    app.state.holdUntil = performance.now() + VS_INTRO_MS;
-    app.screens.showIntro(TEAM_SIZE[o.mode], INTRO_SUBTITLE);
+    playIntro(app, o.mode, TEAM_SIZE[o.mode], o.difficulty);
   } else {
+    cancelIntro();
     app.state.holdUntil = 0;
   }
 }
