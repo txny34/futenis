@@ -37,6 +37,7 @@ func main() {
 	h := newHub(splitList(*origins), log.Default())
 	h.proxied = *trustProxy
 	mux.Handle("/ws", h)
+	mux.HandleFunc("/lobby", h.ServeLobby)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: readHeaderTimeout}
 	go func() {
