@@ -20,11 +20,14 @@ const HEAD_R = 0.15;
 const LOW_POLY = 5;
 const BOB_AMP = 0.06;
 const BOB_SPEED = 3.2;
+const HYPE_AMP = 4; // bob amplitude multiplier at full hype (fans jump)
 const JITTER = 0.18;
 const SEED = 0x5eed;
 const SCARF_SHARE = 0.6; // fraction of fans wearing a team scarf
 const SCARF_W = 0.42;
 const SCARF_H = 0.12;
+
+type Uniform = { value: number };
 
 /** Deterministic tiny PRNG (mulberry32) so the crowd layout is stable between loads. */
 function rng(seed: number): () => number {
@@ -91,21 +94,22 @@ function seats(): Seat[] {
 }
 
 /** Adds the shared bob to an instanced material (phase from the instance position). */
-function withBob(mat: THREE.Material, time: { value: number }): void {
+function withBob(mat: THREE.Material, time: Uniform, hype: Uniform): void {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = time;
-    shader.vertexShader = "uniform float uTime;\n" + shader.vertexShader.replace(
+    shader.uniforms.uHype = hype;
+    shader.vertexShader = "uniform float uTime;\nuniform float uHype;\n" + shader.vertexShader.replace(
       "#include <begin_vertex>",
       `#include <begin_vertex>
        float ph = instanceMatrix[3].x * 1.7 + instanceMatrix[3].z * 2.3;
-       transformed.y += max(0.0, sin(uTime * ${BOB_SPEED.toFixed(2)} + ph)) * ${BOB_AMP.toFixed(3)};`,
+       transformed.y += max(0.0, sin(uTime * ${BOB_SPEED.toFixed(2)} + ph)) * ${BOB_AMP.toFixed(3)} * (1.0 + uHype * ${HYPE_AMP.toFixed(1)});`,
     );
   };
 }
 
-function bobbing(geo: THREE.BufferGeometry, count: number, time: { value: number }): THREE.InstancedMesh {
+function bobbing(geo: THREE.BufferGeometry, count: number, time: Uniform, hype: Uniform): THREE.InstancedMesh {
   const mat = new THREE.MeshLambertMaterial();
-  withBob(mat, time);
+  withBob(mat, time, hype);
   return new THREE.InstancedMesh(geo, mat, count);
 }
 
@@ -119,12 +123,12 @@ function crowdGeos(): readonly [THREE.BufferGeometry, THREE.BufferGeometry, THRE
   return [body, head, scarf];
 }
 
-function crowd(list: Seat[], time: { value: number }): THREE.InstancedMesh[] {
+function crowd(list: Seat[], time: Uniform, hype: Uniform): THREE.InstancedMesh[] {
   const rand = rng(SEED ^ 0x9e37);
   const [bodyGeo, headGeo, scarfGeo] = crowdGeos();
-  const bodies = bobbing(bodyGeo, list.length, time);
-  const heads = bobbing(headGeo, list.length, time);
-  const scarves = bobbing(scarfGeo, list.length, time);
+  const bodies = bobbing(bodyGeo, list.length, time, hype);
+  const heads = bobbing(headGeo, list.length, time, hype);
+  const scarves = bobbing(scarfGeo, list.length, time, hype);
   const m = new THREE.Matrix4();
   const col = new THREE.Color();
   let nScarf = 0;
@@ -147,12 +151,15 @@ const pick = (list: readonly number[], rand: () => number): number => list[(rand
 export interface Stands {
   readonly group: THREE.Group;
   /** Shared time uniform for the crowd bob; the arena advances it. */
-  readonly time: { value: number };
+  readonly time: Uniform;
+  /** 0..1 crowd excitement (bob amplitude); the arena eases it. */
+  readonly hype: Uniform;
 }
 
 export function buildStands(): Stands {
   const time = { value: 0 };
+  const hype = { value: 0 };
   const group = new THREE.Group();
-  group.add(steps(), ...crowd(seats(), time));
-  return { group, time };
+  group.add(steps(), ...crowd(seats(), time, hype));
+  return { group, time, hype };
 }

@@ -7,8 +7,13 @@ import { buildStructure } from "./structure";
 
 // Stadium around the court: sky dome, fog, tribunes + crowd, roof/towers,
 // neon shapes and the LED strip. Purely cosmetic; the sim knows nothing of it.
+const HYPE_RISE_S = 0.25; // ease toward a higher target (cheer kicks in fast)
+const HYPE_DECAY_PER_S = 0.35; // target falls back to calm
+const HYPE_SPEEDUP = 1; // bob runs (1 + hype x this) times faster
+
 export class Arena {
   private readonly stands: Stands;
+  private hypeTarget = 0;
   private readonly neon = new Neon();
   private readonly led = new LedBoard();
 
@@ -24,9 +29,17 @@ export class Arena {
     this.led.group.visible = !on;
   }
 
-  /** Allocation-free: scalar uniform, two material colors, three texture offsets. */
+  /** Crowd excitement 0..1; the strongest recent cheer wins, then it calms down. */
+  cheer(level: number): void {
+    this.hypeTarget = Math.max(this.hypeTarget, Math.min(1, level));
+  }
+
+  /** Allocation-free: scalar uniforms, two material colors, three texture offsets. */
   update(dt: number): void {
-    this.stands.time.value += dt;
+    const h = this.stands.hype;
+    this.hypeTarget = Math.max(0, this.hypeTarget - HYPE_DECAY_PER_S * dt);
+    h.value += (this.hypeTarget - h.value) * (1 - Math.exp(-dt / HYPE_RISE_S));
+    this.stands.time.value += dt * (1 + h.value * HYPE_SPEEDUP);
     this.neon.update(dt);
     this.led.update(dt);
   }

@@ -1,3 +1,4 @@
+import { HypeMoment, LONG_RALLY, STREAK_CALL } from "./feel/hype";
 import { ShotKind, ShotKindId } from "./feel/shots";
 import { EventKind, SimEvent } from "./snapshot";
 
@@ -28,6 +29,10 @@ const EVENT_CALLS: Readonly<Record<number, Callout>> = {
   [EventKind.HitNet]: { text: "¡RED!", prio: 40, tone: "hot" },
 };
 
+const PUNTAZO: Callout = { text: "¡PUNTAZO!", prio: 55, tone: "gold" };
+const STREAK_TONE = "hot";
+const STREAK_PRIO = 52; // moments sit under PUNTO DE JUEGO / BOLA DE RUPTURA (60): score info wins
+
 const RIVAL_POINT: Callout = { text: "PUNTO RIVAL", prio: 20, tone: "hot" };
 
 export class Callouts {
@@ -46,6 +51,14 @@ export class Callouts {
       : e.kind === EventKind.Point && e.side !== humanTeam ? RIVAL_POINT
         : EVENT_CALLS[e.kind];
     if (c) this.show(c, nowMs);
+  }
+
+  /** Long rally (either team: the crowd loves it) or the human team's streak. */
+  onMoment(m: Readonly<HypeMoment>, humanTeam: number, nowMs: number): void {
+    if (m.touches >= LONG_RALLY) this.show(PUNTAZO, nowMs);
+    else if (m.winner === humanTeam && m.streak >= STREAK_CALL) {
+      this.show({ text: `¡RACHA DE ${m.streak}!`, prio: STREAK_PRIO, tone: STREAK_TONE }, nowMs);
+    }
   }
 
   update(nowMs: number): void {

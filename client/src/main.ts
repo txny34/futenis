@@ -2,6 +2,7 @@ import { Sound } from "./audio/sound";
 import { Tutorial, tutorialDone } from "./tutorial/tutorial";
 import { captureErrors } from "./report/errors";
 import { buildReport } from "./report/report";
+import { LONG_RALLY } from "./feel/hype";
 import { mountDevPanel, isDevMode } from "./dev/panel";
 import { Engine } from "./engine";
 import { Hud } from "./hud";
@@ -19,6 +20,7 @@ import { PlayModal } from "./ui/play-modal/play-modal";
 // Boot straight into the lobby (docs/design/lobby.md §7): no title, no main menu.
 const RESET_KEY = "KeyR";
 const FEED_KEY = "KeyB";
+const HYPE_STREAK_ROAR = 0.6; // a streak gets a smaller roar than a puntazo
 
 function requireElement(id: string): HTMLElement {
   const e = document.getElementById(id);
@@ -142,6 +144,7 @@ function boot(): void {
   const loop = new GameLoop(engine, view, hud, controls, state);
   loop.onMatchOver = (r, snap) => showResult(app, r, snap);
   loop.onGameEvent = (e) => { recorder().onEvent(e); app.sound.onEvent(e); app.tutorial.onEvent(e); };
+  loop.onHype = (m) => app.sound.cheer(m.touches >= LONG_RALLY ? 1 : HYPE_STREAK_ROAR);
   loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);
   app.loop = loop;
   wire(app, menu);
