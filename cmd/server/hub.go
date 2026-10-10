@@ -171,8 +171,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 func (h *hub) expireAlone(r *room, p peer) (stop func()) {
 	var mu sync.Mutex
 	var t *time.Timer
-	var check func()
-	check = func() {
+	check := func() {
 		if r.expireIfWaiting() {
 			p.close(closeNoRival, "no rival")
 			return
