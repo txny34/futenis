@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
@@ -168,8 +167,9 @@ func ecKey(j jwk) *ecdsa.PublicKey {
 	if ex != nil || ey != nil || len(x) != 32 || len(y) != 32 {
 		return nil
 	}
-	if _, err := ecdh.P256().NewPublicKey(append(append([]byte{4}, x...), y...)); err != nil {
+	pk, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), append(append([]byte{4}, x...), y...))
+	if err != nil {
 		return nil // not a point on P-256
 	}
-	return &ecdsa.PublicKey{Curve: elliptic.P256(), X: new(big.Int).SetBytes(x), Y: new(big.Int).SetBytes(y)}
+	return pk
 }

@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,9 +29,9 @@ func newFakeIssuer(t *testing.T) *fakeIssuer {
 	}
 	f := &fakeIssuer{key: k, kid: "test-kid"}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		pad := func(b *big.Int) string { return b64(b.FillBytes(make([]byte, 32))) }
+		raw, _ := k.PublicKey.Bytes() // 0x04 || X || Y
 		_ = json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]string{{
-			"kty": "EC", "crv": "P-256", "alg": "ES256", "kid": f.kid, "x": pad(k.X), "y": pad(k.Y),
+			"kty": "EC", "crv": "P-256", "alg": "ES256", "kid": f.kid, "x": b64(raw[1:33]), "y": b64(raw[33:]),
 		}}})
 	}))
 	t.Cleanup(f.srv.Close)
