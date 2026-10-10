@@ -40,6 +40,10 @@ type hub struct {
 	queueSeq int           // matchmaking room counter (queue.go)
 	queues   map[string]*queue
 
+	auth    *verifier       // Supabase token check; nil = ranked disabled
+	active  map[string]bool // accounts with a live ranked connection (one each)
+	ratings ratingStore     // ranked ELO store; nil = ranked disabled
+
 	lobbies     []*lobby                          // shared online lobbies (lobby.go), opened on demand
 	lobbyConns  *connLimiter                      // per-client cap for /lobby (stricter than matches)
 	lobbyTicker func() (<-chan time.Time, func()) // injectable for tests
@@ -50,7 +54,7 @@ type hub struct {
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
+		queues: map[string]*queue{}, active: map[string]bool{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -138,8 +142,33 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	var r *room
 	var slot, humans int
 	var start bool
+	rankedMode, ranked := rankedModes[queued]
+	network := "" // ranked: the client's limit key, seated next to its account
+	if ranked {
+		uid, ok := h.authenticate(ctx, c)
+		if !ok {
+			p.close(closeNoAuth, "sign in required")
+			return
+		}
+		if !h.claimRanked(uid) {
+			p.close(closeFull, "already in a ranked match")
+			return
+		}
+		defer h.releaseRanked(uid)
+		network = key
+		key = "user:" + uid // one queued connection per account
+	}
 	if queued != "" {
 		code, r, slot, start, humans = h.joinQueue(queued, p, key)
+		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, key[len("user:"):], network) {
+			r.leave(slot)
+			if r.isClosed() {
+				h.forget(code, r)
+			}
+			h.leaveQueue(queued, code, key)
+			p.close(closeFull, "same account or network already in this match")
+			return
+		}
 	} else {
 		r, slot, start, humans = h.join(code, sim.Mode1v1, p)
 	}
@@ -159,7 +188,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		c.CloseNow()
 	}()
 	if start {
-		h.announce(r)
+		h.announce(r, rankedMode)
 	} else {
 		if queued != "" {
 			defer h.leaveQueue(queued, code, key) // only a seated waiter owns a queue spot
@@ -245,14 +274,18 @@ func (h *hub) armFill(r *room, humans int, queued, code string) {
 		if queued != "" {
 			h.closeQueueRoom(queued, code) // started: no longer the open room
 		}
-		h.announce(r)
+		h.announce(r, "")
 	})
 }
 
 // announce sends WELCOME to every seated peer and starts the match loop.
-func (h *hub) announce(r *room) {
+// rankedMode ("1v1"/"2v2", "" = casual) wires the ELO report at game over.
+func (h *hub) announce(r *room, rankedMode string) {
 	r.mu.Lock()
 	peers := r.peers
+	if rankedMode != "" && r.ranked {
+		r.onOver = func(w int, users [sim.MaxPlayers]string) { h.reportRanked(rankedMode, r, users, w) }
+	}
 	r.mu.Unlock()
 	for i, p := range peers {
 		sendTo(p, encodeWelcome(i)) // nil if that seat is empty

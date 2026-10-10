@@ -4,7 +4,7 @@ import { recorder } from "../profile/recorder";
 import { ReplayEngine } from "../replay/replay-engine";
 import { Snap } from "../snapshot";
 import { arm, configureMatch, enterLobby, errText, safeStart, type App } from "./flow";
-import { startOnline } from "./online-flow";
+import { requeue } from "./online-flow";
 import { isOnline, markOnlineOver } from "./online-state";
 
 const HUMAN_TEAM = 0;
@@ -44,7 +44,7 @@ export function showResult(app: App, r: Readonly<MatchResult>, snap: Float64Arra
   const rankNote = elo ? rankChange(elo.before, elo.after) : null;
   app.screens.showResult({ won: winner === HUMAN_TEAM, games0: r.games0, games1: r.games1, rankNote }, {
     rematch: () => {
-      if (isOnline() && (app.mode === "1v1" || app.mode === "2v2")) startOnline(app, app.mode); // back in the queue
+      if (isOnline()) requeue(app); // back in the same queue
       else if (app.last) safeStart(app, app.last);
     },
     lobby: () => {

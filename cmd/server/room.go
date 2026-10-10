@@ -46,6 +46,47 @@ type room struct {
 	started bool
 	closed  bool
 	startAt time.Time // when the match began; the idle clock starts here
+
+	ranked   bool                                           // ranked queue: no bot fill, ELO at game over
+	users    [sim.MaxPlayers]string                         // verified account per seat (ranked only)
+	nets     [sim.MaxPlayers]string                         // client limit key per seat (ranked only)
+	onOver   func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
+	reported bool                                           // ranked result already sent (game over or forfeit)
+}
+
+// claimReport returns true exactly once: the caller reports the ranked result.
+func (r *room) claimReport() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.reported {
+		return false
+	}
+	r.reported = true
+	return true
+}
+
+// teamOf maps a seat to its team (1v1: the seat; 2v2: seat/2, sim/rules.go).
+func (r *room) teamOf(slot int) int {
+	if r.mode == sim.Mode2v2 {
+		return slot / 2
+	}
+	return slot
+}
+
+// markRanked records slot's verified account and network (limit key); the
+// room becomes ranked. It refuses an account or a network already seated:
+// nobody plays against themselves, and two accounts from one network can't
+// trade wins.
+func (r *room) markRanked(slot int, user, network string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.users {
+		if i != slot && (r.users[i] == user || (r.nets[i] != "" && r.nets[i] == network)) {
+			return false
+		}
+	}
+	r.ranked, r.users[slot], r.nets[slot] = true, user, network
+	return true
 }
 
 func newRoom(mode sim.Mode) *room {
@@ -90,7 +131,7 @@ func (r *room) join(p peer) (slot int, start bool, humans int) {
 func (r *room) startEarly() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.closed || r.humansLocked() < minHumans2v2 {
+	if r.closed || r.ranked || r.humansLocked() < minHumans2v2 {
 		return false
 	}
 	return r.startLocked()

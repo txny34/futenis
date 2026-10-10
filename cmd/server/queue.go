@@ -10,7 +10,9 @@ import (
 // Matchmaking: one queue per mode (/ws?queue=1v1 | 2v2). Each queue has at
 // most one room open for joiners. A 2v2 room starts when full, or fillWait
 // after its second person arrives (bots take the empty seats).
-var queueModes = map[string]sim.Mode{"1v1": sim.Mode1v1, "2v2": sim.Mode2v2}
+var queueModes = map[string]sim.Mode{
+	"1v1": sim.Mode1v1, "2v2": sim.Mode2v2, "ranked1v1": sim.Mode1v1, "ranked2v2": sim.Mode2v2,
+}
 
 const fillWait = 20 * time.Second
 

@@ -27,8 +27,8 @@ export const ONLINE_CASUAL: readonly CardDef[] = [
   { mode: "2v2", ranked: false, available: true, title: C2, sub: t("Online · si faltan jugadores, completan bots", "Online · bots fill empty seats") },
 ];
 export const ONLINE_RANKED: readonly CardDef[] = [
-  { mode: "1v1", ranked: true, available: false, title: t("1v1 · CLASIFICACIÓN", "1v1 · RANKED"), sub: t("Suma ELO · Próximamente", "Earns ELO · Coming soon") },
-  { mode: "2v2", ranked: true, available: false, title: t("2v2 · CLASIFICACIÓN", "2v2 · RANKED"), sub: t("Suma ELO · Próximamente", "Earns ELO · Coming soon") },
+  { mode: "1v1", ranked: true, available: true, title: t("1v1 · CLASIFICACIÓN", "1v1 · RANKED"), sub: t("Suma ELO · requiere cuenta", "Earns ELO · account required") },
+  { mode: "2v2", ranked: true, available: true, title: t("2v2 · CLASIFICACIÓN", "2v2 · RANKED"), sub: t("Suma ELO · 4 personas, sin bots", "Earns ELO · 4 people, no bots") },
 ];
 export const BOT_CASUAL: readonly CardDef[] = [
   { mode: "1v1", ranked: false, available: true, title: C1, sub: t("Contra el bot · sin ELO", "Vs the bot · no ELO") },
