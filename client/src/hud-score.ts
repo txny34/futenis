@@ -1,9 +1,10 @@
+import { t } from "./i18n/t";
 import { Mode, POINT_LABELS, Snap } from "./snapshot";
 
 // Padel scoreboard (contact-v2 §21): 0/15/30/40/AD per team + games won +
 // server dot, and a rally shot counter ("7 golpes") top-right that pulses on
 // every new touch. DOM nodes are built once; text only changes on change.
-const NAMES = ["Local", "Visita"] as const;
+const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const;
 const UNSET = -1;
 const PULSE_CLASS = "is-pulse";
 
@@ -58,7 +59,7 @@ export class Scoreboard {
     const grew = n > this.lastShots && this.lastShots !== UNSET;
     this.lastShots = n;
     this.shots.hidden = n <= 0 || snap[Snap.Mode] === Mode.Playground;
-    this.shots.textContent = n === 1 ? "1 golpe" : `${n} golpes`;
+    this.shots.textContent = n === 1 ? t("1 golpe", "1 touch") : t(`${n} golpes`, `${n} touches`);
     if (!grew) return;
     this.shots.classList.remove(PULSE_CLASS);
     void this.shots.offsetWidth; // restart the CSS animation

@@ -1,5 +1,6 @@
 /** Top-down court minimap for the Entrenamiento panel: machine zone (rival half) + bounce zone (your half). */
 import type { TrainingSettings } from "./training-settings";
+import { t } from "../i18n/t";
 
 // The player looks from below: X = +10 (rival back wall) at the top, X = -10 at
 // the bottom; Z = -5 (Izquierda) on the left. 1 m = 10 SVG units.
@@ -39,7 +40,7 @@ export interface Minimap {
 }
 
 export function minimap(): Minimap {
-  const root = svg("svg", "fx-map", { viewBox: `-4 -4 ${W + 8} ${H + 8}`, role: "img", "aria-label": "Cancha: zona de máquina y zona de pique" });
+  const root = svg("svg", "fx-map", { viewBox: `-4 -4 ${W + 8} ${H + 8}`, role: "img", "aria-label": t("Cancha: zona de máquina y zona de pique", "Court: machine zone and bounce zone") });
   root.append(
     svg("rect", "fx-map__court", { x: 0, y: 0, width: W, height: H, rx: 2 }),
     line(0, sy(SERVICE_LINE), W, sy(SERVICE_LINE)),

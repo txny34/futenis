@@ -3,6 +3,7 @@ import { Hype, HypeMoment, LONG_RALLY } from "./feel/hype";
 import { MatchResult, MatchTally } from "./feel/tally";
 import { ShotFeed } from "./feel/shots";
 import { Hud } from "./hud";
+import { t } from "./i18n/t";
 import { Controls } from "./input";
 import { CourtView, HumanView, ScreenPoint } from "./render";
 import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
@@ -104,7 +105,8 @@ export class GameLoop {
       if (!frozen) this.simulate(dt, now);
     } catch (err) {
       this.state.running = false;
-      this.hud.error(`Error de simulación: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      this.hud.error(t(`Error de simulación: ${msg}`, `Simulation error: ${msg}`));
     }
     const live = this.state.running && !this.state.paused;
     this.human.showOverlays = live;

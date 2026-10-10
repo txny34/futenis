@@ -1,4 +1,5 @@
 import type { GameMode } from "../ui/types";
+import { t } from "../i18n/t";
 
 // Mirror of sim/lobby.go (docs/design/lobby.md §2). Verified at load against
 // futenis.layout().lobbyPads / lobbyPadRadius (layout-check.ts). CHANGE TOGETHER.
@@ -15,7 +16,11 @@ export const LobbyCfg = { HoldTime: 72, HalfX: 73, HalfZ: 74 } as const;
 
 /** Pad index -> mode it starts (lobby.md §6). */
 export const PAD_MODES: readonly GameMode[] = ["playground", "1v1", "2v2"];
-export const PAD_LABELS: readonly string[] = ["Entrenamiento · Lanzapelotas", "1v1 contra el bot", "2v2 contra bots"];
+export const PAD_LABELS: readonly string[] = [
+  t("Entrenamiento · Lanzapelotas", "Training · Ball machine"),
+  t("1v1 contra el bot", "1v1 vs the bot"),
+  t("2v2 contra bots", "2v2 vs bots"),
+];
 
 export const padX = (i: number): number => LOBBY_PADS[i * 2];
 export const padZ = (i: number): number => LOBBY_PADS[i * 2 + 1];

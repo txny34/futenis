@@ -1,6 +1,8 @@
 /** "Ajustes" screen: tabbed panels that emit immutable settings updates. */
 import { Choice, el, segmented, slider, toggle } from "./dom";
 import { keybindView } from "./keybind-view";
+import { t } from "../i18n/t";
+import type { Lang } from "../i18n/lang";
 import {
   FpsCap, HUD_SCALE_MAX, LandingMarker, HUD_SCALE_MIN, Quality, SENS_MAX, SENS_MIN, Settings, VOLUME_MAX, VOLUME_MIN,
 } from "./settings";
@@ -9,23 +11,24 @@ export type SettingsUpdate = (fn: (s: Settings) => Settings) => void;
 
 type TabId = "controls" | "video" | "audio" | "game";
 const TABS: readonly Choice<TabId>[] = [
-  { value: "controls", label: "Controles" },
-  { value: "video", label: "Video" },
-  { value: "audio", label: "Audio" },
-  { value: "game", label: "Juego" },
+  { value: "controls", label: t("Controles", "Controls") },
+  { value: "video", label: t("Video", "Video") },
+  { value: "audio", label: t("Audio", "Audio") },
+  { value: "game", label: t("Juego", "Game") },
 ];
 
 const QUALITY_CHOICES: readonly Choice<Quality>[] = [
-  { value: "low", label: "Baja" }, { value: "med", label: "Media" }, { value: "high", label: "Alta" },
+  { value: "low", label: t("Baja", "Low") }, { value: "med", label: t("Media", "Medium") }, { value: "high", label: t("Alta", "High") },
 ];
 const FPS_CHOICES: readonly Choice<FpsCap>[] = [
-  { value: 60, label: "60" }, { value: 144, label: "144" }, { value: 240, label: "240" }, { value: 0, label: "Sin límite" },
+  { value: 60, label: "60" }, { value: 144, label: "144" }, { value: 240, label: "240" }, { value: 0, label: t("Sin límite", "No limit") },
 ];
 
 const LANDING_CHOICES: readonly Choice<LandingMarker>[] = [
-  { value: "always", label: "Siempre" }, { value: "easy", label: "Solo Fácil" }, { value: "never", label: "Nunca" },
+  { value: "always", label: t("Siempre", "Always") }, { value: "easy", label: t("Solo Fácil", "Easy only") }, { value: "never", label: t("Nunca", "Never") },
 ];
 
+const LANG_CHOICES: readonly Choice<Lang>[] = [{ value: "es", label: "Español" }, { value: "en", label: "English" }];
 const SENS_STEP = 0.05;
 const HUD_STEP = 0.05;
 const PERCENT = 100;
@@ -34,7 +37,7 @@ const fmtPct = (v: number): string => `${Math.round(v)}%`;
 
 function controlsPanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
   return [
-    slider({ label: "Sensibilidad del mouse", min: SENS_MIN, max: SENS_MAX, step: SENS_STEP,
+    slider({ label: t("Sensibilidad del mouse", "Mouse sensitivity"), min: SENS_MIN, max: SENS_MAX, step: SENS_STEP,
       value: s.controls.mouseSensitivity, format: fmtX,
       onInput: (v) => up((p) => ({ ...p, controls: { ...p.controls, mouseSensitivity: v } })) }),
     ...keybindView(s.controls.keys, (keys) => up((p) => ({ ...p, controls: { ...p.controls, keys } }))),
@@ -44,10 +47,10 @@ function controlsPanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
 function videoPanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
   const set = (patch: Partial<Settings["video"]>): void => up((p) => ({ ...p, video: { ...p.video, ...patch } }));
   return [
-    segmented("Calidad", QUALITY_CHOICES, s.video.quality, (quality) => set({ quality })),
-    toggle("Sombras", s.video.shadows, (shadows) => set({ shadows })),
-    segmented("Límite de FPS", FPS_CHOICES, s.video.fpsCap, (fpsCap) => set({ fpsCap })),
-    toggle("Mostrar FPS", s.video.showFps, (showFps) => set({ showFps })),
+    segmented(t("Calidad", "Quality"), QUALITY_CHOICES, s.video.quality, (quality) => set({ quality })),
+    toggle(t("Sombras", "Shadows"), s.video.shadows, (shadows) => set({ shadows })),
+    segmented(t("Límite de FPS", "FPS limit"), FPS_CHOICES, s.video.fpsCap, (fpsCap) => set({ fpsCap })),
+    toggle(t("Mostrar FPS", "Show FPS"), s.video.showFps, (showFps) => set({ showFps })),
   ];
 }
 
@@ -56,21 +59,22 @@ function audioPanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
     label, min: VOLUME_MIN, max: VOLUME_MAX, step: 1, value: s.audio[key], format: fmtPct,
     onInput: (v) => up((p) => ({ ...p, audio: { ...p.audio, [key]: v } })),
   });
-  return [vol("General", "master"), vol("Efectos", "sfx"), vol("Música", "music"),
-    el("p", "fx-note", "Todavía no hay música: el volumen se guarda para cuando llegue.")];
+  return [vol(t("General", "Master"), "master"), vol(t("Efectos", "Effects"), "sfx"), vol(t("Música", "Music"), "music"),
+    el("p", "fx-note", t("Todavía no hay música: el volumen se guarda para cuando llegue.", "No music yet: the volume is saved for when it arrives."))];
 }
 
 function gamePanel(s: Settings, up: SettingsUpdate): HTMLElement[] {
   const set = (patch: Partial<Settings["game"]>): void => up((p) => ({ ...p, game: { ...p.game, ...patch } }));
   return [
-    toggle("Círculo de desvío de puntería", s.game.showAimCircle, (showAimCircle) => set({ showAimCircle })),
-    segmented("Marcador de pique", LANDING_CHOICES, s.game.landingMarker, (landingMarker) => set({ landingMarker })),
-    toggle("Cámara dinámica (off = fija)", s.game.dynamicCamera, (dynamicCamera) => set({ dynamicCamera })),
-    toggle("Vibración de cámara", s.game.cameraShake, (cameraShake) => set({ cameraShake })),
-    slider({ label: "Escala del HUD", min: HUD_SCALE_MIN, max: HUD_SCALE_MAX, step: HUD_STEP,
+    toggle(t("Círculo de desvío de puntería", "Aim deflection circle"), s.game.showAimCircle, (showAimCircle) => set({ showAimCircle })),
+    segmented(t("Marcador de pique", "Bounce marker"), LANDING_CHOICES, s.game.landingMarker, (landingMarker) => set({ landingMarker })),
+    toggle(t("Cámara dinámica (off = fija)", "Dynamic camera (off = fixed)"), s.game.dynamicCamera, (dynamicCamera) => set({ dynamicCamera })),
+    toggle(t("Vibración de cámara", "Camera shake"), s.game.cameraShake, (cameraShake) => set({ cameraShake })),
+    slider({ label: t("Escala del HUD", "HUD scale"), min: HUD_SCALE_MIN, max: HUD_SCALE_MAX, step: HUD_STEP,
       value: s.game.hudScale, format: (v) => fmtPct(v * PERCENT), onInput: (hudScale) => set({ hudScale }) }),
-    toggle("Modo daltónico", s.game.colorblind, (colorblind) => set({ colorblind })),
-    el("p", "fx-note", "Modo daltónico: calidad del golpe, equipos y avisos con colores distinguibles. Se aplica al recargar la página."),
+    toggle(t("Modo daltónico", "Colorblind mode"), s.game.colorblind, (colorblind) => set({ colorblind })),
+    segmented("Idioma / Language", LANG_CHOICES, s.game.lang, (lang) => set({ lang })),
+    el("p", "fx-note", t("Modo daltónico: calidad del golpe, equipos y avisos con colores distinguibles. Idioma y modo daltónico se aplican al recargar la página.", "Colorblind mode: shot quality, teams and alerts in distinguishable colors. Language and colorblind mode apply after reloading the page.")),
   ];
 }
 

@@ -1,5 +1,10 @@
 // Remappable keyboard actions (backlog "Accesibilidad: remapeo de teclas").
 // Mouse buttons (golpe/globo) and the mode keys B/R stay fixed.
+// Labels here stay in Spanish: this module is imported by settings.ts (for
+// DEFAULT_KEYS/validateKeys), so importing the ../i18n/t helper here would
+// create a circular import (t -> ui/settings -> ui/keybinds -> t) that
+// crashes at module load. Translation happens at the call sites instead
+// (keybind-view.ts, key-hints.ts), which can safely import t.
 export type KeyAction = "up" | "down" | "left" | "right" | "jump" | "dash" | "free";
 
 export type KeyBinds = Readonly<Record<KeyAction, string>>;

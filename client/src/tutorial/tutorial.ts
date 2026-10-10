@@ -1,11 +1,15 @@
+import { t } from "../i18n/t";
 import { SimEvent } from "../snapshot";
 import { TUTORIAL_STEPS, TutorialProgress } from "./steps";
 
 // Tutorial overlay: step card (title, instruction, progress pips) over the
 // ball machine. Touches the DOM only when the progress changes.
 const DONE_KEY = "futenis.tutorial.done";
-const DONE_TITLE = "¡Listo!";
-const DONE_TEXT = "Ya sabés lo básico. Esc → «Volver al lobby» y jugar contra bots.";
+const DONE_TITLE = t("¡Listo!", "Done!");
+const DONE_TEXT = t(
+  "Ya sabés lo básico. Esc → «Volver al lobby» y jugar contra bots.",
+  "You know the basics now. Esc → \"Back to lobby\" to play against bots.",
+);
 
 function node(tag: "div" | "span", cls: string): HTMLElement {
   const e = document.createElement(tag);

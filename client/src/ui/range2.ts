@@ -1,6 +1,7 @@
 /** Double-ended range slider: two overlaid native range inputs (keyboard + a11y for free) on one track. */
 import { el } from "./dom";
 import type { Bounds, Range } from "./training-settings";
+import { t } from "../i18n/t";
 
 export interface Range2Spec {
   readonly label: string;
@@ -29,8 +30,8 @@ export function range2(s: Range2Spec): HTMLElement {
   head.append(el("span", "fx-row__label", s.label), out);
   const track = el("div", "fx-range2__track");
   const fill = el("div", "fx-range2__fill");
-  const lo = thumb(b, s.value.lo, `${s.label} mínimo`);
-  const hi = thumb(b, s.value.hi, `${s.label} máximo`);
+  const lo = thumb(b, s.value.lo, t(`${s.label} mínimo`, `${s.label} minimum`));
+  const hi = thumb(b, s.value.hi, t(`${s.label} máximo`, `${s.label} maximum`));
   track.append(fill, lo, hi);
   wrap.append(head, track);
   if (s.ends) {

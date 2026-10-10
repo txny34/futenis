@@ -8,6 +8,7 @@ import { settingsView } from "./settings-view";
 import { reportView } from "./report-view";
 import { trainingView } from "./training-view";
 import type { TrainingSettings } from "./training-settings";
+import { t } from "../i18n/t";
 
 export type { Difficulty, GameMode, MatchOptions } from "./types";
 export type { Settings } from "./settings";
@@ -118,8 +119,8 @@ export class MenuUI {
   }
 
   private settingsScreen(): HTMLElement {
-    const back = button("Volver", () => this.back(), "fx-btn fx-btn--ghost");
-    return panel("Ajustes", settingsView(() => this.current, (fn) => this.update(fn)), back);
+    const back = button(t("Volver", "Back"), () => this.back(), "fx-btn fx-btn--ghost");
+    return panel(t("Ajustes", "Settings"), settingsView(() => this.current, (fn) => this.update(fn)), back);
   }
 
   private render(screen: Screen): void {

@@ -1,3 +1,4 @@
+import { t } from "./i18n/t";
 import { assertLayout } from "./layout-check";
 import { EVENT_STRIDE, MAX_EVENTS, MAX_PLAYERS, SNAP_LEN, SimEvent } from "./snapshot";
 
@@ -95,7 +96,7 @@ export class Engine implements StepEngine {
     const { instance } = await WebAssembly.instantiateStreaming(fetch(WASM_URL), go.importObject);
     void go.run(instance);
     const bridge = globalThis.futenis;
-    if (!bridge) throw new Error("WASM no registró el objeto global 'futenis'");
+    if (!bridge) throw new Error(t("WASM no registró el objeto global 'futenis'", "WASM did not register the global object 'futenis'"));
     assertLayout(bridge, { snapLen: SNAP_LEN, inputPerPlayer: INPUT_PER_PLAYER, eventStride: EVENT_STRIDE, maxEvents: MAX_EVENTS, cfgLen: CFG_LEN });
     check("init", bridge.init(new Uint8Array(this.input.buffer), new Uint8Array(this.out.buffer)));
     this.bridge = bridge;
@@ -156,7 +157,7 @@ export class Engine implements StepEngine {
   }
 
   private requireBridge(): FutenisBridge {
-    if (!this.bridge) throw new Error("Engine no cargado: llamá load() primero");
+    if (!this.bridge) throw new Error(t("Engine no cargado: llamá load() primero", "Engine not loaded: call load() first"));
     return this.bridge;
   }
 

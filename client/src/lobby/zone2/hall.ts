@@ -4,6 +4,7 @@ import { ProfileStats, profileStore } from "../../profile/store";
 import { FONT_STACK, canvasTexture } from "../decor/util";
 import { Board } from "./board";
 import { Podium } from "./podium";
+import { t } from "../../i18n/t";
 
 // Zona 2 · Salón de la fama (docs/design/lobby.md §7.2), at the +Z end of the
 // lobby, behind spawn. Three framed boards (ELO 1v1, top wins, ELO 2v2) facing
@@ -29,7 +30,7 @@ function titleTex(): THREE.CanvasTexture {
     c.font = `84px ${FONT_STACK}`;
     c.textAlign = "center";
     c.textBaseline = "middle";
-    c.fillText("SALÓN DE LA FAMA", 512, 68, 1000);
+    c.fillText(t("SALÓN DE LA FAMA", "HALL OF FAME"), 512, 68, 1000);
   });
 }
 
@@ -48,9 +49,9 @@ function signTex(): THREE.CanvasTexture {
     c.font = `44px ${FONT_STACK}`;
     c.textAlign = "center";
     c.textBaseline = "middle";
-    c.fillText("ZONA 2", 256, 128, 490);
+    c.fillText(t("ZONA 2", "ZONE 2"), 256, 128, 490);
     c.font = `38px ${FONT_STACK}`;
-    c.fillText("SALÓN DE LA FAMA", 256, 196, 490);
+    c.fillText(t("SALÓN DE LA FAMA", "HALL OF FAME"), 256, 196, 490);
   });
 }
 
@@ -58,9 +59,9 @@ export class HallOfFame {
   readonly group = new THREE.Group();
   /** Constant light set (LobbyDecor.setLit dims it outside the lobby). */
   readonly lights = new THREE.Group();
-  private readonly elo1 = new Board("MEJOR ELO 1v1", SIDE_W);
-  private readonly wins = new Board("TOP VICTORIAS", CENTER_W);
-  private readonly elo2 = new Board("MEJOR ELO 2v2", SIDE_W);
+  private readonly elo1 = new Board(t("MEJOR ELO 1v1", "BEST ELO 1v1"), SIDE_W);
+  private readonly wins = new Board(t("TOP VICTORIAS", "TOP WINS"), CENTER_W);
+  private readonly elo2 = new Board(t("MEJOR ELO 2v2", "BEST ELO 2v2"), SIDE_W);
   private readonly podiums: readonly [Podium, Podium] = [new Podium(), new Podium()];
 
   constructor() {

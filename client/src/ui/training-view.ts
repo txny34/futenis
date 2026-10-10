@@ -8,18 +8,20 @@ import {
   FEED_DEPTH, INTERVAL, LATERAL, loadTraining, MACHINE_DEPTH, PERCENT, saveTraining,
   SHOT_DRIVE, SHOT_LOB, SHOT_SMASH, TrainingSettings,
 } from "./training-settings";
+// Aliased: the trainingView() function below uses a local `t` for TrainingSettings.
+import { t as tr } from "../i18n/t";
 
 type Patch = Partial<TrainingSettings>;
 
-const SIDES: readonly [string, string] = ["Izquierda", "Derecha"];
-const DEPTHS: readonly [string, string] = ["Red", "Fondo"];
+const SIDES: readonly [string, string] = [tr("Izquierda", "Left"), tr("Derecha", "Right")];
+const DEPTHS: readonly [string, string] = [tr("Red", "Net"), tr("Fondo", "Back")];
 const SHOT_CHIPS: readonly Choice<number>[] = [
-  { value: SHOT_DRIVE, label: "Derecha" }, { value: SHOT_LOB, label: "Globo" }, { value: SHOT_SMASH, label: "Remate" },
+  { value: SHOT_DRIVE, label: tr("Derecha", "Drive") }, { value: SHOT_LOB, label: tr("Globo", "Lob") }, { value: SHOT_SMASH, label: tr("Remate", "Smash") },
 ];
-const FEEDING: readonly Choice<boolean>[] = [{ value: false, label: "Continua" }, { value: true, label: "A demanda" }];
-const BOUNCE: readonly Choice<boolean>[] = [{ value: false, label: "Permitido" }, { value: true, label: "Solo volea" }];
-const VALID: readonly Choice<1 | 2>[] = [{ value: 1, label: "1.er bote" }, { value: 2, label: "2.º bote" }];
-const RANDOM_HINT = "Cada bola toma un valor al azar dentro del rango. Acotalo para repetir la misma bola.";
+const FEEDING: readonly Choice<boolean>[] = [{ value: false, label: tr("Continua", "Continuous") }, { value: true, label: tr("A demanda", "On demand") }];
+const BOUNCE: readonly Choice<boolean>[] = [{ value: false, label: tr("Permitido", "Allowed") }, { value: true, label: tr("Solo volea", "Volley only") }];
+const VALID: readonly Choice<1 | 2>[] = [{ value: 1, label: tr("1.er bote", "1st bounce") }, { value: 2, label: tr("2.º bote", "2nd bounce") }];
+const RANDOM_HINT = tr("Cada bola toma un valor al azar dentro del rango. Acotalo para repetir la misma bola.", "Each ball picks a random value within the range. Narrow it to repeat the same ball.");
 
 const meters = (v: number): string => `${v.toFixed(1)} m`;
 const percent = (v: number): string => `${Math.round(v)}%`;
@@ -71,31 +73,31 @@ export function trainingView(onStart: (t: TrainingSettings) => void, onBack: () 
     saveTimer = window.setTimeout(flush, SAVE_DEBOUNCE_MS);
   };
 
-  const pista = card("Pista",
+  const pista = card(tr("Pista", "Court"),
     el("div", "fx-tmap"),
-    range2({ label: "Posición de la máquina", bounds: LATERAL, value: t.machineZ, format: meters, ends: SIDES, onInput: (r) => set({ machineZ: r }) }),
-    range2({ label: "Profundidad de la máquina", bounds: MACHINE_DEPTH, value: t.machineX, format: meters, ends: DEPTHS, onInput: (r) => set({ machineX: r }) }),
-    range2({ label: "Dirección del tiro", bounds: LATERAL, value: t.feedZ, format: meters, ends: SIDES, onInput: (r) => set({ feedZ: r }) }),
-    range2({ label: "Profundidad del tiro", bounds: FEED_DEPTH, value: t.feedX, format: meters, ends: DEPTHS, onInput: (r) => set({ feedX: r }) }),
+    range2({ label: tr("Posición de la máquina", "Machine position"), bounds: LATERAL, value: t.machineZ, format: meters, ends: SIDES, onInput: (r) => set({ machineZ: r }) }),
+    range2({ label: tr("Profundidad de la máquina", "Machine depth"), bounds: MACHINE_DEPTH, value: t.machineX, format: meters, ends: DEPTHS, onInput: (r) => set({ machineX: r }) }),
+    range2({ label: tr("Dirección del tiro", "Shot direction"), bounds: LATERAL, value: t.feedZ, format: meters, ends: SIDES, onInput: (r) => set({ feedZ: r }) }),
+    range2({ label: tr("Profundidad del tiro", "Shot depth"), bounds: FEED_DEPTH, value: t.feedX, format: meters, ends: DEPTHS, onInput: (r) => set({ feedX: r }) }),
   );
   pista.querySelector(".fx-tmap")?.append(map.root);
 
-  const golpe = card("Golpe",
-    chips("Golpes", SHOT_CHIPS, t.shots, (m) => set({ shots: m })),
-    range2({ label: "Potencia", bounds: PERCENT, value: t.power, format: percent, onInput: (r) => set({ power: r }) }),
-    range2({ label: "Calidad del golpe", bounds: PERCENT, value: t.quality, format: percent, onInput: (r) => set({ quality: r }) }),
+  const golpe = card(tr("Golpe", "Shot"),
+    chips(tr("Golpes", "Shots"), SHOT_CHIPS, t.shots, (m) => set({ shots: m })),
+    range2({ label: tr("Potencia", "Power"), bounds: PERCENT, value: t.power, format: percent, onInput: (r) => set({ power: r }) }),
+    range2({ label: tr("Calidad del golpe", "Shot quality"), bounds: PERCENT, value: t.quality, format: percent, onInput: (r) => set({ quality: r }) }),
     el("p", "fx-note", RANDOM_HINT),
   );
 
   interval.append(slider({
-    label: "Intervalo", min: INTERVAL.min, max: INTERVAL.max, step: INTERVAL.step, value: t.interval,
+    label: tr("Intervalo", "Interval"), min: INTERVAL.min, max: INTERVAL.max, step: INTERVAL.step, value: t.interval,
     format: seconds, onInput: (v) => set({ interval: v }),
   }));
-  const sesion = card("Sesión",
-    segmented("Alimentación", FEEDING, t.onDemand, (v) => set({ onDemand: v })),
+  const sesion = card(tr("Sesión", "Session"),
+    segmented(tr("Alimentación", "Feeding"), FEEDING, t.onDemand, (v) => set({ onDemand: v })),
     interval,
-    segmented("Bote", BOUNCE, t.volleyOnly, (v) => set({ volleyOnly: v })),
-    segmented("Devolución válida", VALID, t.validBounce, (v) => set({ validBounce: v })),
+    segmented(tr("Bote", "Bounce"), BOUNCE, t.volleyOnly, (v) => set({ volleyOnly: v })),
+    segmented(tr("Devolución válida", "Valid return"), VALID, t.validBounce, (v) => set({ validBounce: v })),
   );
   set({}); // initial paint of minimap + interval visibility
 
@@ -105,12 +107,12 @@ export function trainingView(onStart: (t: TrainingSettings) => void, onBack: () 
   grid.append(pista, golpe, sesion);
   const actions = el("div", "fx-actions");
   actions.append(
-    button("Volver", () => { flush(); onBack(); }, "fx-btn fx-btn--ghost"),
-    button("Empezar", () => { flush(); onStart(t); }, "fx-btn fx-btn--hero"),
+    button(tr("Volver", "Back"), () => { flush(); onBack(); }, "fx-btn fx-btn--ghost"),
+    button(tr("Empezar", "Start"), () => { flush(); onStart(t); }, "fx-btn fx-btn--hero"),
   );
   root.append(
-    el("h2", "fx-card__title", "Entrenamiento"),
-    el("p", "fx-train__sub", "Ajustá la máquina y empezá la sesión."),
+    el("h2", "fx-card__title", tr("Entrenamiento", "Training")),
+    el("p", "fx-train__sub", tr("Ajustá la máquina y empezá la sesión.", "Set up the machine and start the session.")),
     grid, challengesCard(), actions,
   );
   return root;

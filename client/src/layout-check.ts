@@ -1,3 +1,4 @@
+import { t } from "./i18n/t";
 import { LOBBY_PADS, LOBBY_PAD_RADIUS, LobbyCfg } from "./lobby/pads";
 import { EventKind, Mode, Snap } from "./snapshot";
 
@@ -41,5 +42,5 @@ export function assertLayout(bridge: FutenisBridge, core: CoreLayout): void {
   const padsOk = pads !== undefined && pads.length === LOBBY_PADS.length && LOBBY_PADS.every((v, i) => pads[i] === v);
   if (!padsOk) detail.push(`lobbyPads: wasm=${pads ? pads.join(",") : "undefined"} client=${LOBBY_PADS.join(",")}`);
   if (detail.length === 0) return;
-  throw new Error(`desalineado cliente/wasm (recompilá ambos): ${detail.join(", ")}`);
+  throw new Error(`${t("desalineado cliente/wasm (recompilá ambos)", "client/wasm mismatch (recompile both)")}: ${detail.join(", ")}`);
 }

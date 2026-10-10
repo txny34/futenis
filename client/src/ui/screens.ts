@@ -1,5 +1,6 @@
 /** Static screens: shared panel + pause. Pure builders. */
 import { button, el } from "./dom";
+import { t } from "../i18n/t";
 
 export function panel(title: string, ...children: HTMLElement[]): HTMLElement {
   const p = el("section", "fx-card");
@@ -10,12 +11,12 @@ export function panel(title: string, ...children: HTMLElement[]): HTMLElement {
 export interface PauseActions { resume: () => void; settings: () => void; report: () => void; quit: () => void }
 
 export function pauseMenu(a: PauseActions): HTMLElement {
-  const nav = el("nav", "fx-stack", "", { "aria-label": "Pausa" });
+  const nav = el("nav", "fx-stack", "", { "aria-label": t("Pausa", "Pause") });
   nav.append(
-    button("Reanudar", a.resume, "fx-btn fx-btn--hero"),
-    button("Ajustes", a.settings),
-    button("Reportar un bug", a.report),
-    button("Volver al lobby", a.quit, "fx-btn fx-btn--ghost"),
+    button(t("Reanudar", "Resume"), a.resume, "fx-btn fx-btn--hero"),
+    button(t("Ajustes", "Settings"), a.settings),
+    button(t("Reportar un bug", "Report a bug"), a.report),
+    button(t("Volver al lobby", "Back to lobby"), a.quit, "fx-btn fx-btn--ghost"),
   );
-  return panel("Pausa", nav);
+  return panel(t("Pausa", "Pause"), nav);
 }

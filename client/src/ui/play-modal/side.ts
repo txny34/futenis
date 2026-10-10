@@ -1,10 +1,12 @@
+import { displayName } from "../../profile/display-name";
 import { rankOf } from "../../profile/rank";
 import { profileStore } from "../../profile/store";
 import { el } from "../dom";
+import { t } from "../../i18n/t";
 
 // Left "Tu perfil" card of "Elegí un modo". Re-rendered on every open (no per-frame work).
 export class ProfileSummary {
-  readonly root = el("section", "fx-play__profile", "", { "aria-label": "Tu perfil" });
+  readonly root = el("section", "fx-play__profile", "", { "aria-label": t("Tu perfil", "Your profile") });
   private readonly initial = el("span", "fx-profile__initial");
   private readonly level = el("span", "fx-profile__level");
   private readonly name = el("b", "fx-play__name");
@@ -25,15 +27,15 @@ export class ProfileSummary {
     d1.append(this.elo1);
     d2.append(this.elo2);
     elos.append(el("dt", "", "ELO 1v1"), d1, el("dt", "", "ELO 2v2"), d2);
-    this.root.append(el("h3", "fx-play__heading", "Tu perfil"), head, elos);
+    this.root.append(el("h3", "fx-play__heading", t("Tu perfil", "Your profile")), head, elos);
   }
 
   refresh(): void {
     const s = profileStore().get();
-    this.initial.textContent = s.name.charAt(0).toUpperCase();
+    this.initial.textContent = displayName(s.name).charAt(0).toUpperCase();
     this.level.textContent = String(s.level);
-    this.name.textContent = s.name;
-    this.record.textContent = `Nivel ${s.level} · ${s.wins}G ${s.losses}P`;
+    this.name.textContent = displayName(s.name);
+    this.record.textContent = t(`Nivel ${s.level} · ${s.wins}G ${s.losses}P`, `Level ${s.level} · ${s.wins}W ${s.losses}L`);
     this.elo1.textContent = `${rankOf(s.elo["1v1"]).label} · ${s.elo["1v1"]}`;
     this.elo2.textContent = `${rankOf(s.elo["2v2"]).label} · ${s.elo["2v2"]}`;
   }

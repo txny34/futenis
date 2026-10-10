@@ -1,6 +1,7 @@
 import type { SimEvent } from "./snapshot";
 import { Sound } from "./audio/sound";
 import { Tutorial, tutorialDone } from "./tutorial/tutorial";
+import { LANG, t } from "./i18n/t";
 import { captureErrors } from "./report/errors";
 import { buildReport } from "./report/report";
 import { LONG_RALLY } from "./feel/hype";
@@ -31,7 +32,7 @@ const MEDAL_ROAR = 0.5;
 
 function requireElement(id: string): HTMLElement {
   const e = document.getElementById(id);
-  if (!e) throw new Error(`Falta el elemento #${id} en index.html`);
+  if (!e) throw new Error(`${t("Falta el elemento", "Missing element")} #${id} ${t("en", "in")} index.html`);
   return e;
 }
 
@@ -102,7 +103,7 @@ async function load(app: App): Promise<void> {
   try {
     await app.engine.load();
   } catch (err) {
-    app.hud.error(`No se pudo cargar el juego: ${errText(err)}`);
+    app.hud.error(`${t("No se pudo cargar el juego", "Could not load the game")}: ${errText(err)}`);
     return;
   }
   if (isDevMode()) app.refreshDev = mountDevPanel(app.engine, (m) => app.hud.error(m));
@@ -129,10 +130,10 @@ function playModal(app: () => App): PlayModal {
 function lobbyMenu(app: () => App, menu: MenuUI): void {
   menu.setLobbyMenu(() => ({
     items: [
-      { label: "Tutorial", run: () => safeStart(app(), tutorialOptions()) },
-      { label: "Entrenamiento", run: () => menu.openTraining((t) => safeStart(app(), lobbyOptions("playground", false, t))) },
-      { label: "Ajustes", run: () => menu.openSettings() },
-      { label: "Reportar un bug", run: () => menu.openReport() },
+      { label: t("Tutorial", "Tutorial"), run: () => safeStart(app(), tutorialOptions()) },
+      { label: t("Entrenamiento", "Training"), run: () => menu.openTraining((cfg) => safeStart(app(), lobbyOptions("playground", false, cfg))) },
+      { label: t("Ajustes", "Settings"), run: () => menu.openSettings() },
+      { label: t("Reportar un bug", "Report a bug"), run: () => menu.openReport() },
     ],
   }));
 }
@@ -141,12 +142,13 @@ function onMedal(app: App, e: SimEvent): void {
   const earned = app.challenges.onEvent(e);
   if (earned.length === 0) return;
   const top = earned[earned.length - 1]; // banner shows one; every medal is saved
-  app.hud.medal(`¡${MEDALS[top.medal].toUpperCase()}! ${top.def.title}`, performance.now());
+  app.hud.medal(t(`¡${MEDALS[top.medal].toUpperCase()}! ${top.def.title}`, `${MEDALS[top.medal].toUpperCase()}! ${top.def.title}`), performance.now());
   app.sound.cheer(MEDAL_ROAR);
 }
 
 function boot(): void {
   captureErrors();
+  document.documentElement.lang = LANG;
   applyThemeCss(document.documentElement); // --hud-* for overlays outside #hud (VS card, menus)
   const hud = new Hud(requireElement("hud"));
   const menu = new MenuUI(requireElement("ui"));
@@ -156,7 +158,7 @@ function boot(): void {
   const state: LoopState = { running: false, paused: false, fpsCap: 0, cameraShake: true, holdUntil: 0, showLanding: false };
   const engine = new Engine();
   let ref: App | null = null;
-  const get = (): App => { if (!ref) throw new Error("app no inicializada"); return ref; };
+  const get = (): App => { if (!ref) throw new Error(t("app no inicializada", "app not initialized")); return ref; };
   const app: App = {
     engine, view, hud, sound: new Sound(), tutorial: new Tutorial(requireElement("hud")), challenges: new ChallengeSession(), tape: new Tape(), replaying: false, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
@@ -183,5 +185,5 @@ try {
   boot();
 } catch (err: unknown) {
   const hudRoot = document.getElementById("hud");
-  if (hudRoot) hudRoot.textContent = `Error: ${errText(err)}`;
+  if (hudRoot) hudRoot.textContent = `${t("Error", "Error")}: ${errText(err)}`;
 }

@@ -1,3 +1,4 @@
+import { t } from "./i18n/t";
 import { EventKind, Mode, SimEvent, Snap } from "./snapshot";
 
 // Entrenamiento HUD (docs/design/training.md §5): big RACHA counter + MEJOR,
@@ -9,7 +10,7 @@ const ANIM_CLASS = "is-live";
 const PULSE_CLASS = "is-pulse";
 const UNSET = -1;
 const TENTHS = 10;
-const OK_TEXT = "¡+1!";
+const OK_TEXT = t("¡+1!", "+1!");
 
 function node(tag: "div" | "span" | "b", cls: string, text = ""): HTMLElement {
   const e = document.createElement(tag);
@@ -22,7 +23,7 @@ export class TrainingHud {
   readonly root = node("div", "");
   readonly pop = node("div", "");
   private readonly streak = node("b", "train__streak", "0");
-  private readonly best = node("span", "train__best", "MEJOR 0");
+  private readonly best = node("span", "train__best", t("MEJOR 0", "BEST 0"));
   private readonly next = node("div", "train__next");
   private readonly hint = node("div", "train__hint");
   private lastStreak = UNSET;
@@ -37,9 +38,9 @@ export class TrainingHud {
     this.root.hidden = true;
     this.pop.hidden = true;
     this.next.hidden = true;
-    this.hint.textContent = `${launchKey}: lanzar bola`;
+    this.hint.textContent = t(`${launchKey}: lanzar bola`, `${launchKey}: launch ball`);
     this.hint.hidden = true;
-    this.root.append(node("span", "train__label", "RACHA"), this.streak, this.best, this.next, this.hint);
+    this.root.append(node("span", "train__label", t("RACHA", "STREAK")), this.streak, this.best, this.next, this.hint);
   }
 
   /** FeedOnDemand of the current session (read once at match start). */
@@ -57,7 +58,9 @@ export class TrainingHud {
 
   onEvent(e: SimEvent, nowMs: number): void {
     if (e.kind === EventKind.ReturnOK) this.popup(OK_TEXT, "ok", nowMs);
-    else if (e.kind === EventKind.ReturnFail && this.lastStreak > 0) this.popup(`RACHA: ${this.lastStreak}`, "fail", nowMs);
+    else if (e.kind === EventKind.ReturnFail && this.lastStreak > 0) {
+      this.popup(t(`RACHA: ${this.lastStreak}`, `STREAK: ${this.lastStreak}`), "fail", nowMs);
+    }
   }
 
   update(snap: Float64Array, nowMs: number): void {
@@ -82,16 +85,19 @@ export class TrainingHud {
     }
     if (best === this.lastBest) return;
     this.lastBest = best;
-    this.best.textContent = `MEJOR ${best}`;
+    this.best.textContent = t(`MEJOR ${best}`, `BEST ${best}`);
   }
 
   /** Countdown in tenths of a second; -1 (waiting for demand / ball live) hides it. */
   private updateNext(feedIn: number): void {
-    const t = feedIn < 0 ? UNSET : Math.ceil(feedIn * TENTHS);
-    if (t === this.lastNext) return;
-    this.lastNext = t;
-    this.next.hidden = t === UNSET || this.onDemand;
-    if (t !== UNSET) this.next.textContent = `Próxima bola ${(t / TENTHS).toFixed(1)} s`;
+    const tenths = feedIn < 0 ? UNSET : Math.ceil(feedIn * TENTHS);
+    if (tenths === this.lastNext) return;
+    this.lastNext = tenths;
+    this.next.hidden = tenths === UNSET || this.onDemand;
+    if (tenths !== UNSET) {
+      const secs = (tenths / TENTHS).toFixed(1);
+      this.next.textContent = t(`Próxima bola ${secs} s`, `Next ball ${secs} s`);
+    }
   }
 
   private popup(text: string, tone: string, nowMs: number): void {

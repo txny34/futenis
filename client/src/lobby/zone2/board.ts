@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { THEME } from "../../env/theme";
 import { FONT_STACK } from "../decor/util";
+import { t } from "../../i18n/t";
 
 // One framed leaderboard screen of the hall (lobby/zone2). Local data only:
 // the guest's own highlighted row plus clearly-marked "coming soon" slots
@@ -63,7 +64,7 @@ export class Board {
     c.fillText(this.title, W / 2, 90, W - 60);
     c.fillStyle = H_.boardMuted;
     c.font = `30px ${FONT_STACK}`;
-    c.fillText("RANKING ONLINE — PRÓXIMAMENTE", W / 2, 180, W - 60);
+    c.fillText(t("RANKING ONLINE — PRÓXIMAMENTE", "ONLINE RANKING — COMING SOON"), W / 2, 180, W - 60);
     this.drawSlots(c);
     this.drawOwn(c);
     this.tex.needsUpdate = true;
@@ -91,7 +92,7 @@ export class Board {
     c.fillStyle = H_.ownText;
     c.textAlign = "left";
     c.font = `40px ${FONT_STACK}`;
-    c.fillText(`TÚ · ${this.name}`, 60, OWN_Y + OWN_H / 2, W - 300);
+    c.fillText(t(`TÚ · ${this.name}`, `YOU · ${this.name}`), 60, OWN_Y + OWN_H / 2, W - 300);
     c.textAlign = "right";
     c.font = `52px ${FONT_STACK}`;
     c.fillText(this.value, W - 60, OWN_Y + OWN_H / 2);

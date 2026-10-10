@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { CharacterPose, DEFAULT_LOOK, createCharacter } from "../../character/character";
 import { THEME } from "../../env/theme";
 import { FONT_STACK, canvasTexture } from "../decor/util";
+import { t } from "../../i18n/t";
 
 // Podium blocks 1-2-3 under a side board. Only #1 can hold a statue: the
 // player's own character rig, frozen in an idle pose, shown once they have
@@ -38,7 +39,7 @@ function inviteTex(): THREE.CanvasTexture {
     c.font = `64px ${FONT_STACK}`;
     c.textAlign = "center";
     c.textBaseline = "middle";
-    c.fillText("¿Serás vos?", 256, 66, 496);
+    c.fillText(t("¿Serás vos?", "Could it be you?"), 256, 66, 496);
   });
 }
 
