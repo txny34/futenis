@@ -35,8 +35,9 @@ type hub struct {
 	idle     time.Duration // injectable for tests
 	wait     time.Duration
 
-	queueSeq  int    // matchmaking room counter (queue.go)
-	queueCode string // room waiting for a second queued player, "" if none
+	queueSeq   int    // matchmaking room counter (queue.go)
+	queueCode  string // room waiting for a second queued player, "" if none
+	queueOwner string // limit key of the player waiting in queueCode
 }
 
 func newHub(origins []string, logger *log.Logger) *hub {
@@ -95,7 +96,7 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "bad room code", http.StatusBadRequest)
 		return
 	}
-	ip := clientIP(req, h.proxied)
+	ip := limitKey(clientIP(req, h.proxied))
 	if !h.conns.acquire(ip) {
 		http.Error(w, "too many connections", http.StatusTooManyRequests)
 		return
@@ -106,7 +107,7 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return // Accept already wrote the HTTP error
 	}
 	c.SetReadLimit(readLimit)
-	h.serve(req.Context(), code, queued, c)
+	h.serve(req.Context(), code, queued, ip, c)
 }
 
 // join finds or creates the room for code and joins p, retrying once if the
@@ -124,13 +125,13 @@ func (h *hub) join(code string, p peer) (r *room, slot int, start bool) {
 }
 
 // serve joins the room and runs the read loop until the peer disconnects.
-func (h *hub) serve(ctx context.Context, code string, queued bool, c *websocket.Conn) {
+func (h *hub) serve(ctx context.Context, code string, queued bool, key string, c *websocket.Conn) {
 	p := wsPeer{c}
 	var r *room
 	var slot int
 	var start bool
 	if queued {
-		code, r, slot, start = h.joinQueue(p)
+		code, r, slot, start = h.joinQueue(p, key)
 	} else {
 		r, slot, start = h.join(code, p)
 	}
@@ -215,11 +216,18 @@ func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, done <-chan str
 			return
 		case <-t.C:
 		}
-		if !r.isStarted() {
-			lastSeen.Store(time.Now().UnixNano()) // queue/lobby wait never counts as idle
+		startAt, started := r.startedAt()
+		if !started {
+			t.Reset(h.idle / 4) // waiting for a rival never counts as idle
+			continue
 		}
-		left := h.idle - time.Since(time.Unix(0, lastSeen.Load()))
-		if left <= 0 && r.isStarted() {
+		// The clock runs from the later of the last message and the match start.
+		last := time.Unix(0, lastSeen.Load())
+		if startAt.After(last) {
+			last = startAt
+		}
+		left := h.idle - time.Since(last)
+		if left <= 0 {
 			p.close(closeIdle, "idle")
 			return
 		}

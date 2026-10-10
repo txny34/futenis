@@ -32,6 +32,7 @@ type room struct {
 	stop    chan struct{}
 	started bool
 	closed  bool
+	startAt time.Time // when the second peer joined; the idle clock starts here
 }
 
 func newRoom() *room { return &room{stop: make(chan struct{})} }
@@ -63,6 +64,7 @@ func (r *room) join(p peer) (slot int, start bool) {
 	}
 	if !r.started {
 		r.started = true
+		r.startAt = time.Now()
 		start = true
 	}
 	return slot, start
@@ -72,6 +74,13 @@ func (r *room) isStarted() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.started
+}
+
+// startedAt reports when the match began (ok false while waiting).
+func (r *room) startedAt() (t time.Time, ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.startAt, r.started
 }
 
 // expireIfWaiting closes the room iff the match never started, atomically

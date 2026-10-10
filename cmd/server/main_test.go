@@ -16,3 +16,10 @@ func TestApplyEnv(t *testing.T) {
 		t.Fatalf("env not applied: %q %q %v", addr, origins, trust)
 	}
 }
+
+func TestSplitList(t *testing.T) {
+	got := splitList(" a.app, b.app ,,")
+	if len(got) != 2 || got[0] != "a.app" || got[1] != "b.app" {
+		t.Fatalf("got %q", got)
+	}
+}

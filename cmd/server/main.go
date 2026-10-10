@@ -4,7 +4,7 @@
 //
 // Usage: go run ./cmd/server [-addr 127.0.0.1:8091] [-origins localhost:8090] [-trust-proxy]
 //
-// Hosting (Render): PORT overrides -addr (listening on all interfaces),
+// Hosting (Fly.io): PORT overrides -addr (listening on all interfaces),
 // FUTENIS_ORIGINS overrides -origins and FUTENIS_TRUST_PROXY=1 sets -trust-proxy.
 package main
 
@@ -34,7 +34,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	mux := http.NewServeMux()
-	h := newHub(strings.Split(*origins, ","), log.Default())
+	h := newHub(splitList(*origins), log.Default())
 	h.proxied = *trustProxy
 	mux.Handle("/ws", h)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
@@ -62,4 +62,15 @@ func applyEnv(addr, origins *string, trustProxy *bool) {
 	if os.Getenv("FUTENIS_TRUST_PROXY") == "1" {
 		*trustProxy = true
 	}
+}
+
+// splitList splits a comma-separated flag, trimming spaces and dropping empties.
+func splitList(s string) []string {
+	var out []string
+	for _, v := range strings.Split(s, ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }

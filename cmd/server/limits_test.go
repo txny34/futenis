@@ -193,3 +193,29 @@ func TestHubPerIPLimit(t *testing.T) {
 		t.Fatalf("second conn from same IP: err %v res %v", err, res)
 	}
 }
+
+func TestClientIPFlyHeaderWins(t *testing.T) {
+	req := &http.Request{RemoteAddr: "10.0.0.1:443", Header: http.Header{}}
+	req.Header.Set("X-Forwarded-For", "6.6.6.6, 7.7.7.7")
+	req.Header.Set("Fly-Client-IP", "9.9.9.9")
+	if got := clientIP(req, true); got != "9.9.9.9" {
+		t.Fatalf("got %q", got)
+	}
+	if got := clientIP(req, false); got != "10.0.0.1" {
+		t.Fatalf("untrusted: got %q", got)
+	}
+}
+
+func TestLimitKeyBucketsIPv6(t *testing.T) {
+	for in, want := range map[string]string{
+		"9.9.9.9":                 "9.9.9.9",
+		"2001:db8:1:2:aaaa::1":    "2001:db8:1:2::/64",
+		"2001:db8:1:2:bbbb:cc::9": "2001:db8:1:2::/64",
+		"::ffff:9.9.9.9":          "9.9.9.9",
+		"garbage":                 "garbage",
+	} {
+		if got := limitKey(in); got != want {
+			t.Errorf("%q: got %q want %q", in, got, want)
+		}
+	}
+}
