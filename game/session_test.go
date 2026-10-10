@@ -188,3 +188,30 @@ func TestLobbyConfigureRunsNoBot(t *testing.T) {
 		t.Fatalf("lobby snapshot: pad=%v mode=%v", out[outCurr+sim.SnapLobbyPad], out[outCurr+sim.SnapMode])
 	}
 }
+
+// A player who leaves an online 2v2 is replaced by the bot mid-match: the
+// match keeps its state and the freed slot starts receiving AI input.
+func TestSetHumanMaskHandsSlotToBot(t *testing.T) {
+	g := NewSession()
+	if err := g.Configure(int(sim.Mode2v2), int(ai.Normal), 5, 0b1111); err != nil {
+		t.Fatal(err)
+	}
+	out := make([]float64, OutLen)
+	var idle [sim.MaxPlayers]sim.PlayerInput
+	for i := 0; i < 60; i++ {
+		g.Run(idle, 2, out)
+	}
+	before := out[outCurr+sim.SnapP3X]
+	if err := g.SetHumanMask(0b0111); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 240; i++ {
+		g.Run(idle, 2, out)
+	}
+	if out[outCurr+sim.SnapP3X] == before {
+		t.Fatal("slot 3 never moved after being handed to the bot")
+	}
+	if err := g.SetHumanMask(1 << sim.MaxPlayers); err == nil {
+		t.Fatal("out-of-range mask accepted")
+	}
+}

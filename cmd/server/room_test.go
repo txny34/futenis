@@ -61,14 +61,14 @@ func decodeBody(b []byte) []float64 {
 }
 
 func TestRoomJoinFull(t *testing.T) {
-	r := newRoom()
-	if slot, start := r.join(&fakePeer{}); slot != 0 || start {
+	r := newRoom(sim.Mode1v1)
+	if slot, start, _ := r.join(&fakePeer{}); slot != 0 || start {
 		t.Fatal("first join")
 	}
-	if slot, start := r.join(&fakePeer{}); slot != 1 || !start {
+	if slot, start, _ := r.join(&fakePeer{}); slot != 1 || !start {
 		t.Fatal("second join should start")
 	}
-	if slot, start := r.join(&fakePeer{}); slot != -1 || start {
+	if slot, start, _ := r.join(&fakePeer{}); slot != -1 || start {
 		t.Fatal("third peer accepted")
 	}
 }
@@ -77,7 +77,7 @@ func TestRoomJoinFull(t *testing.T) {
 // before anything else, so WELCOME is never followed by WAITING.
 func TestRoomWaitingOrder(t *testing.T) {
 	for range 50 {
-		r := newRoom()
+		r := newRoom(sim.Mode1v1)
 		host, guest := &fakePeer{}, &fakePeer{}
 		var wg sync.WaitGroup
 		starts := make(chan bool, 2)
@@ -85,7 +85,7 @@ func TestRoomWaitingOrder(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, start := r.join(p)
+				_, start, _ := r.join(p)
 				if start {
 					sendTo(r.peers[0], encodeWelcome(0))
 					sendTo(r.peers[1], encodeWelcome(1))
@@ -123,7 +123,7 @@ func btoi(b bool) int {
 }
 
 func TestRoomFramesRotated(t *testing.T) {
-	r := newRoom()
+	r := newRoom(sim.Mode1v1)
 	host, guest := &fakePeer{}, &fakePeer{}
 	r.join(host)
 	r.join(guest)
@@ -153,7 +153,7 @@ func TestRoomFramesRotated(t *testing.T) {
 }
 
 func TestRoomGuestInputRotated(t *testing.T) {
-	r := newRoom()
+	r := newRoom(sim.Mode1v1)
 	in := sim.PlayerInput{MoveX: 1, MoveZ: -0.5, TargetX: 4, TargetZ: 2, Buttons: 3, Spin: 1}
 	r.setInput(0, in)
 	r.setInput(1, in)
@@ -163,7 +163,7 @@ func TestRoomGuestInputRotated(t *testing.T) {
 }
 
 func TestRoomLeave(t *testing.T) {
-	r := newRoom()
+	r := newRoom(sim.Mode1v1)
 	host, guest := &fakePeer{}, &fakePeer{}
 	r.join(host)
 	r.join(guest)
@@ -173,7 +173,7 @@ func TestRoomLeave(t *testing.T) {
 	if len(msgs) != 2 || msgs[0][0] != msgWaiting || msgs[1][0] != msgPeerLeft || !closed {
 		t.Fatalf("host msgs %v closed %v", msgs, closed)
 	}
-	if slot, _ := r.join(&fakePeer{}); !r.isClosed() || slot != -1 {
+	if slot, _, _ := r.join(&fakePeer{}); !r.isClosed() || slot != -1 {
 		t.Fatal("closed room accepted a peer")
 	}
 	if m, _ := guest.snapshot(); len(m) != 0 {

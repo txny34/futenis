@@ -4,18 +4,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/txny34/futenis/ai"
 	"github.com/txny34/futenis/game"
 	"github.com/txny34/futenis/sim"
 )
 
 const (
-	roomSlots        = 2
-	frameInterval    = time.Second / 60
-	ticksPerFrame    = sim.TickRate / 60
-	roomPointsToWin  = 5
-	humanMaskOneVOne = 0b11
-	closeNormal      = 1000
+	frameInterval   = time.Second / 60
+	ticksPerFrame   = sim.TickRate / 60
+	roomPointsToWin = 5
+	closeNormal     = 1000
+	// minHumans2v2: a 2v2 room may start early (bots fill the rest) once this
+	// many people are in; see hub.fillWait.
+	minHumans2v2 = 2
 )
 
 // peer is one connected browser; send must be safe for concurrent use.
@@ -24,31 +24,41 @@ type peer interface {
 	close(code int, reason string)
 }
 
-// room is a private 1v1 match: slot 0 = host, slot 1 = guest (rotated view).
+// room is one online match: 1v1 (2 seats) or 2v2 (4 seats). Seat = sim slot;
+// team = slot % 2. Every client gets its own view (game.ViewOut). In 2v2 an
+// empty seat is played by the bot, also when someone leaves mid-match.
 type room struct {
 	mu      sync.Mutex
-	peers   [roomSlots]peer
+	mode    sim.Mode
+	seats   int
+	peers   [sim.MaxPlayers]peer
 	inputs  [sim.MaxPlayers]sim.PlayerInput
 	stop    chan struct{}
 	started bool
 	closed  bool
-	startAt time.Time // when the second peer joined; the idle clock starts here
+	startAt time.Time // when the match began; the idle clock starts here
 }
 
-func newRoom() *room { return &room{stop: make(chan struct{})} }
+func newRoom(mode sim.Mode) *room {
+	seats := 2
+	if mode == sim.Mode2v2 {
+		seats = sim.MaxPlayers
+	}
+	return &room{mode: mode, seats: seats, stop: make(chan struct{})}
+}
 
-// join adds p and returns its slot (-1 if full or closed). start is true for
-// exactly one caller: the one whose join fills the room. A lone joiner gets
-// WAITING while the lock is held, so a concurrent WELCOME can never precede
-// it (the send is bounded by the peer's write timeout).
-func (r *room) join(p peer) (slot int, start bool) {
+// join adds p and returns its slot (-1 if full, closed or already started).
+// start is true for exactly one caller: the one whose join fills the room.
+// humans is the head count after joining. A waiting joiner gets WAITING while
+// the lock is held, so a concurrent WELCOME can never precede it.
+func (r *room) join(p peer) (slot int, start bool, humans int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.closed {
-		return -1, false
+	if r.closed || r.started {
+		return -1, false, 0
 	}
 	slot = -1
-	for i := range r.peers {
+	for i := 0; i < r.seats; i++ {
 		if r.peers[i] == nil {
 			r.peers[i] = p
 			slot = i
@@ -56,18 +66,55 @@ func (r *room) join(p peer) (slot int, start bool) {
 		}
 	}
 	if slot < 0 {
-		return -1, false
+		return -1, false, 0
 	}
-	if r.peers[1-slot] == nil {
+	humans = r.humansLocked()
+	if humans < r.seats {
 		_ = p.send(encodeSignal(msgWaiting))
-		return slot, false
+		return slot, false, humans
 	}
-	if !r.started {
-		r.started = true
-		r.startAt = time.Now()
-		start = true
+	return slot, r.startLocked(), humans
+}
+
+// startEarly starts a 2v2 room that is not full yet (bots take the empty
+// seats). It reports true for exactly one caller.
+func (r *room) startEarly() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed || r.humansLocked() < minHumans2v2 {
+		return false
 	}
-	return slot, start
+	return r.startLocked()
+}
+
+func (r *room) startLocked() bool {
+	if r.started {
+		return false
+	}
+	r.started = true
+	r.startAt = time.Now()
+	return true
+}
+
+func (r *room) humansLocked() int {
+	n := 0
+	for _, p := range r.peers {
+		if p != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// humanMaskLocked has bit i set for every seated person.
+func (r *room) humanMaskLocked() int {
+	m := 0
+	for i, p := range r.peers {
+		if p != nil {
+			m |= 1 << i
+		}
+	}
+	return m
 }
 
 // startedAt reports when the match began (ok false while waiting).
@@ -82,8 +129,8 @@ func (r *room) startedAt() (t time.Time, ok bool) {
 func (r *room) expireIfWaiting() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.started || r.closed {
-		return false
+	if r.started || r.closed || (r.mode == sim.Mode2v2 && r.humansLocked() >= minHumans2v2) {
+		return false // 2v2 with enough people: the fill timer starts it with bots
 	}
 	r.closed = true
 	close(r.stop)
@@ -96,65 +143,10 @@ func (r *room) isClosed() bool {
 	return r.closed
 }
 
-// setInput stores slot's latest input (client view; the guest's is rotated).
+// setInput stores slot's latest input, turned from the client's view into server space.
 func (r *room) setInput(slot int, in sim.PlayerInput) {
-	if slot == 1 {
-		in = game.RotateInput(in)
-	}
+	in = game.ViewInput(in, slot)
 	r.mu.Lock()
 	r.inputs[slot] = in
 	r.mu.Unlock()
-}
-
-// leave removes slot, tells the other peer and stops the room.
-func (r *room) leave(slot int) {
-	r.mu.Lock()
-	if r.closed {
-		r.mu.Unlock()
-		return
-	}
-	r.closed = true
-	other := r.peers[1-slot]
-	r.peers[slot] = nil
-	close(r.stop)
-	r.mu.Unlock()
-	if other != nil {
-		_ = other.send(encodeSignal(msgPeerLeft))
-		other.close(closeNormal, "peer left")
-	}
-}
-
-// run plays the match until the room stops. tick is injectable for tests.
-func (r *room) run(tick <-chan time.Time) {
-	s := game.NewSession()
-	if err := s.Configure(int(sim.Mode1v1), int(ai.Normal), roomPointsToWin, humanMaskOneVOne); err != nil {
-		panic(err) // constant arguments: a failure is a programming error
-	}
-	out := make([]float64, game.OutLen)
-	rot := make([]float64, game.OutLen)
-	host := make([]byte, frameMsgLen)
-	guest := make([]byte, frameMsgLen)
-	for {
-		select {
-		case <-r.stop:
-			return
-		case <-tick:
-		}
-		r.mu.Lock()
-		in := r.inputs
-		p0, p1 := r.peers[0], r.peers[1]
-		r.mu.Unlock()
-		s.Run(in, ticksPerFrame, out)
-		game.RotateOut1v1(rot, out)
-		encodeFrame(host, out)
-		encodeFrame(guest, rot)
-		sendTo(p0, host)
-		sendTo(p1, guest)
-	}
-}
-
-func sendTo(p peer, b []byte) {
-	if p != nil {
-		_ = p.send(b) // a dead peer is detected by its read loop, which calls leave
-	}
 }

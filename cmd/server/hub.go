@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/sim"
 )
 
 const (
@@ -35,14 +36,15 @@ type hub struct {
 	idle     time.Duration // injectable for tests
 	wait     time.Duration
 
-	queueSeq   int    // matchmaking room counter (queue.go)
-	queueCode  string // room waiting for a second queued player, "" if none
-	queueOwner string // limit key of the player waiting in queueCode
+	fill     time.Duration // 2v2: wait before bots fill the empty seats (injectable)
+	queueSeq int           // matchmaking room counter (queue.go)
+	queues   map[string]*queue
 }
 
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
-		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout}
+		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
+		queues: map[string]*queue{}}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -52,7 +54,7 @@ func realTicker() (<-chan time.Time, func()) {
 
 // roomFor returns the open room for code, creating it if missing or closed.
 // It returns nil when a new room is needed but the hub is at capacity.
-func (h *hub) roomFor(code string) *room {
+func (h *hub) roomFor(code string, mode sim.Mode) *room {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	r := h.rooms[code]
@@ -60,7 +62,7 @@ func (h *hub) roomFor(code string) *room {
 		if r == nil && len(h.rooms) >= h.maxRooms {
 			return nil
 		}
-		r = newRoom()
+		r = newRoom(mode)
 		h.rooms[code] = r
 	}
 	return r
@@ -87,12 +89,12 @@ func (p wsPeer) close(code int, reason string) { _ = p.c.Close(websocket.StatusC
 
 func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
-	code, queued := q.Get("room"), q.Has("queue")
-	if queued && q.Get("queue") != queueMode {
+	code, queued := q.Get("room"), q.Get("queue")
+	if _, ok := queueModes[queued]; q.Has("queue") && !ok {
 		http.Error(w, "bad queue", http.StatusBadRequest)
 		return
 	}
-	if !queued && !roomCode.MatchString(code) {
+	if queued == "" && !roomCode.MatchString(code) {
 		http.Error(w, "bad room code", http.StatusBadRequest)
 		return
 	}
@@ -112,28 +114,29 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // join finds or creates the room for code and joins p, retrying once if the
 // room closed concurrently. r is nil when the hub is full.
-func (h *hub) join(code string, p peer) (r *room, slot int, start bool) {
+func (h *hub) join(code string, mode sim.Mode, p peer) (r *room, slot int, start bool, humans int) {
 	for range 2 {
-		if r = h.roomFor(code); r == nil {
-			return nil, -1, false
+		if r = h.roomFor(code, mode); r == nil {
+			return nil, -1, false, 0
 		}
-		if slot, start = r.join(p); slot >= 0 || !r.isClosed() {
-			return r, slot, start
+		if slot, start, humans = r.join(p); slot >= 0 || !r.isClosed() {
+			return r, slot, start, humans
 		}
 	}
-	return r, -1, false
+	return r, -1, false, 0
 }
 
 // serve joins the room and runs the read loop until the peer disconnects.
-func (h *hub) serve(ctx context.Context, code string, queued bool, key string, c *websocket.Conn) {
+func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.Conn) {
 	p := wsPeer{c}
 	var r *room
-	var slot int
+	var slot, humans int
 	var start bool
-	if queued {
-		code, r, slot, start = h.joinQueue(p, key)
+	if queued != "" {
+		code, r, slot, start, humans = h.joinQueue(queued, p, key)
+		defer h.leaveQueue(queued, code, key)
 	} else {
-		r, slot, start = h.join(code, p)
+		r, slot, start, humans = h.join(code, sim.Mode1v1, p)
 	}
 	if r == nil {
 		p.close(closeBusy, "server full")
@@ -143,10 +146,17 @@ func (h *hub) serve(ctx context.Context, code string, queued bool, key string, c
 		p.close(closeFull, "room full")
 		return
 	}
-	defer func() { r.leave(slot); h.forget(code, r); c.CloseNow() }()
+	defer func() {
+		r.leave(slot)
+		if r.isClosed() { // a 2v2 goes on (or keeps waiting) while people remain
+			h.forget(code, r)
+		}
+		c.CloseNow()
+	}()
 	if start {
 		h.announce(r)
 	} else {
+		h.armFill(r, humans)
 		noRival := time.AfterFunc(h.wait, func() {
 			if r.expireIfWaiting() {
 				p.close(closeNoRival, "no rival")
@@ -195,13 +205,27 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 	}
 }
 
-// announce sends WELCOME to both peers and starts the match loop.
+// armFill: the second person in a 2v2 room starts the countdown after which
+// bots fill the empty seats.
+func (h *hub) armFill(r *room, humans int) {
+	if r.mode != sim.Mode2v2 || humans != minHumans2v2 {
+		return
+	}
+	time.AfterFunc(h.fill, func() {
+		if r.startEarly() {
+			h.announce(r)
+		}
+	})
+}
+
+// announce sends WELCOME to every seated peer and starts the match loop.
 func (h *hub) announce(r *room) {
 	r.mu.Lock()
-	p0, p1 := r.peers[0], r.peers[1]
+	peers := r.peers
 	r.mu.Unlock()
-	sendTo(p0, encodeWelcome(0)) // nil if that peer already left
-	sendTo(p1, encodeWelcome(1))
+	for i, p := range peers {
+		sendTo(p, encodeWelcome(i)) // nil if that seat is empty
+	}
 	tick, stop := h.ticker()
 	go func() { defer stop(); r.run(tick) }()
 }
