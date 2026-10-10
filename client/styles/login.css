@@ -1,0 +1,27 @@
+/* "Iniciá sesión" modal + "¿Primera vez?" tutorial card. Colors only from --fx-* tokens. */
+.fx-login {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;
+  background: rgba(3, 10, 26, .8); backdrop-filter: blur(8px); font-family: var(--fx-body); color: var(--fx-line);
+}
+.fx-login[hidden], .fx-login__reason[hidden], .fx-tutprompt[hidden] { display: none; }
+.fx-login__card { width: min(440px, 100%); display: grid; gap: 14px; }
+.fx-login__card .fx-card__title { margin-bottom: 4px; }
+.fx-login__reason { margin: 0; color: var(--fx-ball); font-weight: 600; }
+.fx-login__note { margin: 0; color: var(--fx-muted); font-size: 14px; }
+.fx-login__btn { text-align: center; font-weight: 600; }
+.fx-login__btn--discord { background: var(--fx-discord); border-color: var(--fx-discord); }
+.fx-login__btn--google { background: var(--fx-line); color: var(--fx-court-deep); border-color: var(--fx-line); }
+.fx-login__btn:hover { transform: translateY(-2px); }
+.fx-login__guest { text-align: center; font-size: 16px; padding: 12px; }
+
+.fx-tutprompt {
+  position: fixed; left: 16px; top: 16px; z-index: 6; width: 260px; padding: 14px 16px; border-radius: var(--fx-radius);
+  display: grid; gap: 6px; background: var(--fx-card); border: 2px solid var(--fx-ball);
+  color: var(--fx-line); font-family: var(--fx-body); pointer-events: auto;
+}
+.fx-tutprompt__title { font: 400 18px var(--fx-display); color: var(--fx-ball); }
+.fx-tutprompt__text { margin: 0; color: var(--fx-muted); font-size: 14px; }
+.fx-tutprompt__go { font-size: 16px; padding: 10px 14px; text-align: center; }
+.fx-tutprompt__close {
+  position: absolute; top: 6px; right: 8px; background: none; border: 0; color: var(--fx-muted); font-size: 16px; cursor: pointer;
+}

@@ -3,6 +3,7 @@ import { BOT_CASUAL, CardDef, cardSection, modeCard, ONLINE_CASUAL, ONLINE_RANKE
 import { historyPanel, infoPanel } from "./panels";
 import { ProfileSummary } from "./side";
 import { t } from "../../i18n/t";
+import { authUser } from "../../auth/auth";
 
 export type { PlayKind, PlayPick, QueueMode } from "./cards";
 
@@ -26,6 +27,7 @@ export class PlayModal {
   private readonly toast = el("p", "fx-lobby__toast fx-play__toast", t("Próximamente", "Coming soon"), { role: "status" });
   private readonly profile = new ProfileSummary();
   private readonly openCbs: Array<(open: boolean) => void> = [];
+  private needAccount: () => void = () => undefined;
   private pick: PlayPick | null = null;
   private toastTimer = 0;
 
@@ -65,6 +67,8 @@ export class PlayModal {
 
   get isOpen(): boolean { return !this.root.hidden; }
   onOpenChange(cb: (open: boolean) => void): void { this.openCbs.push(cb); }
+  /** Ranked picked without an account: the caller shows "Iniciá sesión". */
+  onNeedAccount(cb: () => void): void { this.needAccount = cb; }
 
   /** preselect: the pad's card; JUGAR opens with nothing selected. Always opens online. */
   open(preselect: PlayPick | null = null): void {
@@ -115,6 +119,7 @@ export class PlayModal {
     const p = this.pick;
     const card = this.visibleCards().find(([d]) => samePick(p, d))?.[0];
     if (p === null || !card) return;
+    if (card.ranked && !authUser()) { this.close(); this.needAccount(); return; }
     if (!card.available) { this.soon(); return; }
     this.close();
     this.onStart(p, this.kind);

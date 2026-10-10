@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-gB2Jox7UETAA0hIUyDydweE3XiP47xsOcFmb+wcMIIo='; style-src 'self' https://fonts.googleapis.com 'sha256-E8bwzd7apWNOtGXZWwi+gn35YTXcIa/S+oS8L/vx03w='; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://zlzihrszbowgwvluqmju.supabase.co wss://futenis-server.fly.dev ws://localhost:8091 ws://127.0.0.1:8091; object-src 'none'; base-uri 'none'; form-action 'none'" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>futenis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,6 +17,7 @@
   <link rel="stylesheet" href="styles/play-modal.css" />
   <link rel="stylesheet" href="styles/play-cards.css" />
   <link rel="stylesheet" href="styles/play-art.css" />
+  <link rel="stylesheet" href="styles/login.css" />
   <style>
     html, body { margin: 0; height: 100%; background: #02040d; color: #e6edf3; font-family: system-ui, sans-serif; overflow: hidden; }
     #app { position: fixed; inset: 0; }
