@@ -70,7 +70,7 @@ func (r *room) run(tick <-chan time.Time) {
 			if p == nil {
 				continue
 			}
-			game.ViewOut(view, out, scratch, i)
+			game.ViewOut(view, out, scratch, i, mode == sim.Mode2v2)
 			encodeFrame(msgs[i], view)
 			sendTo(p, msgs[i])
 		}

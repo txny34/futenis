@@ -44,8 +44,8 @@ func TestQueue2v2FourPlayersGetSeats0To3(t *testing.T) {
 		cs = append(cs, c)
 	}
 	for i, c := range cs {
-		if w := readMsg(ctx, t, c, msgWelcome, welcomeLen); int(w[2]) != i {
-			t.Fatalf("player %d got seat %d", i, w[2])
+		if w := readMsg(ctx, t, c, msgWelcome, welcomeLen); int(w[2]) != seats2v2[i] {
+			t.Fatalf("player %d got seat %d, want %d (first two are rivals)", i, w[2], seats2v2[i])
 		}
 	}
 	tick <- time.Time{}

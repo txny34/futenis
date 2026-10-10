@@ -18,6 +18,13 @@ const (
 	minHumans2v2 = 2
 )
 
+// Seat fill order. 2v2 teams are {0,1} vs {2,3} (sim/rules.go): the first two
+// people become rivals, each with a bot partner until more arrive.
+var (
+	seats1v1 = []int{0, 1}
+	seats2v2 = []int{0, 2, 1, 3}
+)
+
 // peer is one connected browser; send must be safe for concurrent use.
 type peer interface {
 	send(b []byte) error
@@ -31,6 +38,7 @@ type room struct {
 	mu      sync.Mutex
 	mode    sim.Mode
 	seats   int
+	order   []int
 	peers   [sim.MaxPlayers]peer
 	inputs  [sim.MaxPlayers]sim.PlayerInput
 	stop    chan struct{}
@@ -40,11 +48,11 @@ type room struct {
 }
 
 func newRoom(mode sim.Mode) *room {
-	seats := 2
+	order := seats1v1
 	if mode == sim.Mode2v2 {
-		seats = sim.MaxPlayers
+		order = seats2v2
 	}
-	return &room{mode: mode, seats: seats, stop: make(chan struct{})}
+	return &room{mode: mode, seats: len(order), order: order, stop: make(chan struct{})}
 }
 
 // join adds p and returns its slot (-1 if full, closed or already started).
@@ -58,7 +66,7 @@ func (r *room) join(p peer) (slot int, start bool, humans int) {
 		return -1, false, 0
 	}
 	slot = -1
-	for i := 0; i < r.seats; i++ {
+	for _, i := range r.order {
 		if r.peers[i] == nil {
 			r.peers[i] = p
 			slot = i
@@ -145,7 +153,7 @@ func (r *room) isClosed() bool {
 
 // setInput stores slot's latest input, turned from the client's view into server space.
 func (r *room) setInput(slot int, in sim.PlayerInput) {
-	in = game.ViewInput(in, slot)
+	in = game.ViewInput(in, slot, r.mode == sim.Mode2v2)
 	r.mu.Lock()
 	r.inputs[slot] = in
 	r.mu.Unlock()

@@ -18,7 +18,6 @@ var snapNeg = [...]int{
 var snapSwap = [...][2]int{
 	{sim.SnapScore0, sim.SnapScore1}, {sim.SnapPoints0, sim.SnapPoints1},
 	{sim.SnapGames0, sim.SnapGames1}, {sim.SnapSets0, sim.SnapSets1},
-	{sim.SnapP0DashActive, sim.SnapP1DashActive}, {sim.SnapP2DashActive, sim.SnapP3DashActive},
 }
 
 // playerPos/playerExtra/playerContact are each slot's block starts.
@@ -26,6 +25,7 @@ var (
 	playerPos     = [sim.MaxPlayers]int{sim.SnapP0X, sim.SnapP1X, sim.SnapP2X, sim.SnapP3X}
 	playerExtra   = [sim.MaxPlayers]int{sim.SnapP0VelX, sim.SnapP1VelX, sim.SnapP2VelX, sim.SnapP3VelX}
 	playerContact = [sim.MaxPlayers]int{sim.SnapP0ContactTicks, sim.SnapP1ContactTicks, sim.SnapP2ContactTicks, sim.SnapP3ContactTicks}
+	playerDash    = [sim.MaxPlayers]int{sim.SnapP0DashActive, sim.SnapP1DashActive, sim.SnapP2DashActive, sim.SnapP3DashActive}
 )
 
 const (
@@ -35,13 +35,20 @@ const (
 
 // RotateOut1v1 writes the guest view of frame src into dst (both len OutLen,
 // must not alias). No allocations.
-func RotateOut1v1(dst, src []float64) {
+func RotateOut1v1(dst, src []float64) { rotateOut(dst, src, 1) }
+
+// RotateOut2v2 is the 2v2 equivalent: teams are slots {0,1} vs {2,3}
+// (sim/rules.go), so the rotation pairs slot i with i^2.
+func RotateOut2v2(dst, src []float64) { rotateOut(dst, src, 2) }
+
+// rotateOut rotates the court and maps slot i to i^k (k = 1 in 1v1, 2 in 2v2).
+func rotateOut(dst, src []float64, k int) {
 	copy(dst[:OutLen], src[:OutLen])
-	rotateSnap(dst[outPrev:outCurr], src[outPrev:outCurr])
-	rotateSnap(dst[outCurr:outEventCount], src[outCurr:outEventCount])
+	rotateSnap(dst[outPrev:outCurr], src[outPrev:outCurr], k)
+	rotateSnap(dst[outCurr:outEventCount], src[outCurr:outEventCount], k)
 	n := clamp(int(src[outEventCount]), 0, maxEvents)
 	for i := 0; i < n; i++ {
-		rotateEvent(dst[outEvents+i*eventStride:], src[outEvents+i*eventStride:])
+		rotateEvent(dst[outEvents+i*eventStride:], src[outEvents+i*eventStride:], k)
 	}
 }
 
@@ -52,7 +59,7 @@ func RotateInput(in sim.PlayerInput) sim.PlayerInput {
 	return in
 }
 
-func rotateSnap(d, s []float64) {
+func rotateSnap(d, s []float64, k int) {
 	for _, i := range snapNeg {
 		d[i] = -s[i]
 	}
@@ -61,9 +68,10 @@ func rotateSnap(d, s []float64) {
 	}
 	d[sim.SnapServer] = flipTeam(s[sim.SnapServer])
 	d[sim.SnapLastTeam] = flipTeam(s[sim.SnapLastTeam])
-	d[sim.SnapServerPlayer] = flipPlayer(s[sim.SnapServerPlayer])
+	d[sim.SnapServerPlayer] = flipPlayer(s[sim.SnapServerPlayer], k)
 	for i := 0; i < sim.MaxPlayers; i++ {
-		j := i ^ 1
+		j := i ^ k
+		d[playerDash[i]] = s[playerDash[j]]
 		rotatePos(d[playerPos[i]:], s[playerPos[j]:])
 		copy(d[playerExtra[i]:playerExtra[i]+extraLen], s[playerExtra[j]:playerExtra[j]+extraLen])
 		d[playerExtra[i]] = -s[playerExtra[j]]     // VelX
@@ -78,12 +86,12 @@ func rotatePos(d, s []float64) {
 
 // rotateEvent mirrors one event record. side is a team for every event except
 // the EvPad* lobby events, where it is a pad index; those never occur online
-// (1v1 only), so flipping it as a team is safe.
-func rotateEvent(d, s []float64) {
-	rotatePos(d[2:], s[2:]) // posX, posY, posZ
-	rotatePos(d[9:], s[9:]) // velX, velY, velZ
-	d[5] = flipTeam(s[5])   // side
-	d[6] = flipPlayer(s[6]) // player
+// (no lobby mode online), so flipping it as a team is safe.
+func rotateEvent(d, s []float64, k int) {
+	rotatePos(d[2:], s[2:])    // posX, posY, posZ
+	rotatePos(d[9:], s[9:])    // velX, velY, velZ
+	d[5] = flipTeam(s[5])      // side
+	d[6] = flipPlayer(s[6], k) // player
 }
 
 // flipTeam maps team 0<->1 and keeps anything else (-1 = none).
@@ -94,10 +102,10 @@ func flipTeam(t float64) float64 {
 	return t
 }
 
-// flipPlayer maps slot p to p^1 for 0..3 and keeps anything else (-1 = none).
-func flipPlayer(p float64) float64 {
+// flipPlayer maps slot p to p^k for 0..3 and keeps anything else (-1 = none).
+func flipPlayer(p float64, k int) float64 {
 	if p >= 0 && p < sim.MaxPlayers {
-		return float64(int(p) ^ 1)
+		return float64(int(p) ^ k)
 	}
 	return p
 }
