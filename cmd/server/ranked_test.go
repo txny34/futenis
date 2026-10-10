@@ -118,3 +118,42 @@ func TestGameOverWinner(t *testing.T) {
 		t.Fatalf("w=%d over=%v", w, over)
 	}
 }
+
+// Leaving a started ranked match is a forfeit: the leaver's team loses, once.
+func TestRankedLeaverForfeits(t *testing.T) {
+	r := newRoom(sim.Mode1v1)
+	r.join(&fakePeer{})
+	r.join(&fakePeer{})
+	r.markRanked(0, userA)
+	r.markRanked(1, userB)
+	got := make(chan int, 2)
+	r.onOver = func(w int, _ [sim.MaxPlayers]string) { got <- w }
+	r.leave(0) // userA quits
+	select {
+	case w := <-got:
+		if w != 1 {
+			t.Fatalf("winner %d, want the team that stayed (1)", w)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no result reported for a ranked quit")
+	}
+	if r.claimReport() { // a later game over must report nothing
+		t.Fatal("result could be reported twice")
+	}
+}
+
+// A ranked 2v2 never hands a seat to a bot: a leaver ends the match.
+func TestRanked2v2LeaverEndsMatch(t *testing.T) {
+	r := newRoom(sim.Mode2v2)
+	for i := 0; i < 4; i++ {
+		r.join(&fakePeer{})
+	}
+	for i := 0; i < 4; i++ {
+		r.markRanked(i, userA)
+	}
+	r.onOver = func(int, [sim.MaxPlayers]string) {}
+	r.leave(2)
+	if !r.isClosed() {
+		t.Fatal("ranked 2v2 kept going with a bot")
+	}
+}

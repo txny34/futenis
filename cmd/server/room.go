@@ -47,9 +47,29 @@ type room struct {
 	closed  bool
 	startAt time.Time // when the match began; the idle clock starts here
 
-	ranked bool                                           // ranked queue: no bot fill, ELO at game over
-	users  [sim.MaxPlayers]string                         // verified account per seat (ranked only)
-	onOver func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
+	ranked   bool                                           // ranked queue: no bot fill, ELO at game over
+	users    [sim.MaxPlayers]string                         // verified account per seat (ranked only)
+	onOver   func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
+	reported bool                                           // ranked result already sent (game over or forfeit)
+}
+
+// claimReport returns true exactly once: the caller reports the ranked result.
+func (r *room) claimReport() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.reported {
+		return false
+	}
+	r.reported = true
+	return true
+}
+
+// teamOf maps a seat to its team (1v1: the seat; 2v2: seat/2, sim/rules.go).
+func (r *room) teamOf(slot int) int {
+	if r.mode == sim.Mode2v2 {
+		return slot / 2
+	}
+	return slot
 }
 
 // markRanked records slot's verified account; the room becomes ranked.
