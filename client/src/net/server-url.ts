@@ -4,6 +4,6 @@ declare const __FUTENIS_SERVER__: string;
 const DEV_PORT = 8091;
 
 export function serverBase(): string {
-  if (__FUTENIS_SERVER__) return __FUTENIS_SERVER__;
+  if (__FUTENIS_SERVER__) return __FUTENIS_SERVER__.replace(/\/+$/, "");
   return `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:${DEV_PORT}`;
 }

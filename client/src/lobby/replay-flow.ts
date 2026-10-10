@@ -5,7 +5,7 @@ import { ReplayEngine } from "../replay/replay-engine";
 import { Snap } from "../snapshot";
 import { arm, configureMatch, enterLobby, errText, safeStart, type App } from "./flow";
 import { startOnline } from "./online-flow";
-import { isOnline } from "./online-state";
+import { isOnline, markOnlineOver } from "./online-state";
 
 const HUMAN_TEAM = 0;
 
@@ -38,6 +38,7 @@ export function startReplay(app: App): void {
 export function showResult(app: App, r: Readonly<MatchResult>, snap: Float64Array): void {
   app.controls.enabled = false;
   app.controls.releaseAll();
+  if (isOnline()) markOnlineOver();
   const winner = r.winner >= 0 ? r.winner : snap[Snap.Sets0] >= snap[Snap.Sets1] ? 0 : 1;
   const elo = app.replaying ? null : recorder().matchOver(winner === HUMAN_TEAM, r.games0, r.games1);
   const rankNote = elo ? rankChange(elo.before, elo.after) : null;

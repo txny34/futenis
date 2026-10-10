@@ -88,7 +88,7 @@ export class RemoteEngine implements StepEngine {
   close(): void {
     const ws = this.ws;
     this.ws = null;
-    if (ws) { ws.onclose = null; ws.close(); }
+    if (ws) { ws.onclose = null; ws.onmessage = null; ws.close(); }
   }
 
   peek(): StepResult { this.result.eventCount = 0; return this.result; }

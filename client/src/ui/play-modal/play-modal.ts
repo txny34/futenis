@@ -13,6 +13,7 @@ export type { PlayKind, PlayPick, QueueMode } from "./cards";
 const SOON_MS = 1800;
 const IDLE_LABEL = t("ELEGÍ UN MODO", "PICK A MODE");
 const GO_LABEL = t("JUGAR", "PLAY");
+const SOON_LABEL = t("PRÓXIMAMENTE", "COMING SOON");
 
 export class PlayModal {
   private readonly root = el("div", "fx-play", "", { role: "dialog", "aria-modal": "true", "aria-label": t("Elegí un modo", "Pick a mode") });
@@ -74,7 +75,8 @@ export class PlayModal {
     this.select(preselect);
     this.root.hidden = false;
     this.emit(true);
-    this.visibleCards().find(([p]) => samePick(this.pick, p))?.[1].focus({ preventScroll: true });
+    const cards = this.visibleCards();
+    (cards.find(([p]) => samePick(this.pick, p)) ?? cards[0])?.[1].focus({ preventScroll: true });
   }
 
   private visibleCards(): ReadonlyArray<readonly [CardDef, HTMLButtonElement, PlayKind]> {
@@ -104,8 +106,9 @@ export class PlayModal {
       b.classList.toggle("is-selected", on);
       b.setAttribute("aria-checked", String(on));
     }
+    const card = p === null ? undefined : this.visibleCards().find(([d]) => samePick(p, d))?.[0];
     this.go.disabled = p === null;
-    this.go.textContent = p === null ? IDLE_LABEL : GO_LABEL;
+    this.go.textContent = p === null ? IDLE_LABEL : card?.available === false ? SOON_LABEL : GO_LABEL;
   }
 
   private start(): void {

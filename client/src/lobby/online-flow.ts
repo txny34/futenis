@@ -3,10 +3,10 @@ import { NetStatus, RemoteEngine } from "../net/remote-engine";
 import { serverBase } from "../net/server-url";
 import { recorder } from "../profile/recorder";
 import type { QueueMode } from "../ui/play-modal/play-modal";
-import { arm, landingAllowed, type App } from "./flow";
+import { arm, enterLobby, landingAllowed, type App } from "./flow";
 import { cancelIntro } from "./intro";
 import { endReplay } from "./replay-state";
-import { leaveOnline, setRemote } from "./online-state";
+import { isCurrent, leaveOnline, onlineOver, setRemote } from "./online-state";
 
 // Online casual match from "Elegí un modo": the server pairs whoever is queued
 // (cmd/server/queue.go) and the loop renders its frames instead of the local sim.
@@ -26,6 +26,24 @@ function statusText(s: NetStatus): string {
   }
 }
 
+const LIVE: ReadonlySet<NetStatus> = new Set<NetStatus>(["conectando", "esperando rival", "jugando"]);
+const BACK_MS = 2500; // time to read why the session ended before the lobby
+const NOTE_MS = 5000;
+
+/** Status line while live; a session the server ended goes back to the lobby with its reason. */
+function onStatus(app: App, remote: RemoteEngine, s: NetStatus, ping: number): void {
+  if (!isCurrent(remote) || onlineOver()) return; // left already, or the result card is up
+  const text = s === "jugando" ? `${ping} ms` : statusText(s);
+  app.hud.error(text);
+  if (LIVE.has(s)) return;
+  window.setTimeout(() => {
+    if (!isCurrent(remote) || onlineOver()) return;
+    enterLobby(app);
+    app.hud.error(text);
+    window.setTimeout(() => app.hud.error(""), NOTE_MS);
+  }, BACK_MS);
+}
+
 export function startOnline(app: App, mode: QueueMode): void {
   if (!app.loop) return;
   leaveOnline(app);
@@ -33,7 +51,7 @@ export function startOnline(app: App, mode: QueueMode): void {
   cancelIntro();
   recorder().end();
   const remote = new RemoteEngine(`${serverBase()}/ws?queue=${mode}`, 0);
-  remote.onStatus = (s, ping) => app.hud.error(s === "jugando" ? `${ping} ms` : statusText(s));
+  remote.onStatus = (s, ping) => onStatus(app, remote, s, ping);
   setRemote(remote);
   app.mode = mode;
   app.last = null; // Revancha requeues (see showResult); never a bot rematch

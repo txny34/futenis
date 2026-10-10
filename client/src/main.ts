@@ -64,7 +64,7 @@ function wire(app: App, menu: MenuUI): void {
   menu.onOpenChange(() => lobbyOverlay(app));
   app.play.onOpenChange(() => lobbyOverlay(app));
   menu.onPauseChange((paused) => {
-    app.state.paused = paused;
+    app.state.paused = paused && !isOnline(); // the server never pauses: keep stepping, send neutral input
     app.controls.enabled = !paused && app.state.running && !app.replaying; // the tape drives a replay
     app.controls.releaseAll();
   });
@@ -85,7 +85,7 @@ function wire(app: App, menu: MenuUI): void {
   menu.onSettingsChange((s) => applySettings(app, s));
   applySettings(app, menu.settings);
   app.controls.onKeyPress((code) => {
-    if (!app.state.running || app.state.paused || app.replaying) return; // R/B would desync the tape
+    if (!app.state.running || app.state.paused || app.replaying || isOnline()) return; // R/B would desync the tape / the server
     if (code === FEED_KEY && app.mode === "playground") app.engine.respawnBall();
     if (code === RESET_KEY && !app.inLobby) {
       app.engine.reset();
