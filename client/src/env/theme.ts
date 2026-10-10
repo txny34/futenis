@@ -4,6 +4,14 @@
 // and cyan (team 1 / neon B), neon-yellow ball.
 import { LOBBY_DECOR, type LobbyDecorTheme, type HallTheme } from "./theme-lobby";
 import { FX, type FxTheme } from "./theme-fx";
+import { CB, COLORBLIND } from "./theme-cb";
+
+// Team hues (shirts, neon, pads, HUD): orange/sky in colorblind mode.
+const TEAM_A = COLORBLIND ? CB.vermillion : 0xff5a4e; // vermillion: far from the "perfect" yellow
+const TEAM_B = COLORBLIND ? CB.sky : 0x19e3ff;
+const TEAM_A_CSS = COLORBLIND ? CB.vermillionCss : "#ff5a4e";
+const TEAM_B_CSS = COLORBLIND ? CB.skyCss : "#19e3ff";
+const WARN_CSS = COLORBLIND ? CB.purpleCss : "#ff5a4e";
 
 export type { LobbyDecorTheme, HallTheme, FxTheme };
 
@@ -65,6 +73,8 @@ export interface HudTheme {
   readonly accent: string;
   readonly warn: string;
   readonly ring: string;
+  /** "Perfect" / win gold (matches FX.quality[0]). */
+  readonly gold: string;
   readonly team0: string;
   readonly team1: string;
   /** Entrenamiento minimap: machine zone (pink), bounce zone (cyan), court. */
@@ -87,8 +97,8 @@ export const THEME: Theme = {
   metal: 0x161b26,
   netMesh: 0x05080d,
   netBand: 0x3b7bff,
-  neonA: 0xff5a4e,
-  neonB: 0x19e3ff,
+  neonA: TEAM_A,
+  neonB: TEAM_B,
   ball: 0xe6ff1f,
   ballEmissive: 0x8a9c00,
   standConcrete: 0x141c30,
@@ -103,14 +113,14 @@ export const THEME: Theme = {
   hemiGround: 0x05070d,
   ledBg: "#050914",
   ledText: "#19e3ff",
-  ledAccent: "#ff5a4e",
-  team: [0xff5a4e, 0x19e3ff],
+  ledAccent: TEAM_A_CSS,
+  team: [TEAM_A, TEAM_B],
   machine: { body: 0x1b2340, barrel: 0x0b0f1c, trim: 0xff4fa3, flash: 0xff4fa3 },
   lobbyFloor: 0x141a33,
   lobbyEdge: 0x19e3ff,
   padTraining: 0xff4fa3,
-  pad1v1: 0xff5a4e,
-  pad2v2: 0x19e3ff,
+  pad1v1: TEAM_A,
+  pad2v2: TEAM_B,
   padFill: 0xe6ff1f,
   lobbySignBg: "rgba(5, 9, 20, 0.82)",
   lobbySignText: "#eef6ff",
@@ -122,10 +132,11 @@ export const THEME: Theme = {
     text: "#eef6ff",
     muted: "#8ea3c7",
     accent: "#19e3ff",
-    warn: "#ff5a4e",
+    warn: WARN_CSS,
     ring: "#e6ff1f",
-    team0: "#ff5a4e",
-    team1: "#19e3ff",
+    gold: COLORBLIND ? CB.yellowCss : "#ffd23f",
+    team0: TEAM_A_CSS,
+    team1: TEAM_B_CSS,
     trainMachine: "#ff4fa3",
     trainBounce: "#19e3ff",
     trainCourt: "#2c3354",
@@ -138,7 +149,7 @@ export function applyThemeCss(root: HTMLElement, t: HudTheme = THEME.hud): void 
   const vars: ReadonlyArray<readonly [string, string]> = [
     ["--hud-card", t.card], ["--hud-border", t.cardBorder], ["--hud-text", t.text],
     ["--hud-muted", t.muted], ["--hud-accent", t.accent], ["--hud-warn", t.warn],
-    ["--hud-ring", t.ring], ["--hud-team0", t.team0], ["--hud-team1", t.team1],
+    ["--hud-ring", t.ring], ["--hud-gold", t.gold], ["--hud-team0", t.team0], ["--hud-team1", t.team1],
     ["--train-machine", t.trainMachine], ["--train-bounce", t.trainBounce],
     ["--train-court", t.trainCourt], ["--train-line", t.trainLine],
   ];

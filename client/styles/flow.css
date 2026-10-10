@@ -11,11 +11,11 @@
 
 .fx-vs { display: flex; align-items: center; gap: clamp(16px, 6vw, 72px); }
 .fx-vs__team { display: flex; flex-direction: column; align-items: center; gap: 12px; animation: fx-vs-slide .5s cubic-bezier(.2, 1.3, .4, 1) both; }
-.fx-vs__team--0 { --team: #ff5a4e; --from: -60vw; }
-.fx-vs__team--1 { --team: #19e3ff; --from: 60vw; }
+.fx-vs__team--0 { --team: var(--hud-team0, #ff5a4e); --from: -60vw; }
+.fx-vs__team--1 { --team: var(--hud-team1, #19e3ff); --from: 60vw; }
 @keyframes fx-vs-slide { from { transform: translateX(var(--from)); opacity: 0; } }
 .fx-vs__name { font: 400 clamp(22px, 4vw, 40px) / 1 "Bungee", system-ui; color: var(--team); text-shadow: 0 0 18px var(--team); }
-.fx-vs__vs { font: 400 clamp(40px, 9vw, 96px) / 1 "Bungee", system-ui; color: #ffd23f; text-shadow: 0 0 30px #ffd23f; animation: fx-vs-pop .45s .25s cubic-bezier(.2, 1.8, .4, 1) both; }
+.fx-vs__vs { font: 400 clamp(40px, 9vw, 96px) / 1 "Bungee", system-ui; color: var(--hud-gold); text-shadow: 0 0 30px var(--hud-gold); animation: fx-vs-pop .45s .25s cubic-bezier(.2, 1.8, .4, 1) both; }
 @keyframes fx-vs-pop { from { transform: scale(3); opacity: 0; } }
 .fx-vs__sub { margin: 0; letter-spacing: .2em; text-transform: uppercase; opacity: .8; }
 .fx-vs__sils { display: flex; gap: 10px; }
@@ -36,8 +36,8 @@
 
 .fx-result { text-align: center; padding: 28px 36px; border-radius: 18px; background: rgba(13, 17, 23, .85); border: 1px solid rgba(255, 255, 255, .12); animation: fx-vs-pop .4s cubic-bezier(.2, 1.5, .4, 1) both; }
 .fx-result__title { margin: 0; font: 400 clamp(44px, 10vw, 96px) / 1 "Bungee", system-ui; }
-.fx-result--win .fx-result__title { color: #ffd23f; text-shadow: 0 0 32px #ffd23f; }
-.fx-result--lose .fx-result__title { color: #ff5a7a; text-shadow: 0 0 32px #ff5a7a; }
+.fx-result--win .fx-result__title { color: var(--hud-gold); text-shadow: 0 0 32px var(--hud-gold); }
+.fx-result--lose .fx-result__title { color: var(--hud-warn); text-shadow: 0 0 32px var(--hud-warn); }
 .fx-result__score { margin: 14px 0 0; font: 400 clamp(22px, 4vw, 34px) / 1 "Bungee", system-ui; }
 .fx-result__label { margin: 4px 0 18px; letter-spacing: .2em; text-transform: uppercase; opacity: .7; font-size: 12px; }
 .fx-result .fx-actions { justify-content: center; }

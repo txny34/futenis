@@ -1,6 +1,8 @@
 // Gameplay feedback colors (timing ring, impacts, overlays, hit flash,
 // character details). Part of THEME (theme.ts) like theme-lobby.ts.
 
+import { CB, COLORBLIND } from "./theme-cb";
+
 export interface FxTheme {
   /** Timing ring by sim.Quality: perfect / good / forced. */
   readonly quality: readonly [number, number, number];
@@ -20,11 +22,12 @@ export interface FxTheme {
 }
 
 export const FX: FxTheme = {
-  quality: [0xffd23f, 0x19e3ff, 0xff7a6b],
+  // colorblind: yellow / sky / purple stay apart for protan, deutan and tritan eyes
+  quality: COLORBLIND ? [CB.yellow, CB.sky, CB.purple] : [0xffd23f, 0x19e3ff, 0xff7a6b],
   ringTarget: 0xffffff,
   landing: 0xffffff,
   splat: 0xff3d6e,
-  impact: [0xffd23f, 0x19e3ff, 0xffffff],
+  impact: COLORBLIND ? [CB.yellow, CB.sky, 0xffffff] : [0xffd23f, 0x19e3ff, 0xffffff],
   serveBox: 0xffd23f,
   reticle: 0xffffff,
   aimRing: 0xffd23f,

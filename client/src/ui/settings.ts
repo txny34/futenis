@@ -11,6 +11,7 @@ export interface AudioSettings { master: number; sfx: number; music: number }
 export type LandingMarker = "always" | "easy" | "never";
 export interface GameplaySettings {
   showAimCircle: boolean; cameraShake: boolean; dynamicCamera: boolean; hudScale: number; landingMarker: LandingMarker;
+  colorblind: boolean;
 }
 
 export interface Settings {
@@ -38,7 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   controls: { mouseSensitivity: 1, keys: DEFAULT_KEYS },
   video: { quality: "high", shadows: true, fpsCap: 0, showFps: false },
   audio: { master: 80, sfx: 80, music: 60 },
-  game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1, landingMarker: "easy" },
+  game: { showAimCircle: true, cameraShake: true, dynamicCamera: true, hudScale: 1, landingMarker: "easy", colorblind: false },
 };
 
 type Rec = Record<string, unknown>;
@@ -95,6 +96,7 @@ export function validateSettings(raw: unknown): Settings {
       dynamicCamera: bool(g.dynamicCamera, d.game.dynamicCamera),
       hudScale: num(g.hudScale, HUD_SCALE_MIN, HUD_SCALE_MAX, d.game.hudScale),
       landingMarker: oneOf(g.landingMarker, LANDING_MARKERS, d.game.landingMarker),
+      colorblind: bool(g.colorblind, d.game.colorblind),
     },
   };
 }
