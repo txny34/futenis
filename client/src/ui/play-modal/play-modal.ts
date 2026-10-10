@@ -1,13 +1,14 @@
 import { button, el } from "../dom";
-import { CASUAL_CARDS, cardSection, modeCard, PlayPick, RANKED_CARDS, samePick } from "./cards";
+import { BOT_CASUAL, CardDef, cardSection, modeCard, ONLINE_CASUAL, ONLINE_RANKED, PlayKind, PlayPick, samePick } from "./cards";
 import { historyPanel, infoPanel } from "./panels";
 import { ProfileSummary } from "./side";
 import { t } from "../../i18n/t";
 
-export type { PlayPick, QueueMode } from "./cards";
+export type { PlayKind, PlayPick, QueueMode } from "./cards";
 
 // "Elegí un modo" (docs/design/lobby.md): full-screen modal opened by JUGAR and the
-// 1v1/2v2 pads. Single selection; JUGAR starts it. Esc / X close (a sub-sheet first).
+// 1v1/2v2 pads. Online first; the side "Bots" button swaps in the casual bot cards.
+// Single selection; JUGAR starts it. Esc / X close (a sub-sheet first).
 // Built once; open() only toggles classes/text. Never touched per frame.
 const SOON_MS = 1800;
 const IDLE_LABEL = t("ELEGÍ UN MODO", "PICK A MODE");
@@ -15,7 +16,10 @@ const GO_LABEL = t("JUGAR", "PLAY");
 
 export class PlayModal {
   private readonly root = el("div", "fx-play", "", { role: "dialog", "aria-modal": "true", "aria-label": t("Elegí un modo", "Pick a mode") });
-  private readonly cards: Array<readonly [PlayPick, HTMLButtonElement]> = [];
+  private readonly cards: Array<readonly [CardDef, HTMLButtonElement, PlayKind]> = [];
+  private readonly centers: Record<PlayKind, HTMLElement> = { online: el("div", "fx-play__center"), bots: el("div", "fx-play__center") };
+  private readonly swap = button("", () => this.setKind(this.kind === "online" ? "bots" : "online"), "fx-play__side fx-play__side--swap");
+  private kind: PlayKind = "online";
   private readonly go = button(IDLE_LABEL, () => this.start(), "fx-play__go");
   private readonly sheet = el("section", "fx-play__sheet");
   private readonly toast = el("p", "fx-lobby__toast fx-play__toast", t("Próximamente", "Coming soon"), { role: "status" });
@@ -24,19 +28,22 @@ export class PlayModal {
   private pick: PlayPick | null = null;
   private toastTimer = 0;
 
-  constructor(parent: HTMLElement, private readonly onStart: (p: PlayPick) => void) {
-    const mk = (defs: typeof CASUAL_CARDS): HTMLButtonElement[] => defs.map((d) => {
+  constructor(parent: HTMLElement, private readonly onStart: (p: PlayPick, kind: PlayKind) => void) {
+    const mk = (defs: readonly CardDef[], kind: PlayKind): HTMLButtonElement[] => defs.map((d) => {
       const b = modeCard(d, (p) => this.select(p));
-      this.cards.push([d, b]);
+      this.cards.push([d, b, kind]);
       return b;
     });
-    const center = el("div", "fx-play__center");
-    center.append(cardSection(t("Partidas casuales", "Casual matches"), false, mk(CASUAL_CARDS)),
-      cardSection(t("Clasificatorias", "Ranked"), true, mk(RANKED_CARDS)));
+    this.centers.online.append(cardSection(t("Online · casuales", "Online · casual"), false, mk(ONLINE_CASUAL, "online")),
+      cardSection(t("Clasificatorias", "Ranked"), true, mk(ONLINE_RANKED, "online")));
+    this.centers.bots.append(cardSection(t("Contra bots · casuales", "Vs bots · casual"), false, mk(BOT_CASUAL, "bots")));
+    const center = el("div", "fx-play__centers");
+    center.append(this.centers.online, this.centers.bots);
     const left = el("div", "fx-play__left");
     left.append(this.profile.root);
     const right = el("nav", "fx-play__right", "", { "aria-label": t("Más", "More") });
     right.append(
+      this.swap,
       button(t("Historial", "History"), () => this.showSheet(t("Historial", "History"), historyPanel()), "fx-play__side"),
       button(t("Información", "Info"), () => this.showSheet(t("Información", "Info"), infoPanel()), "fx-play__side"),
       button(t("Recompensas", "Rewards"), () => this.soon(), "fx-play__side"),
@@ -58,15 +65,28 @@ export class PlayModal {
   get isOpen(): boolean { return !this.root.hidden; }
   onOpenChange(cb: (open: boolean) => void): void { this.openCbs.push(cb); }
 
-  /** preselect: the pad's casual card; JUGAR opens with nothing selected. */
+  /** preselect: the pad's card; JUGAR opens with nothing selected. Always opens online. */
   open(preselect: PlayPick | null = null): void {
     if (this.isOpen) return;
     this.profile.refresh();
     this.sheet.hidden = true;
+    this.setKind("online");
     this.select(preselect);
     this.root.hidden = false;
     this.emit(true);
-    (this.cards.find(([p]) => samePick(this.pick, p))?.[1] ?? this.cards[0]?.[1])?.focus({ preventScroll: true });
+    this.visibleCards().find(([p]) => samePick(this.pick, p))?.[1].focus({ preventScroll: true });
+  }
+
+  private visibleCards(): ReadonlyArray<readonly [CardDef, HTMLButtonElement, PlayKind]> {
+    return this.cards.filter(([, , k]) => k === this.kind);
+  }
+
+  private setKind(kind: PlayKind): void {
+    this.kind = kind;
+    this.centers.online.hidden = kind !== "online";
+    this.centers.bots.hidden = kind !== "bots";
+    this.swap.textContent = kind === "online" ? t("Jugar contra bots", "Play vs bots") : t("Jugar online", "Play online");
+    this.select(null);
   }
 
   close(): void {
@@ -79,8 +99,8 @@ export class PlayModal {
 
   private select(p: PlayPick | null): void {
     this.pick = p;
-    for (const [d, b] of this.cards) {
-      const on = p !== null && samePick(p, d);
+    for (const [d, b, k] of this.cards) {
+      const on = p !== null && k === this.kind && samePick(p, d);
       b.classList.toggle("is-selected", on);
       b.setAttribute("aria-checked", String(on));
     }
@@ -90,9 +110,11 @@ export class PlayModal {
 
   private start(): void {
     const p = this.pick;
-    if (p === null) return;
+    const card = this.visibleCards().find(([d]) => samePick(p, d))?.[0];
+    if (p === null || !card) return;
+    if (!card.available) { this.soon(); return; }
     this.close();
-    this.onStart(p);
+    this.onStart(p, this.kind);
   }
 
   private showSheet(title: string, body: HTMLElement): void {

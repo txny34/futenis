@@ -3,26 +3,37 @@ import { modeArt } from "./art/index";
 import { ballIcon, trophyIcon } from "./art/trophy";
 import { t } from "../../i18n/t";
 
-// The four mode cards of "Elegí un modo": two casual, two ranked.
+// Mode cards of "Elegí un modo". Online (default): casual + ranked against people.
+// Bots (side button): casual only — ELO is earned only in ranked online matches.
 export type QueueMode = "1v1" | "2v2";
+export type PlayKind = "online" | "bots";
 
 export interface PlayPick {
   readonly mode: QueueMode;
   readonly ranked: boolean;
 }
 
-interface CardDef extends PlayPick {
+export interface CardDef extends PlayPick {
   readonly title: string;
   readonly sub: string;
+  /** false: shown but JUGAR answers "Próximamente". */
+  readonly available: boolean;
 }
 
-export const CASUAL_CARDS: readonly CardDef[] = [
-  { mode: "1v1", ranked: false, title: t("1v1 · CASUAL", "1v1 · CASUAL"), sub: t("Sin ELO en juego", "No ELO at stake") },
-  { mode: "2v2", ranked: false, title: t("2v2 · CASUAL", "2v2 · CASUAL"), sub: t("Vos + bot contra dos bots", "You + bot vs two bots") },
+const SOON = t("Próximamente", "Coming soon");
+const C1 = t("1v1 · CASUAL", "1v1 · CASUAL");
+const C2 = t("2v2 · CASUAL", "2v2 · CASUAL");
+export const ONLINE_CASUAL: readonly CardDef[] = [
+  { mode: "1v1", ranked: false, available: true, title: C1, sub: t("Contra otra persona · sin ELO", "Vs another player · no ELO") },
+  { mode: "2v2", ranked: false, available: false, title: C2, sub: SOON },
 ];
-export const RANKED_CARDS: readonly CardDef[] = [
-  { mode: "1v1", ranked: true, title: t("1v1 · CLASIFICACIÓN", "1v1 · RANKED"), sub: t("Suma ELO · 1.5x XP", "Earns ELO · 1.5x XP") },
-  { mode: "2v2", ranked: true, title: t("2v2 · CLASIFICACIÓN", "2v2 · RANKED"), sub: t("Suma ELO · 1.5x XP", "Earns ELO · 1.5x XP") },
+export const ONLINE_RANKED: readonly CardDef[] = [
+  { mode: "1v1", ranked: true, available: false, title: t("1v1 · CLASIFICACIÓN", "1v1 · RANKED"), sub: t("Suma ELO · Próximamente", "Earns ELO · Coming soon") },
+  { mode: "2v2", ranked: true, available: false, title: t("2v2 · CLASIFICACIÓN", "2v2 · RANKED"), sub: t("Suma ELO · Próximamente", "Earns ELO · Coming soon") },
+];
+export const BOT_CASUAL: readonly CardDef[] = [
+  { mode: "1v1", ranked: false, available: true, title: C1, sub: t("Contra el bot · sin ELO", "Vs the bot · no ELO") },
+  { mode: "2v2", ranked: false, available: true, title: C2, sub: t("Vos + bot contra dos bots", "You + bot vs two bots") },
 ];
 
 export const samePick = (a: PlayPick | null, b: PlayPick): boolean => a !== null && a.mode === b.mode && a.ranked === b.ranked;

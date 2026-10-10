@@ -4,19 +4,13 @@ import { LANG, t } from "./i18n/t";
 import { Controls } from "./input";
 import { GameLoop, LoopState } from "./loop";
 import { NetStatus, RemoteEngine } from "./net/remote-engine";
+import { serverBase } from "./net/server-url";
 import { CourtView } from "./render";
 
-const SERVER_PORT = 8091;
-declare const __FUTENIS_SERVER__: string; // injected by cmd/dev's esbuild Define (FUTENIS_SERVER)
 const CODE_LEN = 5;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MAX_LAG_MS = 1000;
 const ROOM_RE = /^[A-Z0-9]{3,12}$/;
-
-function serverBase(): string {
-  if (__FUTENIS_SERVER__) return __FUTENIS_SERVER__;
-  return `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:${SERVER_PORT}`;
-}
 
 function requireElement(id: string): HTMLElement {
   const e = document.getElementById(id);
