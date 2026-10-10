@@ -1,4 +1,5 @@
 /** Match-flow overlays: VS intro before the first serve and the VICTORIA/DERROTA result. */
+import type { RankNote } from "../profile/rank";
 import { button, el } from "./dom";
 
 export const VS_INTRO_MS = 3200; // backlog: under 4 s, skippable
@@ -8,6 +9,8 @@ const LEAVE_MS = 300;
 
 export interface ResultInfo {
   readonly won: boolean;
+  /** Ranked only: "¡Subiste a Oro I!" when the rank changed (profile/rank.ts). */
+  readonly rankNote?: RankNote | null;
   readonly games0: number;
   readonly games1: number;
 }
@@ -51,6 +54,7 @@ export class MatchScreens {
       el("h2", "fx-result__title", r.won ? "VICTORIA" : "DERROTA"),
       el("p", "fx-result__score", `${TEAM_NAMES[0]} ${r.games0} – ${r.games1} ${TEAM_NAMES[1]}`),
       el("p", "fx-result__label", "Juegos"),
+      ...(r.rankNote ? [el("p", `fx-result__rank${r.rankNote.up ? "" : " fx-result__rank--down"}`, r.rankNote.text, { role: "status" })] : []),
       actions,
     );
     this.mount(card);

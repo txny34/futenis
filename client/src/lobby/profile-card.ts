@@ -1,4 +1,5 @@
-import { profileStore, ProfileStats } from "../profile/store";
+import { rankOf } from "../profile/rank";
+import { profileStore, ProfileStats, type Queue } from "../profile/store";
 import { el } from "../ui/dom";
 
 // Tarjeta de perfil arriba a la derecha (solo en el lobby): avatar con nivel,
@@ -38,8 +39,16 @@ export class ProfileCard {
     this.name.textContent = s.name;
     this.fill.style.width = `${Math.round((100 * s.xp) / s.xpToNext)}%`;
     this.xp.textContent = `${s.xp} / ${s.xpToNext} XP`;
-    this.elo1.textContent = `1v1 · ${s.elo["1v1"]}`;
-    this.elo2.textContent = `2v2 · ${s.elo["2v2"]}`;
+    showRank(this.elo1, "1v1", s.elo["1v1"]);
+    showRank(this.elo2, "2v2", s.elo["2v2"]);
     this.root.title = `Nivel ${s.level} · ${s.wins}G ${s.losses}P · racha ${s.streak} · ${s.perfects} perfectos`;
   }
+}
+
+/** "1v1 · Oro II" chip tinted by tier, exact ELO in the tooltip. */
+function showRank(chip: HTMLElement, queue: Queue, elo: number): void {
+  const r = rankOf(elo);
+  chip.textContent = `${queue} · ${r.label}`;
+  chip.dataset.tier = r.tier;
+  chip.title = `${queue}: ${elo} ELO`;
 }
