@@ -102,9 +102,11 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
 }
 
 function receive(remotes: RemotePlayers, v: DataView): void {
-  if (v.byteLength < HEADER + 8 || v.getUint8(1) !== 1) return;
+  if (v.byteLength < HEADER + 4 || v.getUint8(1) !== 1) return; // each case checks its own length
   const f = (i: number): number => v.getFloat64(HEADER + i * 8, true);
-  switch (v.getUint8(0)) {
+  const type = v.getUint8(0);
+  if (type !== LobbyMsg.RosterQ && v.byteLength < HEADER + 8) return; // float messages start with an f64
+  switch (type) {
     case LobbyMsg.Roster: {
       const n = Math.min(f(0) | 0, Math.floor((v.byteLength - HEADER - 8) / (ROSTER_STRIDE * 8)));
       for (let i = 0; i < n; i++) {

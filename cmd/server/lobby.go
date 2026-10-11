@@ -148,7 +148,7 @@ func (l *lobby) broadcast() {
 				l.entries = append(l.entries, lobbyEntry{id: oid, p: o.pos})
 			}
 		}
-		n := 0
+		var n int
 		if lp.compact {
 			n = encodeRosterQ(lp.buf, l.entries)
 		} else {
