@@ -167,12 +167,13 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	rankedMode, ranked := rankedModes[queued]
 	network := "" // ranked: the client's limit key, seated next to its account
 	if ranked {
-		uid, ok := h.authenticate(ctx, c)
+		acc, ok := h.authenticate(ctx, c)
+		uid := acc.id
 		if !ok {
 			p.close(closeNoAuth, "sign in required")
 			return
 		}
-		if cl, ok = h.claimRanked(uid); !ok {
+		if cl, ok = h.claimRanked(acc); !ok {
 			p.close(closeFull, "already in a ranked match")
 			return
 		}

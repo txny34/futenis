@@ -28,10 +28,10 @@ var userID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4
 // rankedModes maps a ranked queue to its ratings column.
 var rankedModes = map[string]string{"ranked1v1": "1v1", "ranked2v2": "2v2"}
 
-// authenticate reads the AUTH message and returns the verified user id.
-func (h *hub) authenticate(ctx context.Context, c *websocket.Conn) (string, bool) {
+// authenticate reads the AUTH message and returns the verified account.
+func (h *hub) authenticate(ctx context.Context, c *websocket.Conn) (account, bool) {
 	if h.auth == nil || h.ratings == nil {
-		return "", false // ranked not configured on this server
+		return account{}, false // ranked not configured on this server
 	}
 	c.SetReadLimit(authReadLimit)
 	defer c.SetReadLimit(readLimit)
@@ -39,13 +39,13 @@ func (h *hub) authenticate(ctx context.Context, c *websocket.Conn) (string, bool
 	defer cancel()
 	typ, b, err := c.Read(actx)
 	if err != nil || typ != websocket.MessageBinary || len(b) <= headerLen || b[0] != msgAuth || b[1] != protoVersion {
-		return "", false
+		return account{}, false
 	}
-	id, err := h.auth.verify(string(b[headerLen:]))
-	if err != nil || !userID.MatchString(id) {
-		return "", false
+	acc, err := h.auth.verify(string(b[headerLen:]))
+	if err != nil || !userID.MatchString(acc.id) {
+		return account{}, false
 	}
-	return id, true
+	return acc, true
 }
 
 // reportRanked stores the new ratings and sends each seated player a RESULT.
@@ -72,9 +72,11 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 		return
 	}
 	after := applyElo(before, teams, winner)
-	if err := h.ratings.save(ctx, mode, after); err != nil {
+	if err := h.ratings.save(ctx, mode, resultRows(r, users, after, winner)); err != nil {
 		h.logger.Printf("ranked %s: %v", mode, err)
-		return
+		if legacy, ok := err.(errLegacySave); !ok || legacy.err != nil {
+			return // nothing saved: no RESULT
+		}
 	}
 	r.mu.Lock()
 	peers := r.peers
@@ -84,6 +86,18 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 			sendTo(p, encodeResult(ratingOf(before, users[i]), after[users[i]]))
 		}
 	}
+}
+
+// resultRows pairs every seated account with its new ELO, win flag and public name.
+func resultRows(r *room, users [sim.MaxPlayers]string, after map[string]int, winner int) []rankedRow {
+	r.mu.Lock()
+	claims := r.claims
+	r.mu.Unlock()
+	rows := make([]rankedRow, 0, r.seats)
+	for i := 0; i < r.seats; i++ {
+		rows = append(rows, rankedRow{ID: users[i], Elo: after[users[i]], Won: r.teamOf(i) == winner, Name: claims[i].name})
+	}
+	return rows
 }
 
 func encodeResult(before, after int) []byte {
@@ -112,7 +126,8 @@ func gameOverWinner(out []float64) (int, bool) {
 // parallel matches whose rating writes could overwrite each other.
 // Each claim has its own generation: a late release from an old connection
 // (replaced, or of a finished match) never frees the account's newer claim.
-func (h *hub) claimRanked(uid string) (claim, bool) {
+func (h *hub) claimRanked(acc account) (claim, bool) {
+	uid := acc.id
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if _, busy := h.active[uid]; busy {
@@ -120,7 +135,7 @@ func (h *hub) claimRanked(uid string) (claim, bool) {
 	}
 	h.claimSeq++
 	h.active[uid] = h.claimSeq
-	return claim{uid: uid, gen: h.claimSeq}, true
+	return claim{uid: uid, gen: h.claimSeq, name: acc.name}, true
 }
 
 // releaseRanked frees c if it is still the account's live claim ("" = none).
@@ -134,8 +149,9 @@ func (h *hub) releaseRanked(c claim) {
 
 // claim is one ranked reservation of an account.
 type claim struct {
-	uid string
-	gen uint64
+	uid  string
+	gen  uint64
+	name string // public name for the leaderboard (cleaned; "" = keep the stored one)
 }
 
 // distinct reports whether every id appears once (defense in depth for reports).
