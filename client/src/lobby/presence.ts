@@ -1,5 +1,5 @@
 import { t } from "../i18n/t";
-import { LobbyMsg, MAX_NAME_BYTES, PRESENCE_LEN, ROSTER_STRIDE } from "../net/lobby-proto";
+import { CM, FACING_Q, LobbyMsg, MAX_NAME_BYTES, PRESENCE_LEN, ROSTER_Q_HEAD, ROSTER_Q_STRIDE, ROSTER_STRIDE } from "../net/lobby-proto";
 import { serverBase } from "../net/server-url";
 import { displayName } from "../profile/display-name";
 import { profileStore } from "../profile/store";
@@ -46,7 +46,7 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
   };
 
   const open = (): void => {
-    const s = new WebSocket(`${serverBase()}/lobby`);
+    const s = new WebSocket(`${serverBase()}/lobby?v=2`); // compact roster (ROSTER_Q)
     s.binaryType = "arraybuffer";
     s.onmessage = (m: MessageEvent<ArrayBuffer>) => receive(remotes, new DataView(m.data));
     s.onopen = () => { backoff = RETRY_MIN_MS; };
@@ -102,14 +102,25 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
 }
 
 function receive(remotes: RemotePlayers, v: DataView): void {
-  if (v.byteLength < HEADER + 8 || v.getUint8(1) !== 1) return;
+  if (v.byteLength < HEADER + 4 || v.getUint8(1) !== 1) return; // each case checks its own length
   const f = (i: number): number => v.getFloat64(HEADER + i * 8, true);
-  switch (v.getUint8(0)) {
+  const type = v.getUint8(0);
+  if (type !== LobbyMsg.RosterQ && v.byteLength < HEADER + 8) return; // float messages start with an f64
+  switch (type) {
     case LobbyMsg.Roster: {
       const n = Math.min(f(0) | 0, Math.floor((v.byteLength - HEADER - 8) / (ROSTER_STRIDE * 8)));
       for (let i = 0; i < n; i++) {
         const k = 1 + i * ROSTER_STRIDE;
         remotes.place(f(k), f(k + 1), f(k + 2), f(k + 3), f(k + 4));
+      }
+      break;
+    }
+    case LobbyMsg.RosterQ: {
+      const n = Math.min(v.getUint32(HEADER, true), Math.floor((v.byteLength - ROSTER_Q_HEAD) / ROSTER_Q_STRIDE));
+      for (let i = 0; i < n; i++) {
+        const o = ROSTER_Q_HEAD + i * ROSTER_Q_STRIDE;
+        remotes.place(v.getUint32(o, true), v.getInt16(o + 4, true) * CM, v.getUint16(o + 6, true) * CM,
+          v.getInt16(o + 8, true) * CM, v.getInt16(o + 10, true) * FACING_Q);
       }
       break;
     }

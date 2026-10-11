@@ -26,6 +26,7 @@ type lobbyPeer struct {
 	nameAt time.Time
 	buf    []byte
 
+	compact    bool            // wants ROSTER_Q (lobby_compact.go)
 	key        string          // client limit key (lobby_report.go)
 	reportedBy map[string]bool // networks that reported this name
 	flagged    bool            // name hidden after reports: fixed to fallbackName
@@ -147,7 +148,12 @@ func (l *lobby) broadcast() {
 				l.entries = append(l.entries, lobbyEntry{id: oid, p: o.pos})
 			}
 		}
-		n := encodeRoster(lp.buf, l.entries)
+		var n int
+		if lp.compact {
+			n = encodeRosterQ(lp.buf, l.entries)
+		} else {
+			n = encodeRoster(lp.buf, l.entries)
+		}
 		l.out = append(l.out, rosterOut{p: lp.p, msg: lp.buf[:n]})
 	}
 	l.mu.Unlock()

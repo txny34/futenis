@@ -168,3 +168,26 @@ func TestLobbyShards(t *testing.T) {
 		t.Fatalf("%d lobbies for %d people", len(seen), maxLobby+1)
 	}
 }
+
+func TestLobbyCompactRosterOnRequest(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tick := make(chan time.Time)
+	srv, _ := newLobbyServer(t, tick)
+	c, _, err := websocket.Dial(ctx, "ws"+srv.URL[4:]+"/?v=2", &websocket.DialOptions{HTTPHeader: http.Header{"Fly-Client-IP": {"10.5.9.1"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.CloseNow() })
+	old := dialLobby(ctx, t, srv, "10.5.9.2")
+	write(ctx, t, old, presenceMsg(1, 0, 2, 0))
+	write(ctx, t, c, presenceMsg(-1, 0, -2, 0))
+	time.Sleep(30 * time.Millisecond)
+	tick <- time.Time{}
+	if q := readType(ctx, t, c, msgRosterQ); len(q) != rosterQLen(1) {
+		t.Fatalf("compact roster len %d", len(q))
+	}
+	if r := readType(ctx, t, old, msgRoster); len(r) != rosterMsgLen(1) {
+		t.Fatalf("old clients keep the float roster, len %d", len(r))
+	}
+}

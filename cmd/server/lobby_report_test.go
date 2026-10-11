@@ -11,10 +11,10 @@ func TestLobbyReportsHideANameAfterTwoNetworks(t *testing.T) {
 	a, _ := l.join(&fakePeer{})
 	a2, _ := l.join(&fakePeer{}) // second tab of a
 	b, _ := l.join(&fakePeer{})
-	l.setKey(target, "net-t")
-	l.setKey(a, "net-a")
-	l.setKey(a2, "net-a")
-	l.setKey(b, "net-b")
+	l.setClient(target, "net-t", false)
+	l.setClient(a, "net-a", false)
+	l.setClient(a2, "net-a", false)
+	l.setClient(b, "net-b", false)
 	l.setName(target, "Ofensivo", time.Now())
 	for _, id := range []int{a, a2, b, target} {
 		l.setPos(id, presence{})
@@ -53,8 +53,8 @@ func TestLobbyReportFromSameNetworkIgnored(t *testing.T) {
 	l := newLobby()
 	target, _ := l.join(&fakePeer{})
 	sib, _ := l.join(&fakePeer{})
-	l.setKey(target, "net")
-	l.setKey(sib, "net")
+	l.setClient(target, "net", false)
+	l.setClient(sib, "net", false)
 	l.setName(target, "Alguien", time.Now())
 	l.setPos(sib, presence{})
 	if name, _ := l.report(sib, target); name != "" {
@@ -66,15 +66,15 @@ func TestLobbyReportNeedsAChosenNameAndAPlacedReporter(t *testing.T) {
 	l := newLobby()
 	target, _ := l.join(&fakePeer{})
 	a, _ := l.join(&fakePeer{})
-	l.setKey(target, "t")
-	l.setKey(a, "a")
+	l.setClient(target, "t", false)
+	l.setClient(a, "a", false)
 	l.setName(target, "Alguien", time.Now())
 	if name, _ := l.report(a, target); name != "" {
 		t.Fatal("a reporter that never walked in the lobby doesn't count")
 	}
 	l.setPos(a, presence{})
 	nameless, _ := l.join(&fakePeer{})
-	l.setKey(nameless, "n")
+	l.setClient(nameless, "n", false)
 	if name, _ := l.report(a, nameless); name != "" {
 		t.Fatal("a player without a name can't be muted before choosing one")
 	}
