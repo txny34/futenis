@@ -25,6 +25,10 @@ type lobbyPeer struct {
 	placed bool // sent at least one PRESENCE
 	nameAt time.Time
 	buf    []byte
+
+	key        string          // client limit key (lobby_report.go)
+	reportedBy map[string]bool // networks that reported this name
+	flagged    bool            // name hidden after reports: fixed to fallbackName
 }
 
 type lobby struct {
@@ -89,7 +93,7 @@ func (l *lobby) setPos(id int, pos presence) {
 func (l *lobby) setName(id int, name string, now time.Time) {
 	l.mu.Lock()
 	lp := l.peers[id]
-	if lp == nil || lp.name == name || now.Sub(lp.nameAt) < nameEvery {
+	if lp == nil || lp.flagged || lp.name == name || now.Sub(lp.nameAt) < nameEvery {
 		l.mu.Unlock()
 		return
 	}

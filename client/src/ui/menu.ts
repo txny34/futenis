@@ -13,7 +13,7 @@ import { t } from "../i18n/t";
 export type { Difficulty, GameMode, MatchOptions } from "./types";
 export type { Settings } from "./settings";
 
-type Screen = "setup" | "settings" | "report" | "pause" | "lobby" | "hidden";
+type Screen = "setup" | "settings" | "report" | "pause" | "lobby" | "panel" | "hidden";
 type Listener<T> = (v: T) => void;
 
 const NAV_SELECTOR = "textarea, button:not(:disabled), input, [tabindex='0']";
@@ -82,6 +82,11 @@ export class MenuUI {
     if (!build) return;
     this.reportBack = this.screen === "pause" || this.screen === "lobby" ? this.screen : "hidden";
     this.mount("report", reportView(build, () => this.back()));
+  }
+  /** A lobby menu sub-panel (e.g. "Jugadores en el lobby"); its back returns to the lobby menu. */
+  openPanel(build: (back: () => void) => HTMLElement): void {
+    const back: Screen = this.screen === "lobby" ? "lobby" : "hidden";
+    this.mount("panel", build(() => this.render(back)));
   }
   showPause(): void {
     if (!this.inGame) return;

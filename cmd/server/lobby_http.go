@@ -34,6 +34,7 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer l.leave(id)
+	l.setKey(id, ip)
 	h.lobbyLoop(req.Context(), l, id, c)
 }
 
@@ -94,6 +95,10 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn
 		switch {
 		case isPing(b):
 			_ = p.send(encodePong(pong, b))
+		case isReportMsg(b):
+			if name, hidden := l.report(id, int(f64(b, 0))); name != "" {
+				h.logger.Printf("lobby report: %q (player %d) by player %d, hidden=%v", name, int(f64(b, 0)), id, hidden)
+			}
 		case isNameMsg(b):
 			l.setName(id, cleanName(string(b[headerLen:])), time.Now())
 		default:
