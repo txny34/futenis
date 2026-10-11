@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/lobby"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
@@ -98,18 +99,6 @@ func TestLobbyRejectsGarbage(t *testing.T) {
 	}
 }
 
-func TestLobbyFull(t *testing.T) {
-	l := newLobby()
-	for i := 0; i < maxLobby; i++ {
-		if _, ok := l.join(&fakePeer{}); !ok {
-			t.Fatalf("join %d rejected", i)
-		}
-	}
-	if _, ok := l.join(&fakePeer{}); ok {
-		t.Fatal("lobby over capacity")
-	}
-}
-
 func TestLobbySilentPeerIsDropped(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -145,7 +134,7 @@ func TestLobbyRateLimit(t *testing.T) {
 	defer cancel()
 	srv, _ := newLobbyServer(t, make(chan time.Time))
 	a := dialLobby(ctx, t, srv, "10.6.1.1")
-	for i := 0; i < maxLobbyMsgs+5; i++ {
+	for i := 0; i < lobby.MaxMsgs+5; i++ {
 		_ = a.Write(ctx, websocket.MessageBinary, wire.EncodePresence(0, 0, 0, 0))
 	}
 	if _, _, err := a.Read(ctx); websocket.CloseStatus(err) != closeRate {
@@ -157,8 +146,8 @@ func TestLobbyRateLimit(t *testing.T) {
 func TestLobbyShards(t *testing.T) {
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	defer close(h.done)
-	seen := map[*lobby]int{}
-	for i := 0; i < maxLobby+1; i++ {
+	seen := map[*lobby.Lobby]int{}
+	for i := 0; i < lobby.Max+1; i++ {
 		l, _, ok := h.joinLobby(&fakePeer{})
 		if !ok {
 			t.Fatalf("join %d rejected", i)
@@ -166,7 +155,7 @@ func TestLobbyShards(t *testing.T) {
 		seen[l]++
 	}
 	if len(seen) != 2 {
-		t.Fatalf("%d lobbies for %d people", len(seen), maxLobby+1)
+		t.Fatalf("%d lobbies for %d people", len(seen), lobby.Max+1)
 	}
 }
 

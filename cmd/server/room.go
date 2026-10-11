@@ -28,8 +28,8 @@ var (
 
 // peer is one connected browser; send must be safe for concurrent use.
 type peer interface {
-	send(b []byte) error
-	close(code int, reason string)
+	Send(b []byte) error
+	Close(code int, reason string)
 }
 
 // room is one online match: 1v1 (2 seats) or 2v2 (4 seats). Seat = sim slot;
@@ -130,7 +130,7 @@ func (r *room) join(p peer) (slot int, start bool, humans int) {
 	}
 	humans = r.humansLocked()
 	if humans < r.seats {
-		_ = p.send(wire.EncodeSignal(wire.MsgWaiting))
+		_ = p.Send(wire.EncodeSignal(wire.MsgWaiting))
 		return slot, false, humans
 	}
 	return slot, r.startLocked(), humans

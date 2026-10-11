@@ -52,7 +52,7 @@ func (h *hub) serveRejoin(ctx context.Context, token string, c *websocket.Conn) 
 	ref, ok := h.seats[token]
 	h.mu.Unlock()
 	if !ok || !ref.r.reattach(ref.slot, token, p) {
-		p.close(closeGone, "match over")
+		p.Close(closeGone, "match over")
 		return
 	}
 	h.logger.Printf("room %s slot %d: rejoined", ref.r.code, ref.slot)

@@ -60,8 +60,8 @@ func (r *room) leave(slot int, p peer, dropped bool) bool {
 func tellLeft(others [sim.MaxPlayers]peer) {
 	for _, o := range others {
 		if o != nil {
-			_ = o.send(wire.EncodeSignal(wire.MsgPeerLeft))
-			o.close(closeNormal, "peer left")
+			_ = o.Send(wire.EncodeSignal(wire.MsgPeerLeft))
+			o.Close(closeNormal, "peer left")
 		}
 	}
 }
@@ -122,6 +122,6 @@ func (r *room) run(tick <-chan time.Time) {
 
 func sendTo(p peer, b []byte) {
 	if p != nil {
-		_ = p.send(b) // a dead peer is detected by its read loop, which calls leave
+		_ = p.Send(b) // a dead peer is detected by its read loop, which calls leave
 	}
 }

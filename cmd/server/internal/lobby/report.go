@@ -1,4 +1,4 @@
-package main
+package lobby
 
 import (
 	"github.com/txny34/futenis/cmd/server/internal/names"
@@ -6,15 +6,15 @@ import (
 )
 
 // Lobby moderation: anyone can report another player's name (REPORT, body: the
-// target id). Once reportsToHide different networks (client limit keys, so
+// target id). Once ReportsToHide different networks (client limit keys, so
 // two tabs count once) reported it, the name becomes names.Fallback for everyone
 // and stays so for that connection. Hiding a player for oneself is client-only.
 const (
-	reportsToHide = 2
+	ReportsToHide = 2
 )
 
-// setClient records id's network (limit key, for report counting) and roster format.
-func (l *lobby) setClient(id int, key string, compact bool) {
+// SetClient records id's network (limit key, for report counting) and roster format.
+func (l *Lobby) SetClient(id int, key string, compact bool) {
 	l.mu.Lock()
 	if lp := l.peers[id]; lp != nil {
 		lp.key, lp.compact = key, compact
@@ -22,9 +22,9 @@ func (l *lobby) setClient(id int, key string, compact bool) {
 	l.mu.Unlock()
 }
 
-// report counts one report of target's name by from (network key). It returns
-// the reported name and whether this report hid it.
-func (l *lobby) report(from, target int) (name string, hidden bool) {
+// Report counts one Report of target's name by from (network key). It returns
+// the reported name and whether this Report hid it.
+func (l *Lobby) Report(from, target int) (name string, hidden bool) {
 	l.mu.Lock()
 	src, t := l.peers[from], l.peers[target]
 	// Only someone actually in the lobby (placed) reports, once per network, a
@@ -39,7 +39,7 @@ func (l *lobby) report(from, target int) (name string, hidden bool) {
 	}
 	t.reportedBy[src.key] = true
 	name = t.name
-	if len(t.reportedBy) < reportsToHide {
+	if len(t.reportedBy) < ReportsToHide {
 		l.mu.Unlock()
 		return name, false
 	}
@@ -48,7 +48,7 @@ func (l *lobby) report(from, target int) (name string, hidden bool) {
 	l.mu.Unlock()
 	msg := wire.EncodeLobbyName(target, names.Fallback)
 	for _, o := range all {
-		_ = o.send(msg)
+		_ = o.Send(msg)
 	}
 	return name, true
 }

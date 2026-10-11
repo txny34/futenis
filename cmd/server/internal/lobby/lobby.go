@@ -1,4 +1,6 @@
-package main
+// Package lobby is the shared online lobby: every connected player sees the
+// others walk around, with moderation of public names (report.go).
+package lobby
 
 import (
 	"sync"
@@ -10,18 +12,24 @@ import (
 // Shared online lobby: every connected player sees the others walk around.
 // Positions are client-reported (the lobby has no rules) and bounded by
 // wire.DecodePresence; the server relays a ROSTER of the others 10 times a second.
+// Peer is one connected browser; Send must be safe for concurrent use.
+type Peer interface {
+	Send(b []byte) error
+	Close(code int, reason string)
+}
+
 const (
-	maxLobby      = 48
-	maxLobbyShard = 8 // a full lobby opens another, up to maxLobby*maxLobbyShard people
-	maxLobbyPerIP = 2
-	maxLobbyMsgs  = 30 // per second: 10 PRESENCE + 1 PING need far less than the match cap
-	nameEvery     = 2 * time.Second
-	lobbyInterval = time.Second / 10
-	lobbyIdle     = 30 * time.Second // nothing received (hidden tab, dead peer): close
+	Max          = 48
+	MaxShards    = 8 // a full lobby opens another, up to Max*MaxShards people
+	MaxPerClient = 2
+	MaxMsgs      = 30 // per second: 10 PRESENCE + 1 PING need far less than the match cap
+	nameEvery    = 2 * time.Second
+	Interval     = time.Second / 10
+	Idle         = 30 * time.Second // nothing received (hidden tab, dead Peer): close
 )
 
 type lobbyPeer struct {
-	p      peer
+	p      Peer
 	pos    wire.Presence
 	name   string
 	placed bool // sent at least one PRESENCE
@@ -34,7 +42,7 @@ type lobbyPeer struct {
 	flagged    bool            // name hidden after reports: fixed to names.Fallback
 }
 
-type lobby struct {
+type Lobby struct {
 	mu      sync.Mutex
 	peers   map[int]*lobbyPeer
 	nextID  int
@@ -44,19 +52,19 @@ type lobby struct {
 }
 
 type rosterOut struct {
-	p   peer
+	p   Peer
 	msg []byte
 }
 
-func newLobby() *lobby {
-	return &lobby{peers: map[int]*lobbyPeer{}, entries: make([]wire.Entry, 0, maxLobby), out: make([]rosterOut, 0, maxLobby)}
+func New() *Lobby {
+	return &Lobby{peers: map[int]*lobbyPeer{}, entries: make([]wire.Entry, 0, Max), out: make([]rosterOut, 0, Max)}
 }
 
-// join adds p and then sends it the names already known (outside the lock:
+// Join adds p and then sends it the names already known (outside the lock:
 // a slow joiner never blocks the lobby). ok is false when full.
-func (l *lobby) join(p peer) (id int, ok bool) {
+func (l *Lobby) Join(p Peer) (id int, ok bool) {
 	l.mu.Lock()
-	if len(l.peers) >= maxLobby {
+	if len(l.peers) >= Max {
 		l.mu.Unlock()
 		return 0, false
 	}
@@ -68,22 +76,22 @@ func (l *lobby) join(p peer) (id int, ok bool) {
 			names = append(names, wire.EncodeLobbyName(oid, o.name))
 		}
 	}
-	l.peers[id] = &lobbyPeer{p: p, buf: make([]byte, wire.RosterLen(maxLobby))}
+	l.peers[id] = &lobbyPeer{p: p, buf: make([]byte, wire.RosterLen(Max))}
 	l.dirty = true
 	l.mu.Unlock()
 	for _, m := range names {
-		_ = p.send(m)
+		_ = p.Send(m)
 	}
 	return id, true
 }
 
-func (l *lobby) full() bool {
+func (l *Lobby) Full() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return len(l.peers) >= maxLobby
+	return len(l.peers) >= Max
 }
 
-func (l *lobby) setPos(id int, pos wire.Presence) {
+func (l *Lobby) SetPos(id int, pos wire.Presence) {
 	l.mu.Lock()
 	if lp := l.peers[id]; lp != nil && (!lp.placed || lp.pos != pos) {
 		lp.pos, lp.placed, l.dirty = pos, true, true
@@ -91,9 +99,9 @@ func (l *lobby) setPos(id int, pos wire.Presence) {
 	l.mu.Unlock()
 }
 
-// setName stores id's sanitized name and tells everyone else. At most one
+// SetName stores id's sanitized name and tells everyone else. At most one
 // change per nameEvery reaches the others (spam guard); extra ones are ignored.
-func (l *lobby) setName(id int, name string, now time.Time) {
+func (l *Lobby) SetName(id int, name string, now time.Time) {
 	l.mu.Lock()
 	lp := l.peers[id]
 	if lp == nil || lp.flagged || lp.name == name || now.Sub(lp.nameAt) < nameEvery {
@@ -105,11 +113,11 @@ func (l *lobby) setName(id int, name string, now time.Time) {
 	l.mu.Unlock()
 	msg := wire.EncodeLobbyName(id, name)
 	for _, o := range others {
-		_ = o.send(msg)
+		_ = o.Send(msg)
 	}
 }
 
-func (l *lobby) leave(id int) {
+func (l *Lobby) Leave(id int) {
 	l.mu.Lock()
 	delete(l.peers, id)
 	l.dirty = true
@@ -117,12 +125,12 @@ func (l *lobby) leave(id int) {
 	l.mu.Unlock()
 	msg := wire.EncodeGone(id)
 	for _, o := range others {
-		_ = o.send(msg)
+		_ = o.Send(msg)
 	}
 }
 
-func (l *lobby) othersLocked(id int) []peer {
-	out := make([]peer, 0, len(l.peers))
+func (l *Lobby) othersLocked(id int) []Peer {
+	out := make([]Peer, 0, len(l.peers))
 	for oid, o := range l.peers {
 		if oid != id {
 			out = append(out, o.p)
@@ -131,11 +139,11 @@ func (l *lobby) othersLocked(id int) []peer {
 	return out
 }
 
-// broadcast sends every peer a ROSTER of the others that have a position.
-// Messages are built under the lock and sent after it: a slow peer never
-// blocks joins or position updates. Each peer's buffer is only reused on the
+// broadcast sends every Peer a ROSTER of the others that have a position.
+// Messages are built under the lock and sent after it: a slow Peer never
+// blocks joins or position updates. Each Peer's buffer is only reused on the
 // next tick, by this same goroutine.
-func (l *lobby) broadcast() {
+func (l *Lobby) broadcast() {
 	l.mu.Lock()
 	if !l.dirty {
 		l.mu.Unlock()
@@ -160,12 +168,12 @@ func (l *lobby) broadcast() {
 	}
 	l.mu.Unlock()
 	for _, o := range l.out {
-		_ = o.p.send(o.msg) // bounded by the write timeout; a dead peer leaves via its read loop
+		_ = o.p.Send(o.msg) // bounded by the write timeout; a dead Peer leaves via its read loop
 	}
 }
 
-// run broadcasts on every tick until stop closes.
-func (l *lobby) run(tick <-chan time.Time, stop <-chan struct{}) {
+// Run broadcasts on every tick until stop closes.
+func (l *Lobby) Run(tick <-chan time.Time, stop <-chan struct{}) {
 	for {
 		select {
 		case <-stop:

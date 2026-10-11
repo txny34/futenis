@@ -11,6 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
+	"github.com/txny34/futenis/cmd/server/internal/lobby"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
@@ -57,7 +58,7 @@ type hub struct {
 	seats map[string]seatRef // rejoin token -> held seat (room_rejoin.go)
 	grace time.Duration      // how long a dropped seat is held (injectable)
 
-	lobbies     []*lobby                          // shared online lobbies (lobby.go), opened on demand
+	lobbies     []*lobby.Lobby                    // shared online lobbies (lobby.go), opened on demand
 	lobbyConns  *netlimit.ConnLimiter             // per-client cap for /lobby (stricter than matches)
 	lobbyTicker func() (<-chan time.Time, func()) // injectable for tests
 	lobbyIdle   time.Duration
@@ -67,7 +68,7 @@ type hub struct {
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: netlimit.NewConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
+		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(lobby.Max*lobby.MaxShards, lobby.MaxPerClient), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobby.Idle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -108,13 +109,13 @@ func (h *hub) forget(code string, r *room) {
 // wsPeer adapts a websocket.Conn to peer.
 type wsPeer struct{ c *websocket.Conn }
 
-func (p wsPeer) send(b []byte) error {
+func (p wsPeer) Send(b []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), writeTimeout)
 	defer cancel()
 	return p.c.Write(ctx, websocket.MessageBinary, b)
 }
 
-func (p wsPeer) close(code int, reason string) { _ = p.c.Close(websocket.StatusCode(code), reason) }
+func (p wsPeer) Close(code int, reason string) { _ = p.c.Close(websocket.StatusCode(code), reason) }
 
 func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
@@ -176,11 +177,11 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		acc, ok := h.authenticate(ctx, c)
 		uid := acc.ID
 		if !ok {
-			p.close(closeNoAuth, "sign in required")
+			p.Close(closeNoAuth, "sign in required")
 			return
 		}
 		if cl, ok = h.claimRanked(acc); !ok {
-			p.close(closeFull, "already in a ranked match")
+			p.Close(closeFull, "already in a ranked match")
 			return
 		}
 		defer func() {
@@ -203,18 +204,18 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 				h.forget(code, r)
 			}
 			h.leaveQueue(queued, code, key)
-			p.close(closeFull, "same account or network already in this match")
+			p.Close(closeFull, "same account or network already in this match")
 			return
 		}
 	} else {
 		r, slot, start, humans = h.join(code, sim.Mode1v1, p)
 	}
 	if r == nil {
-		p.close(closeBusy, "server full")
+		p.Close(closeBusy, "server full")
 		return
 	}
 	if slot < 0 {
-		p.close(closeFull, "room full")
+		p.Close(closeFull, "room full")
 		return
 	}
 	if start {
@@ -238,7 +239,7 @@ func (h *hub) expireAlone(r *room, p peer) (stop func()) {
 	var t *time.Timer
 	check := func() {
 		if r.expireIfWaiting() {
-			p.close(closeNoRival, "no rival")
+			p.Close(closeNoRival, "no rival")
 			return
 		}
 		if _, started := r.startedAt(); !started && !r.isClosed() {
@@ -278,11 +279,11 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 		lastSeen.Store(time.Now().UnixNano())
 		if !rate.AllowN(time.Now(), maxMsgsPerWindow) {
 			h.logger.Printf("room %s slot %d: rate limit", code, slot)
-			p.close(closeRate, "rate limit")
+			p.Close(closeRate, "rate limit")
 			return false
 		}
 		if typ == websocket.MessageBinary && wire.IsPing(b) {
-			_ = p.send(wire.EncodePong(pong, b))
+			_ = p.Send(wire.EncodePong(pong, b))
 			continue
 		}
 		in, err := wire.DecodeInput(b)
@@ -366,7 +367,7 @@ func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, kicked *atomic.
 		left := h.idle - time.Since(last)
 		if left <= 0 {
 			kicked.Store(true)
-			p.close(closeIdle, "idle")
+			p.Close(closeIdle, "idle")
 			return
 		}
 		t.Reset(max(left, h.idle/4))

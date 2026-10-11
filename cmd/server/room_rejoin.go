@@ -114,7 +114,7 @@ func (r *room) reattach(slot int, token string, p peer) bool {
 	sendTo(p, wire.EncodeWelcome(slot))
 	sendTo(p, wire.EncodeSeat(token))
 	if old != nil {
-		go old.close(closeReplace, "replaced") // the close handshake waits on a peer that may be dead
+		go old.Close(closeReplace, "replaced") // the close handshake waits on a peer that may be dead
 	}
 	if t != nil {
 		back := wire.EncodeSignal(wire.MsgPeerBack)

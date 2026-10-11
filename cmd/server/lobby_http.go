@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/lobby"
 	"github.com/txny34/futenis/cmd/server/internal/names"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
@@ -33,50 +34,50 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 	p := wsPeer{c}
 	l, id, ok := h.joinLobby(p)
 	if !ok {
-		p.close(closeFull, "lobby full")
+		p.Close(closeFull, "lobby full")
 		return
 	}
-	defer l.leave(id)
-	l.setClient(id, ip, req.URL.Query().Get("v") == wire.CompactLobbyFlag)
+	defer l.Leave(id)
+	l.SetClient(id, ip, req.URL.Query().Get("v") == wire.CompactLobbyFlag)
 	h.lobbyLoop(req.Context(), l, id, c)
 }
 
 // joinLobby seats p in the first lobby with room, opening another (with its
 // own broadcast loop) when all are full, up to maxLobbyShard. The join itself
 // (which sends) runs outside the hub lock; a lobby that filled meanwhile is retried.
-func (h *hub) joinLobby(p peer) (l *lobby, id int, ok bool) {
+func (h *hub) joinLobby(p peer) (l *lobby.Lobby, id int, ok bool) {
 	for range 3 {
 		if l = h.pickLobby(); l == nil {
 			return nil, 0, false
 		}
-		if id, ok = l.join(p); ok {
+		if id, ok = l.Join(p); ok {
 			return l, id, true
 		}
 	}
 	return nil, 0, false
 }
 
-func (h *hub) pickLobby() *lobby {
+func (h *hub) pickLobby() *lobby.Lobby {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for _, l := range h.lobbies {
-		if !l.full() {
+		if !l.Full() {
 			return l
 		}
 	}
-	if len(h.lobbies) >= maxLobbyShard {
+	if len(h.lobbies) >= lobby.MaxShards {
 		return nil
 	}
-	l := newLobby()
+	l := lobby.New()
 	h.lobbies = append(h.lobbies, l)
 	tick, stop := h.lobbyTicker()
-	go func() { defer stop(); l.run(tick, h.done) }()
+	go func() { defer stop(); l.Run(tick, h.done) }()
 	return l
 }
 
 // lobbyLoop reads PRESENCE / NAME / PING until the peer leaves, floods, sends
 // garbage or stays silent for lobbyIdle (hidden tab).
-func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn) {
+func (h *hub) lobbyLoop(ctx context.Context, l *lobby.Lobby, id int, c *websocket.Conn) {
 	p := wsPeer{c}
 	var rate netlimit.RateWindow
 	pong := make([]byte, wire.PingLen)
@@ -87,8 +88,8 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn
 		if err != nil {
 			return
 		}
-		if !rate.AllowN(time.Now(), maxLobbyMsgs) {
-			p.close(closeRate, "rate limit")
+		if !rate.AllowN(time.Now(), lobby.MaxMsgs) {
+			p.Close(closeRate, "rate limit")
 			return
 		}
 		if typ != websocket.MessageBinary {
@@ -97,25 +98,25 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn
 		}
 		switch {
 		case wire.IsPing(b):
-			_ = p.send(wire.EncodePong(pong, b))
+			_ = p.Send(wire.EncodePong(pong, b))
 		case wire.IsReportMsg(b):
-			if name, hidden := l.report(id, int(wire.F64(b, 0))); name != "" {
+			if name, hidden := l.Report(id, int(wire.F64(b, 0))); name != "" {
 				h.logger.Printf("lobby report: %q (player %d) by player %d, hidden=%v", name, int(wire.F64(b, 0)), id, hidden)
 			}
 		case wire.IsNameMsg(b):
-			l.setName(id, names.Clean(string(b[wire.HeaderLen:])), time.Now())
+			l.SetName(id, names.Clean(string(b[wire.HeaderLen:])), time.Now())
 		default:
 			pos, err := wire.DecodePresence(b)
 			if err != nil {
 				_ = c.Close(websocket.StatusUnsupportedData, "bad message")
 				return
 			}
-			l.setPos(id, pos)
+			l.SetPos(id, pos)
 		}
 	}
 }
 
 func realLobbyTicker() (<-chan time.Time, func()) {
-	t := time.NewTicker(lobbyInterval)
+	t := time.NewTicker(lobby.Interval)
 	return t.C, t.Stop
 }
