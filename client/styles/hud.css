@@ -33,31 +33,36 @@
   background: var(--hud-card); border: 1px solid var(--hud-border); color: var(--hud-text);
 }
 
-/* Action bar: bottom-center round buttons */
+/* Action bar: bottom-center, big solid round buttons (label above, key below), no panel */
 #actions {
   position: absolute; bottom: calc(14px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
-  display: flex; align-items: flex-start; gap: calc(14px * var(--hud-scale));
-  padding: calc(8px * var(--hud-scale)) calc(14px * var(--hud-scale));
-  border-radius: calc(18px * var(--hud-scale));
-  background: var(--hud-card); border: 1px solid var(--hud-border);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: flex; align-items: flex-start; gap: calc(22px * var(--hud-scale));
   font-family: var(--fx-body, system-ui); color: var(--hud-text);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .5));
 }
-.act { display: flex; flex-direction: column; align-items: center; gap: 2px; width: calc(64px * var(--hud-scale)); }
-.act__svg { width: calc(52px * var(--hud-scale)); height: calc(52px * var(--hud-scale)); overflow: visible; }
-.act__track { fill: rgba(255, 255, 255, .04); stroke: rgba(255, 255, 255, .14); stroke-width: 3; }
-.act__ring { fill: none; stroke: var(--hud-accent); stroke-width: 4; stroke-linecap: round; }
-.act--strike .act__ring { stroke: var(--hud-ring); }
-.act__icon { fill: none; stroke: var(--hud-text); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
-.act__label { font-size: calc(12px * var(--hud-scale)); font-weight: 600; white-space: nowrap; }
+.act {
+  --act-fill: var(--hud-accent);
+  display: flex; flex-direction: column; align-items: center; gap: calc(4px * var(--hud-scale));
+  width: calc(92px * var(--hud-scale));
+}
+.act--strike { --act-fill: var(--hud-ring); }
+.act--lob { --act-fill: var(--train-machine); }
+.act__label {
+  order: -1; font-size: calc(13px * var(--hud-scale)); font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 3px #000;
+}
+.act__svg { width: calc(84px * var(--hud-scale)); height: calc(84px * var(--hud-scale)); overflow: visible; transition: transform .08s; }
+.act__track { fill: var(--act-fill); stroke: rgba(0, 0, 0, .35); stroke-width: 2; }
+.act__ring { fill: none; stroke: var(--hud-text); stroke-width: 4; stroke-linecap: round; }
+.act__icon { fill: none; stroke: #000; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
 .act__key {
-  font: 600 calc(10px * var(--hud-scale)) / 1.4 var(--fx-body, system-ui); color: var(--hud-muted);
-  padding: 0 5px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 4px; white-space: nowrap;
+  font: 700 calc(12px * var(--hud-scale)) / 1.6 var(--fx-body, system-ui); color: var(--hud-text);
+  padding: 0 6px; background: rgba(0, 0, 0, .65); border-radius: 4px; white-space: nowrap;
 }
-.act.is-active .act__track { fill: rgba(25, 227, 255, .18); stroke: var(--hud-accent); }
-.act.is-active .act__icon { opacity: 1; filter: drop-shadow(0 0 4px var(--hud-accent)); }
+.act.is-active .act__svg { transform: scale(1.08); }
+.act.is-active .act__track { stroke: var(--hud-text); stroke-width: 4; filter: drop-shadow(0 0 6px var(--act-fill)); }
+.act.is-active .act__icon { opacity: 1; }
 .act.is-warn .act__ring { stroke: var(--hud-warn); }
-.act.is-warn .act__icon { stroke: var(--hud-warn); fill: var(--hud-warn); }
 
 /* Crosshair while the pointer is locked: above center like the reference (keep in sync with AIM_NDC_Y in input.ts) */
 #crosshair {
@@ -70,8 +75,9 @@
 #crosshair[hidden] { display: none; }
 
 @media (max-width: 640px) {
-  #actions { gap: 6px; padding: 6px 8px; }
-  .act { width: 52px; }
+  #actions { gap: 8px; }
+  .act { width: 56px; }
+  .act__svg { width: 52px; height: 52px; }
   .act__key { display: none; }
 }
 

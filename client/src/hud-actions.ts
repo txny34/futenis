@@ -3,7 +3,8 @@ import { keyHint } from "./ui/key-hints";
 import type { KeyAction } from "./ui/keybinds";
 import { Extra, FLAG_LOB, PLAYER_DASH, PLAYER_EXTRA } from "./snapshot";
 
-// Bottom-center action bar: round ability buttons with SVG icons, a progress
+// Bottom-center action bar (Dash · Golpe · Globo; jump stays on its key but is not
+// shown, like most games): round ability buttons with SVG icons, a progress
 // ring (cooldown for Dash, charge for Golpe) and the key label underneath.
 // Reads the human's extras from the snapshot; touches the DOM only on change
 // (rings are quantized so idle frames write nothing). Dash's ring is its
@@ -14,7 +15,7 @@ const RING_C = 2 * Math.PI * RING_R;
 const RING_STEPS = 60;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-type ActionId = "dash" | "strike" | "lob" | "jump";
+type ActionId = "dash" | "strike" | "lob";
 
 /** `bind` = remappable keyboard action (label follows Ajustes), else the fixed `key` text. */
 interface ActionDef {
@@ -24,7 +25,6 @@ interface ActionDef {
 const ICONS: Readonly<Record<ActionId, string>> = {
   strike: "M32 18 a14 14 0 1 0 0.01 0 Z M14 32 H20 M44 32 H50 M32 14 V8",
   lob: "M16 44 Q32 6 48 44 M42 40 L48 44 L50 37",
-  jump: "M32 46 V20 M22 30 L32 18 L42 30 M22 50 H42",
   dash: "M16 24 H30 M12 32 H28 M16 40 H30 M34 20 L48 32 L34 44",
 };
 
@@ -32,7 +32,6 @@ const ACTIONS: readonly ActionDef[] = [
   { id: "dash", label: "Dash", key: "Q", bind: "dash", icon: ICONS.dash, ring: true },
   { id: "strike", label: t("Golpe", "Strike"), key: "Click", icon: ICONS.strike, ring: true },
   { id: "lob", label: t("Globo", "Lob"), key: t("Click der", "Right click"), icon: ICONS.lob, ring: false },
-  { id: "jump", label: t("Salto", "Jump"), key: t("Espacio", "Space"), bind: "jump", icon: ICONS.jump, ring: false },
 ];
 
 interface Slot {
@@ -82,7 +81,7 @@ export class ActionBar {
   constructor() {
     this.root.id = "actions";
     const made = ACTIONS.map(button);
-    this.slots = { dash: made[0], strike: made[1], lob: made[2], jump: made[3] };
+    this.slots = { dash: made[0], strike: made[1], lob: made[2] };
     this.root.append(...made.map((s) => s.root));
   }
 
@@ -98,7 +97,6 @@ export class ActionBar {
     this.set(this.slots.dash, dashReady, snap[PLAYER_DASH[humanSlot]] === 1, false);
     this.set(this.slots.strike, charge, charge > 0, false);
     this.set(this.slots.lob, 0, (flags & FLAG_LOB) !== 0, false);
-    this.set(this.slots.jump, 0, snap[e + Extra.OnGround] === 0, false);
   }
 
   private set(s: Slot, fill: number, active: boolean, warn: boolean): void {

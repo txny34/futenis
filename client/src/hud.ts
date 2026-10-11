@@ -12,18 +12,13 @@ import { keyHint, moveHint } from "./ui/key-hints";
 import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
 
 const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const; // team colors come from the theme, so no color names
-const helpText = (): string =>
-  t(
-    `${moveHint()} mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · ${keyHint("jump")} salto · ${keyHint("dash")} dash · ${keyHint("free")} mouse libre · Esc pausa · Mando: stick izq mover, der cámara, RT golpe, LT lob, A salto, LB/RB dash`,
-    `${moveHint()} move · Mouse camera · Wheel zoom · Click strike · Right-click lob · ${keyHint("jump")} jump · ${keyHint("dash")} dash · ${keyHint("free")} free mouse · Esc pause · Gamepad: left stick move, right camera, RT strike, LT lob, A jump, LB/RB dash`,
-  );
 const lobbyHelp = (): string =>
   t(
     `${moveHint()} mover · Mouse cámara · ${keyHint("jump")} salto · ${keyHint("free")} mouse libre · Esc menú`,
     `${moveHint()} move · Mouse camera · ${keyHint("jump")} jump · ${keyHint("free")} free mouse · Esc menu`,
   );
 const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
-const PLAYGROUND_HELP = t(` · ${LAUNCH_KEY} lanzar bola`, ` · ${LAUNCH_KEY} launch ball`);
+const PLAYGROUND_HELP = t(`${LAUNCH_KEY} lanzar bola`, `${LAUNCH_KEY} launch ball`);
 const CALL_MS = 1800;
 const SERVE_HINT = t(
   "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado",
@@ -61,7 +56,6 @@ export class Hud {
   private dashCooldownMs = DEFAULT_DASH_COOLDOWN_S * MS_PER_S;
 
   constructor(private readonly root: HTMLElement) {
-    this.help.textContent = helpText();
     this.fps.hidden = true;
     this.call.hidden = true;
     this.hint.hidden = true;
@@ -153,7 +147,7 @@ export class Hud {
     this.root.classList.toggle("is-lobby", mode === Mode.Lobby); // lobby.md §7: no scoreboard/streak
     this.msg.textContent = playground ? "" : message(phase, server); // RACHA owns the top in Entrenamiento
     this.hint.hidden = playground || phase !== Phase.Serve || server !== HUMAN_TEAM;
-    this.help.textContent = mode === Mode.Lobby ? lobbyHelp() : playground ? helpText() + PLAYGROUND_HELP : helpText();
+    this.help.textContent = mode === Mode.Lobby ? lobbyHelp() : playground ? PLAYGROUND_HELP : ""; // in a match the action bar is the only key guide
   }
 
   error(text: string): void { this.err.textContent = text; }
