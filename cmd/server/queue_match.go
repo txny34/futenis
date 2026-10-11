@@ -66,7 +66,7 @@ func (h *hub) rebalance(mode string, now time.Time) {
 	h.mu.Unlock()
 	for _, r := range move {
 		if p, c := r.requeueAlone(); p != nil {
-			h.releaseRanked(c) // before the close: the client's immediate reconnect must find the account free
+			h.releaseRanked(c)                  // before the close: the client's immediate reconnect must find the account free
 			go p.close(closeRequeue, "requeue") // the close handshake may wait on the client
 		}
 	}
