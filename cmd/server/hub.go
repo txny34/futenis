@@ -13,6 +13,7 @@ import (
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -267,7 +268,7 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 	var kicked atomic.Bool
 	go h.watchIdle(r, p, &lastSeen, &kicked, done)
 	var rate netlimit.RateWindow
-	pong := make([]byte, pingMsgLen)
+	pong := make([]byte, wire.PingLen)
 	for {
 		typ, b, err := c.Read(ctx)
 		if err != nil {
@@ -280,11 +281,11 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 			p.close(closeRate, "rate limit")
 			return false
 		}
-		if typ == websocket.MessageBinary && isPing(b) {
-			_ = p.send(encodePong(pong, b))
+		if typ == websocket.MessageBinary && wire.IsPing(b) {
+			_ = p.send(wire.EncodePong(pong, b))
 			continue
 		}
-		in, err := decodeInput(b)
+		in, err := wire.DecodeInput(b)
 		if typ != websocket.MessageBinary || err != nil {
 			h.logger.Printf("room %s slot %d: bad message (type %v, err %v)", code, slot, typ, err)
 			_ = c.Close(websocket.StatusUnsupportedData, "bad message")
@@ -330,9 +331,9 @@ func (h *hub) announce(r *room, rankedMode string) {
 	}
 	h.mu.Unlock()
 	for i, p := range peers {
-		sendTo(p, encodeWelcome(i)) // nil if that seat is empty
+		sendTo(p, wire.EncodeWelcome(i)) // nil if that seat is empty
 		if p != nil {
-			sendTo(p, encodeSeat(tokens[i]))
+			sendTo(p, wire.EncodeSeat(tokens[i]))
 		}
 	}
 	tick, stop := h.ticker()

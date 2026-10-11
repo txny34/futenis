@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// Public names (shared lobby, global leaderboard) go through cleanName: a
+// Public names (shared lobby, global leaderboard) go through Clean: a
 // name with a slur or an insult becomes Fallback. Names are normalized
 // first (lowercase, fullwidth and accents folded, leetspeak, repeated letters
 // squeezed), so "P3ND3J0", "ｐｕｔａ" or "pendeeejo" are caught. Stems match
@@ -43,7 +43,7 @@ var (
 	)
 )
 
-// Clean returns the sanitized name ("" stays ""), or fallbackName when it is offensive.
+// Clean returns the sanitized name ("" stays ""), or Fallback when it is offensive.
 // The full input is checked too: cutting to the length cap must not hide a word.
 func Clean(raw string) string {
 	s := Sanitize(raw)

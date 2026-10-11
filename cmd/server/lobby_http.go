@@ -8,6 +8,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/names"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 // ServeLobby upgrades /lobby: same origin check and per-client caps as /ws.
@@ -36,7 +37,7 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer l.leave(id)
-	l.setClient(id, ip, req.URL.Query().Get("v") == compactLobbyFlag)
+	l.setClient(id, ip, req.URL.Query().Get("v") == wire.CompactLobbyFlag)
 	h.lobbyLoop(req.Context(), l, id, c)
 }
 
@@ -78,7 +79,7 @@ func (h *hub) pickLobby() *lobby {
 func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn) {
 	p := wsPeer{c}
 	var rate netlimit.RateWindow
-	pong := make([]byte, pingMsgLen)
+	pong := make([]byte, wire.PingLen)
 	for {
 		rctx, cancel := context.WithTimeout(ctx, h.lobbyIdle)
 		typ, b, err := c.Read(rctx)
@@ -95,16 +96,16 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn
 			return
 		}
 		switch {
-		case isPing(b):
-			_ = p.send(encodePong(pong, b))
-		case isReportMsg(b):
-			if name, hidden := l.report(id, int(f64(b, 0))); name != "" {
-				h.logger.Printf("lobby report: %q (player %d) by player %d, hidden=%v", name, int(f64(b, 0)), id, hidden)
+		case wire.IsPing(b):
+			_ = p.send(wire.EncodePong(pong, b))
+		case wire.IsReportMsg(b):
+			if name, hidden := l.report(id, int(wire.F64(b, 0))); name != "" {
+				h.logger.Printf("lobby report: %q (player %d) by player %d, hidden=%v", name, int(wire.F64(b, 0)), id, hidden)
 			}
-		case isNameMsg(b):
-			l.setName(id, names.Clean(string(b[headerLen:])), time.Now())
+		case wire.IsNameMsg(b):
+			l.setName(id, names.Clean(string(b[wire.HeaderLen:])), time.Now())
 		default:
-			pos, err := decodePresence(b)
+			pos, err := wire.DecodePresence(b)
 			if err != nil {
 				_ = c.Close(websocket.StatusUnsupportedData, "bad message")
 				return

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -68,7 +69,7 @@ func (r *room) hold(slot int, p peer, grace time.Duration, expire func()) bool {
 	r.away[slot] = time.AfterFunc(grace, expire)
 	others := r.peers
 	r.mu.Unlock()
-	away := encodeAway(grace)
+	away := wire.EncodeAway(grace)
 	for _, o := range others {
 		sendTo(o, away)
 	}
@@ -110,13 +111,13 @@ func (r *room) reattach(slot int, token string, p peer) bool {
 	r.peers[slot] = p
 	others := r.peers
 	r.mu.Unlock()
-	sendTo(p, encodeWelcome(slot))
-	sendTo(p, encodeSeat(token))
+	sendTo(p, wire.EncodeWelcome(slot))
+	sendTo(p, wire.EncodeSeat(token))
 	if old != nil {
 		go old.close(closeReplace, "replaced") // the close handshake waits on a peer that may be dead
 	}
 	if t != nil {
-		back := encodeSignal(msgPeerBack)
+		back := wire.EncodeSignal(wire.MsgPeerBack)
 		for i, o := range others {
 			if i != slot {
 				sendTo(o, back)

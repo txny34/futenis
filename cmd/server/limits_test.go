@@ -11,6 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 func newTestHubWith(set func(h *hub)) *httptest.Server {
@@ -40,14 +41,14 @@ func TestHubIdleKick(t *testing.T) {
 	srv := newTestHubWith(func(h *hub) { h.idle = 50 * time.Millisecond })
 	defer srv.Close()
 	c1 := dial(ctx, t, srv)
-	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	c2 := dial(ctx, t, srv)
 	go keepAlive(ctx, c2) // only the host goes idle
 	expectClose(ctx, t, c1, closeIdle)
 }
 
 func keepAlive(ctx context.Context, c *websocket.Conn) {
-	in := inputMsg([inputFloats]float64{})
+	in := wire.EncodeInput([wire.InputFloats]float64{})
 	for ctx.Err() == nil {
 		if c.Write(ctx, websocket.MessageBinary, in) != nil {
 			return
@@ -76,7 +77,7 @@ func TestHubIdleClockStartsWithMatch(t *testing.T) {
 	srv := newTestHubWith(func(h *hub) { h.idle = 200 * time.Millisecond; h.wait = 5 * time.Second })
 	defer srv.Close()
 	c1 := dial(ctx, t, srv)
-	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	time.Sleep(400 * time.Millisecond) // silent wait: twice the idle timeout
 	c2 := dial(ctx, t, srv)
 	go keepAlive(ctx, c2)
@@ -101,8 +102,8 @@ func TestHubRateLimit(t *testing.T) {
 	srv := newTestHubWith(func(*hub) {})
 	defer srv.Close()
 	c := dial(ctx, t, srv)
-	readMsg(ctx, t, c, msgWaiting, headerLen)
-	in := inputMsg([inputFloats]float64{})
+	readMsg(ctx, t, c, wire.MsgWaiting, wire.HeaderLen)
+	in := wire.EncodeInput([wire.InputFloats]float64{})
 	for i := 0; i <= maxMsgsPerWindow; i++ {
 		if err := c.Write(ctx, websocket.MessageBinary, in); err != nil {
 			break // the server may close before the last write lands
@@ -117,7 +118,7 @@ func TestHubPerIPLimit(t *testing.T) {
 	srv := newTestHubWith(func(h *hub) { h.conns = netlimit.NewConnLimiter(maxConns, 1) })
 	defer srv.Close()
 	c := dialRoom(ctx, t, srv, "AAA")
-	readMsg(ctx, t, c, msgWaiting, headerLen)
+	readMsg(ctx, t, c, wire.MsgWaiting, wire.HeaderLen)
 	_, res, err := websocket.Dial(ctx, "ws"+srv.URL[4:]+"/?room=BBB", nil)
 	if err == nil || res == nil || res.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("second conn from same IP: err %v res %v", err, res)

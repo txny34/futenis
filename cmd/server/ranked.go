@@ -8,6 +8,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -16,12 +17,9 @@ import (
 // queue identity; no bot fill; at game over the server computes and stores
 // the new ELO and tells each player (RESULT).
 const (
-	msgAuth        = 0x03 // client: token bytes
-	msgResult      = 0x86 // server: ELO before, after
 	closeNoAuth    = 4006
 	authWait       = 5 * time.Second
 	authReadLimit  = 4096 // JWTs are larger than game messages
-	resultMsgLen   = headerLen + 2*8
 	ratingsTimeout = 10 * time.Second
 )
 
@@ -40,10 +38,10 @@ func (h *hub) authenticate(ctx context.Context, c *websocket.Conn) (auth.Account
 	actx, cancel := context.WithTimeout(ctx, authWait)
 	defer cancel()
 	typ, b, err := c.Read(actx)
-	if err != nil || typ != websocket.MessageBinary || len(b) <= headerLen || b[0] != msgAuth || b[1] != protoVersion {
+	if err != nil || typ != websocket.MessageBinary || len(b) <= wire.HeaderLen || b[0] != wire.MsgAuth || b[1] != wire.Version {
 		return auth.Account{}, false
 	}
-	acc, err := h.auth.Verify(string(b[headerLen:]))
+	acc, err := h.auth.Verify(string(b[wire.HeaderLen:]))
 	if err != nil || !userID.MatchString(acc.ID) {
 		return auth.Account{}, false
 	}
@@ -85,7 +83,7 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 	r.mu.Unlock()
 	for i, p := range peers {
 		if p != nil && users[i] != "" {
-			sendTo(p, encodeResult(ranked.RatingOf(before, users[i]), after[users[i]]))
+			sendTo(p, wire.EncodeResult(ranked.RatingOf(before, users[i]), after[users[i]]))
 		}
 	}
 }
@@ -100,14 +98,6 @@ func resultRows(r *room, users [sim.MaxPlayers]string, after map[string]int, win
 		rows = append(rows, ranked.Row{ID: users[i], Elo: after[users[i]], Won: r.teamOf(i) == winner, Name: claims[i].name})
 	}
 	return rows
-}
-
-func encodeResult(before, after int) []byte {
-	b := make([]byte, resultMsgLen)
-	putHeader(b, msgResult)
-	putF64(b, 0, float64(before))
-	putF64(b, 1, float64(after))
-	return b
 }
 
 // gameOverWinner reports the winning team (server space) once the frame's

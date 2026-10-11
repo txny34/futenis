@@ -1,19 +1,17 @@
 package main
 
-import "github.com/txny34/futenis/cmd/server/internal/names"
+import (
+	"github.com/txny34/futenis/cmd/server/internal/names"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
+)
 
 // Lobby moderation: anyone can report another player's name (REPORT, body: the
 // target id). Once reportsToHide different networks (client limit keys, so
-// two tabs count once) reported it, the name becomes fallbackName for everyone
+// two tabs count once) reported it, the name becomes names.Fallback for everyone
 // and stays so for that connection. Hiding a player for oneself is client-only.
 const (
-	msgReport     = 0x12 // client: f64 target id
 	reportsToHide = 2
 )
-
-func isReportMsg(b []byte) bool {
-	return len(b) == headerLen+8 && b[0] == msgReport && b[1] == protoVersion
-}
 
 // setClient records id's network (limit key, for report counting) and roster format.
 func (l *lobby) setClient(id int, key string, compact bool) {
@@ -48,7 +46,7 @@ func (l *lobby) report(from, target int) (name string, hidden bool) {
 	t.flagged, t.name = true, names.Fallback
 	all := l.othersLocked(-1)
 	l.mu.Unlock()
-	msg := encodeLobbyName(target, names.Fallback)
+	msg := wire.EncodeLobbyName(target, names.Fallback)
 	for _, o := range all {
 		_ = o.send(msg)
 	}

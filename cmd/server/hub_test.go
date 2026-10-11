@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 func newTestHub(tick chan time.Time) *httptest.Server {
@@ -44,7 +45,7 @@ func readMsg(ctx context.Context, t *testing.T, c *websocket.Conn, typ byte, n i
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(b) != n || b[0] != typ || b[1] != protoVersion {
+	if len(b) != n || b[0] != typ || b[1] != wire.Version {
 		t.Fatalf("got type %#x len %d, want %#x len %d", b[0], len(b), typ, n)
 	}
 	return b
@@ -53,8 +54,8 @@ func readMsg(ctx context.Context, t *testing.T, c *websocket.Conn, typ byte, n i
 // readWelcome reads WELCOME and the SEAT (rejoin token) that follows it.
 func readWelcome(ctx context.Context, t *testing.T, c *websocket.Conn) []byte {
 	t.Helper()
-	w := readMsg(ctx, t, c, msgWelcome, welcomeLen)
-	readMsg(ctx, t, c, msgSeat, headerLen+tokenLen)
+	w := readMsg(ctx, t, c, wire.MsgWelcome, wire.WelcomeLen)
+	readMsg(ctx, t, c, wire.MsgSeat, wire.HeaderLen+tokenLen)
 	return w
 }
 
@@ -66,7 +67,7 @@ func TestHubMatch(t *testing.T) {
 	defer srv.Close()
 
 	c1 := dial(ctx, t, srv)
-	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	c2 := dial(ctx, t, srv)
 	if w := readWelcome(ctx, t, c1); w[2] != 0 {
 		t.Fatalf("host slot %d", w[2])
@@ -75,25 +76,25 @@ func TestHubMatch(t *testing.T) {
 		t.Fatalf("guest slot %d", w[2])
 	}
 	tick <- time.Time{}
-	readMsg(ctx, t, c1, msgFrame, frameMsgLen)
-	readMsg(ctx, t, c2, msgFrame, frameMsgLen)
+	readMsg(ctx, t, c1, wire.MsgFrame, wire.FrameLen)
+	readMsg(ctx, t, c2, wire.MsgFrame, wire.FrameLen)
 
-	ping := make([]byte, pingMsgLen)
-	putHeader(ping, msgPing)
-	putF64(ping, 0, 42.25)
+	ping := make([]byte, wire.PingLen)
+	wire.PutHeader(ping, wire.MsgPing)
+	wire.PutF64(ping, 0, 42.25)
 	if err := c1.Write(ctx, websocket.MessageBinary, ping); err != nil {
 		t.Fatal(err)
 	}
-	if p := readMsg(ctx, t, c1, msgPong, pingMsgLen); f64(p, 0) != 42.25 {
-		t.Fatalf("pong payload %v", f64(p, 0))
+	if p := readMsg(ctx, t, c1, wire.MsgPong, wire.PingLen); wire.F64(p, 0) != 42.25 {
+		t.Fatalf("pong payload %v", wire.F64(p, 0))
 	}
 
-	in := inputMsg([inputFloats]float64{1, 0, 3, 0, 0, 0})
+	in := wire.EncodeInput([wire.InputFloats]float64{1, 0, 3, 0, 0, 0})
 	if err := c2.Write(ctx, websocket.MessageBinary, in); err != nil {
 		t.Fatal(err)
 	}
 	_ = c2.Close(websocket.StatusNormalClosure, "") // leaving on purpose: no seat held
-	readMsg(ctx, t, c1, msgPeerLeft, headerLen)
+	readMsg(ctx, t, c1, wire.MsgPeerLeft, wire.HeaderLen)
 }
 
 func TestHubThirdPeerRejected(t *testing.T) {
@@ -102,7 +103,7 @@ func TestHubThirdPeerRejected(t *testing.T) {
 	srv := newTestHub(make(chan time.Time))
 	defer srv.Close()
 	c1 := dial(ctx, t, srv)
-	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	c2 := dial(ctx, t, srv)
 	// WELCOME proves c2 joined: only then is the room full for c3 (dial returns
 	// at the handshake, before the server-side join runs).
@@ -132,7 +133,7 @@ func TestHubServerFull(t *testing.T) {
 	srv := newTestHubCap(make(chan time.Time), 1)
 	defer srv.Close()
 	c1 := dialRoom(ctx, t, srv, "AAA")
-	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	c2 := dialRoom(ctx, t, srv, "BBB")
 	if _, _, err := c2.Read(ctx); websocket.CloseStatus(err) != closeBusy {
 		t.Fatalf("second room err %v", err)
@@ -152,10 +153,10 @@ func TestHubBadMessage(t *testing.T) {
 		// One room per case: the previous peer's server-side leave may not have
 		// run yet when the next one dials, so a shared room could WELCOME it.
 		{"BADA", websocket.MessageBinary, []byte{1, 2, 3}},
-		{"BADB", websocket.MessageText, inputMsg([inputFloats]float64{})},
+		{"BADB", websocket.MessageText, wire.EncodeInput([wire.InputFloats]float64{})},
 	} {
 		c := dialRoom(ctx, t, srv, tc.room)
-		readMsg(ctx, t, c, msgWaiting, headerLen)
+		readMsg(ctx, t, c, wire.MsgWaiting, wire.HeaderLen)
 		if err := c.Write(ctx, tc.typ, tc.b); err != nil {
 			t.Fatal(err)
 		}

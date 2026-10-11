@@ -1,4 +1,4 @@
-// Online spike wire protocol v1 (docs/design/online-spike.md §4). LE, 8-byte header.
+// Online wire protocol v1 (docs/design/online-spike.md §4; server: cmd/server/internal/wire). LE, 8-byte header.
 export const PROTO_VERSION = 1;
 export const HEADER = 8;
 export const Msg = {

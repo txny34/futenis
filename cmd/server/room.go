@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/game"
 	"github.com/txny34/futenis/sim"
 )
@@ -129,7 +130,7 @@ func (r *room) join(p peer) (slot int, start bool, humans int) {
 	}
 	humans = r.humansLocked()
 	if humans < r.seats {
-		_ = p.send(encodeSignal(msgWaiting))
+		_ = p.send(wire.EncodeSignal(wire.MsgWaiting))
 		return slot, false, humans
 	}
 	return slot, r.startLocked(), humans

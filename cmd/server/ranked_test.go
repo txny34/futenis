@@ -13,6 +13,7 @@ import (
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -44,9 +45,9 @@ func dialRanked(ctx context.Context, t *testing.T, srv *httptest.Server, ip, tok
 	}
 	t.Cleanup(func() { c.CloseNow() })
 	if token != "" {
-		b := make([]byte, headerLen+len(token))
-		putHeader(b, msgAuth)
-		copy(b[headerLen:], token)
+		b := make([]byte, wire.HeaderLen+len(token))
+		wire.PutHeader(b, wire.MsgAuth)
+		copy(b[wire.HeaderLen:], token)
 		if err := c.Write(ctx, websocket.MessageBinary, b); err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +74,7 @@ func TestRankedPairsTwoAccountsNotOneTwice(t *testing.T) {
 	defer cancel()
 	srv, iss, _ := newRankedHub(t)
 	a := dialRanked(ctx, t, srv, "10.3.1.1", tokenFor(t, iss, userA))
-	readMsg(ctx, t, a, msgWaiting, headerLen)
+	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	again := dialRanked(ctx, t, srv, "10.3.1.2", tokenFor(t, iss, userA)) // same account, other IP
 	expectClose(ctx, t, again, closeFull)
 	b := dialRanked(ctx, t, srv, "10.3.1.3", tokenFor(t, iss, userB))
@@ -105,7 +106,7 @@ func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
 		t.Fatalf("stored %v", got)
 	}
 	last := pb.msgs[len(pb.msgs)-1]
-	if last[0] != msgResult || f64(last, 0) != 1000 || f64(last, 1) != 1016 {
+	if last[0] != wire.MsgResult || wire.F64(last, 0) != 1000 || wire.F64(last, 1) != 1016 {
 		t.Fatalf("winner result %v", last)
 	}
 }
@@ -173,7 +174,7 @@ func TestRankedOneActiveConnectionPerAccount(t *testing.T) {
 	got := 0
 	for _, c := range []*websocket.Conn{a, b} {
 		_, m, err := c.Read(ctx)
-		if err == nil && m[0] == msgWaiting {
+		if err == nil && m[0] == wire.MsgWaiting {
 			got++
 		} else if websocket.CloseStatus(err) != closeFull {
 			t.Fatalf("unexpected: %v", err)

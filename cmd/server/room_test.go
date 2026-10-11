@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/game"
 	"github.com/txny34/futenis/sim"
 )
@@ -53,9 +54,9 @@ func (f *fakePeer) waitFor(t *testing.T, n int) [][]byte {
 }
 
 func decodeBody(b []byte) []float64 {
-	out := make([]float64, (len(b)-headerLen)/8)
+	out := make([]float64, (len(b)-wire.HeaderLen)/8)
 	for i := range out {
-		out[i] = math.Float64frombits(binary.LittleEndian.Uint64(b[headerLen+i*8:]))
+		out[i] = math.Float64frombits(binary.LittleEndian.Uint64(b[wire.HeaderLen+i*8:]))
 	}
 	return out
 }
@@ -87,8 +88,8 @@ func TestRoomWaitingOrder(t *testing.T) {
 				defer wg.Done()
 				_, start, _ := r.join(p)
 				if start {
-					sendTo(r.peers[0], encodeWelcome(0))
-					sendTo(r.peers[1], encodeWelcome(1))
+					sendTo(r.peers[0], wire.EncodeWelcome(0))
+					sendTo(r.peers[1], wire.EncodeWelcome(1))
 				}
 				starts <- start
 			}()
@@ -101,7 +102,7 @@ func TestRoomWaitingOrder(t *testing.T) {
 		for _, p := range []*fakePeer{host, guest} {
 			m, _ := p.snapshot()
 			for i, b := range m {
-				if b[0] == msgWaiting {
+				if b[0] == wire.MsgWaiting {
 					waits++
 					if i != 0 {
 						t.Fatalf("WAITING at position %d", i)
@@ -137,7 +138,7 @@ func TestRoomFramesRotated(t *testing.T) {
 	gm := guest.waitFor(t, 3)
 	rot := make([]float64, game.OutLen)
 	for i := range 3 {
-		if len(hm[i]) != frameMsgLen || hm[i][0] != msgFrame || gm[i][0] != msgFrame {
+		if len(hm[i]) != wire.FrameLen || hm[i][0] != wire.MsgFrame || gm[i][0] != wire.MsgFrame {
 			t.Fatalf("frame %d bad header", i)
 		}
 		game.RotateOut1v1(rot, decodeBody(hm[i]))
@@ -170,7 +171,7 @@ func TestRoomLeave(t *testing.T) {
 	r.leave(1, nil, false)
 	r.leave(0, nil, false) // second leave is a no-op
 	msgs, closed := host.snapshot()
-	if len(msgs) != 2 || msgs[0][0] != msgWaiting || msgs[1][0] != msgPeerLeft || !closed {
+	if len(msgs) != 2 || msgs[0][0] != wire.MsgWaiting || msgs[1][0] != wire.MsgPeerLeft || !closed {
 		t.Fatalf("host msgs %v closed %v", msgs, closed)
 	}
 	if slot, _, _ := r.join(&fakePeer{}); !r.isClosed() || slot != -1 {

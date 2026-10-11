@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/txny34/futenis/ai"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/game"
 	"github.com/txny34/futenis/sim"
 )
@@ -59,7 +60,7 @@ func (r *room) leave(slot int, p peer, dropped bool) bool {
 func tellLeft(others [sim.MaxPlayers]peer) {
 	for _, o := range others {
 		if o != nil {
-			_ = o.send(encodeSignal(msgPeerLeft))
+			_ = o.send(wire.EncodeSignal(wire.MsgPeerLeft))
 			o.close(closeNormal, "peer left")
 		}
 	}
@@ -79,7 +80,7 @@ func (r *room) run(tick <-chan time.Time) {
 	view := make([]float64, game.OutLen)
 	msgs := [sim.MaxPlayers][]byte{}
 	for i := range msgs {
-		msgs[i] = make([]byte, frameMsgLen)
+		msgs[i] = make([]byte, wire.FrameLen)
 	}
 	for {
 		select {
@@ -113,7 +114,7 @@ func (r *room) run(tick <-chan time.Time) {
 				continue
 			}
 			game.ViewOut(view, out, scratch, i, mode == sim.Mode2v2)
-			encodeFrame(msgs[i], view)
+			wire.EncodeFrame(msgs[i], view)
 			sendTo(p, msgs[i])
 		}
 	}

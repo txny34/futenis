@@ -10,6 +10,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -34,12 +35,12 @@ func dialRejoin(ctx context.Context, t *testing.T, srv *httptest.Server, token s
 func startPair(ctx context.Context, t *testing.T, srv *httptest.Server) (c1, c2 *websocket.Conn, token string) {
 	t.Helper()
 	c1 = dial(ctx, t, srv)
-	readMsg(ctx, t, c1, msgWaiting, headerLen)
+	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	c2 = dial(ctx, t, srv)
 	readWelcome(ctx, t, c1)
-	readMsg(ctx, t, c2, msgWelcome, welcomeLen)
-	seat := readMsg(ctx, t, c2, msgSeat, headerLen+tokenLen)
-	return c1, c2, string(seat[headerLen:])
+	readMsg(ctx, t, c2, wire.MsgWelcome, wire.WelcomeLen)
+	seat := readMsg(ctx, t, c2, wire.MsgSeat, wire.HeaderLen+tokenLen)
+	return c1, c2, string(seat[wire.HeaderLen:])
 }
 
 func TestRejoinResumesHeldSeat(t *testing.T) {
@@ -51,20 +52,20 @@ func TestRejoinResumesHeldSeat(t *testing.T) {
 	c1, c2, token := startPair(ctx, t, srv)
 
 	c2.CloseNow() // connection lost
-	if a := readMsg(ctx, t, c1, msgPeerAway, headerLen+8); f64(a, 0) != 60 {
-		t.Fatalf("away seconds %v, want 60", f64(a, 0))
+	if a := readMsg(ctx, t, c1, wire.MsgPeerAway, wire.HeaderLen+8); wire.F64(a, 0) != 60 {
+		t.Fatalf("away seconds %v, want 60", wire.F64(a, 0))
 	}
 	back := dialRejoin(ctx, t, srv, token)
-	if w := readMsg(ctx, t, back, msgWelcome, welcomeLen); w[2] != 1 {
+	if w := readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen); w[2] != 1 {
 		t.Fatalf("rejoined slot %d, want 1", w[2])
 	}
-	if s := readMsg(ctx, t, back, msgSeat, headerLen+tokenLen); string(s[headerLen:]) != token {
+	if s := readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+tokenLen); string(s[wire.HeaderLen:]) != token {
 		t.Fatal("rejoin token changed")
 	}
-	readMsg(ctx, t, c1, msgPeerBack, headerLen)
+	readMsg(ctx, t, c1, wire.MsgPeerBack, wire.HeaderLen)
 	tick <- time.Time{}
-	readMsg(ctx, t, c1, msgFrame, frameMsgLen)
-	readMsg(ctx, t, back, msgFrame, frameMsgLen)
+	readMsg(ctx, t, c1, wire.MsgFrame, wire.FrameLen)
+	readMsg(ctx, t, back, wire.MsgFrame, wire.FrameLen)
 }
 
 func TestHoldExpiryEndsMatch(t *testing.T) {
@@ -74,8 +75,8 @@ func TestHoldExpiryEndsMatch(t *testing.T) {
 	defer srv.Close()
 	c1, c2, token := startPair(ctx, t, srv)
 	c2.CloseNow()
-	readMsg(ctx, t, c1, msgPeerAway, headerLen+8)
-	readMsg(ctx, t, c1, msgPeerLeft, headerLen)
+	readMsg(ctx, t, c1, wire.MsgPeerAway, wire.HeaderLen+8)
+	readMsg(ctx, t, c1, wire.MsgPeerLeft, wire.HeaderLen)
 	late := dialRejoin(ctx, t, srv, token)
 	if _, _, err := late.Read(ctx); websocket.CloseStatus(err) != closeGone {
 		t.Fatalf("late rejoin: %v, want close %d", err, closeGone)
@@ -109,14 +110,14 @@ func TestHoldsAreCapped(t *testing.T) {
 	c1, c2, token := startPair(ctx, t, srv)
 	for range maxHolds {
 		c2.CloseNow()
-		readMsg(ctx, t, c1, msgPeerAway, headerLen+8)
+		readMsg(ctx, t, c1, wire.MsgPeerAway, wire.HeaderLen+8)
 		c2 = dialRejoin(ctx, t, srv, token)
-		readMsg(ctx, t, c2, msgWelcome, welcomeLen)
-		readMsg(ctx, t, c2, msgSeat, headerLen+tokenLen)
-		readMsg(ctx, t, c1, msgPeerBack, headerLen)
+		readMsg(ctx, t, c2, wire.MsgWelcome, wire.WelcomeLen)
+		readMsg(ctx, t, c2, wire.MsgSeat, wire.HeaderLen+tokenLen)
+		readMsg(ctx, t, c1, wire.MsgPeerBack, wire.HeaderLen)
 	}
 	c2.CloseNow() // one drop too many: the seat is left for good
-	readMsg(ctx, t, c1, msgPeerLeft, headerLen)
+	readMsg(ctx, t, c1, wire.MsgPeerLeft, wire.HeaderLen)
 }
 
 func TestPausedOnlyWhereNoBotPlays(t *testing.T) {
@@ -146,12 +147,12 @@ func TestRejoinReplacesAConnectionNotSeenDropped(t *testing.T) {
 	defer srv.Close()
 	c1, c2, token := startPair(ctx, t, srv)
 	back := dialRejoin(ctx, t, srv, token) // c2 still open: wifi -> 4G switch
-	readMsg(ctx, t, back, msgWelcome, welcomeLen)
-	readMsg(ctx, t, back, msgSeat, headerLen+tokenLen)
+	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
+	readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+tokenLen)
 	expectClose(ctx, t, c2, closeReplace)
 	tick <- time.Time{} // the match never paused nor ended
-	readMsg(ctx, t, c1, msgFrame, frameMsgLen)
-	readMsg(ctx, t, back, msgFrame, frameMsgLen)
+	readMsg(ctx, t, c1, wire.MsgFrame, wire.FrameLen)
+	readMsg(ctx, t, back, wire.MsgFrame, wire.FrameLen)
 }
 
 func TestClosingTheTabLeaves(t *testing.T) {
@@ -161,19 +162,19 @@ func TestClosingTheTabLeaves(t *testing.T) {
 	defer srv.Close()
 	c1, c2, _ := startPair(ctx, t, srv)
 	_ = c2.Close(websocket.StatusGoingAway, "")
-	readMsg(ctx, t, c1, msgPeerLeft, headerLen)
+	readMsg(ctx, t, c1, wire.MsgPeerLeft, wire.HeaderLen)
 }
 
 // startRanked starts a ranked 1v1 between userA and userB; it returns A's rejoin token.
 func startRanked(ctx context.Context, t *testing.T, srv *httptest.Server, iss *authtest.Issuer, net string) (a, b *websocket.Conn, token string) {
 	t.Helper()
 	a = dialRanked(ctx, t, srv, net+".1", tokenFor(t, iss, userA))
-	readMsg(ctx, t, a, msgWaiting, headerLen)
+	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	b = dialRanked(ctx, t, srv, net+".2", tokenFor(t, iss, userB))
-	readMsg(ctx, t, a, msgWelcome, welcomeLen)
-	seat := readMsg(ctx, t, a, msgSeat, headerLen+tokenLen)
+	readMsg(ctx, t, a, wire.MsgWelcome, wire.WelcomeLen)
+	seat := readMsg(ctx, t, a, wire.MsgSeat, wire.HeaderLen+tokenLen)
 	readWelcome(ctx, t, b)
-	return a, b, string(seat[headerLen:])
+	return a, b, string(seat[wire.HeaderLen:])
 }
 
 func TestRankedHeldSeatKeepsTheAccountBusy(t *testing.T) {
@@ -182,11 +183,11 @@ func TestRankedHeldSeatKeepsTheAccountBusy(t *testing.T) {
 	srv, iss, _ := newRankedHub(t)
 	a, b, token := startRanked(ctx, t, srv, iss, "10.4.1")
 	a.CloseNow()
-	readMsg(ctx, t, b, msgPeerAway, headerLen+8)
+	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
 	again := dialRanked(ctx, t, srv, "10.4.1.3", tokenFor(t, iss, userA)) // a second ranked match meanwhile
 	expectClose(ctx, t, again, closeFull)
 	back := dialRejoin(ctx, t, srv, token)
-	readMsg(ctx, t, back, msgWelcome, welcomeLen)
+	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
 }
 
 func TestRankedBothDroppedIsNoContest(t *testing.T) {
@@ -195,14 +196,14 @@ func TestRankedBothDroppedIsNoContest(t *testing.T) {
 	srv, iss, store := newRankedHub(t)
 	a, b, _ := startRanked(ctx, t, srv, iss, "10.4.2")
 	a.CloseNow()
-	readMsg(ctx, t, b, msgPeerAway, headerLen+8)
+	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
 	b.CloseNow() // nobody left to wait: the match ends without a result
 	time.Sleep(100 * time.Millisecond)
 	if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); len(got) != 0 {
 		t.Fatalf("ratings written %v, want none", got)
 	}
 	again := dialRanked(ctx, t, srv, "10.4.2.3", tokenFor(t, iss, userA)) // the account is free again
-	readMsg(ctx, t, again, msgWaiting, headerLen)
+	readMsg(ctx, t, again, wire.MsgWaiting, wire.HeaderLen)
 }
 
 func TestRankedLeavingWhileRivalHeldIsAForfeit(t *testing.T) {
@@ -211,7 +212,7 @@ func TestRankedLeavingWhileRivalHeldIsAForfeit(t *testing.T) {
 	srv, iss, store := newRankedHub(t)
 	a, b, _ := startRanked(ctx, t, srv, iss, "10.4.3")
 	a.CloseNow() // A's connection blips
-	readMsg(ctx, t, b, msgPeerAway, headerLen+8)
+	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
 	_ = b.Close(websocket.StatusNormalClosure, "") // B quits on purpose to dodge the loss
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {

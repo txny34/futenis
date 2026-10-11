@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/txny34/futenis/cmd/server/internal/names"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 func TestLobbyReportsHideANameAfterTwoNetworks(t *testing.T) {
@@ -19,7 +20,7 @@ func TestLobbyReportsHideANameAfterTwoNetworks(t *testing.T) {
 	l.setClient(b, "net-b", false)
 	l.setName(target, "Ofensivo", time.Now())
 	for _, id := range []int{a, a2, b, target} {
-		l.setPos(id, presence{})
+		l.setPos(id, wire.Presence{})
 	}
 	if name, _ := l.report(a, target+100); name != "" {
 		t.Fatal("unknown target")
@@ -58,7 +59,7 @@ func TestLobbyReportFromSameNetworkIgnored(t *testing.T) {
 	l.setClient(target, "net", false)
 	l.setClient(sib, "net", false)
 	l.setName(target, "Alguien", time.Now())
-	l.setPos(sib, presence{})
+	l.setPos(sib, wire.Presence{})
 	if name, _ := l.report(sib, target); name != "" {
 		t.Fatal("a player's own network can't report it")
 	}
@@ -74,7 +75,7 @@ func TestLobbyReportNeedsAChosenNameAndAPlacedReporter(t *testing.T) {
 	if name, _ := l.report(a, target); name != "" {
 		t.Fatal("a reporter that never walked in the lobby doesn't count")
 	}
-	l.setPos(a, presence{})
+	l.setPos(a, wire.Presence{})
 	nameless, _ := l.join(&fakePeer{})
 	l.setClient(nameless, "n", false)
 	if name, _ := l.report(a, nameless); name != "" {
