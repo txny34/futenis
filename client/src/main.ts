@@ -139,6 +139,7 @@ function lobbyMenu(app: () => App, menu: MenuUI, account: Account): void {
       { label: t("Tutorial", "Tutorial"), run: () => safeStart(app(), tutorialOptions()) },
       { label: t("Entrenamiento", "Training"), run: () => menu.openTraining((cfg) => safeStart(app(), lobbyOptions("playground", false, cfg))) },
       { label: t("Ajustes", "Settings"), run: () => menu.openSettings() },
+      account.playersItem(),
       { label: t("Reportar un bug", "Report a bug"), run: () => menu.openReport() },
       account.menuItem(),
     ],

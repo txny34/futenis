@@ -22,7 +22,10 @@ const decoder = new TextDecoder();
 const MIN_FACING_SPEED = 0.2;
 const HEADER = 8;
 
-export function startPresence(app: App, remotes: RemotePlayers): void {
+/** Lobby actions that need the socket (moderation). */
+export interface Presence { report(id: number): void }
+
+export function startPresence(app: App, remotes: RemotePlayers): Presence {
   let ws: WebSocket | null = null;
   let retryAt = 0;
   let backoff = RETRY_MIN_MS;
@@ -86,6 +89,16 @@ export function startPresence(app: App, remotes: RemotePlayers): void {
     sendName(ws);
     ws.send(buf);
   }, SEND_MS);
+  return {
+    report(id) {
+      if (ws?.readyState !== WebSocket.OPEN) return;
+      const msg = new Uint8Array(HEADER + 8);
+      msg[0] = LobbyMsg.Report;
+      msg[1] = 1;
+      new DataView(msg.buffer).setFloat64(HEADER, id, true);
+      ws.send(msg);
+    },
+  };
 }
 
 function receive(remotes: RemotePlayers, v: DataView): void {

@@ -22,6 +22,7 @@ interface Remote {
   readonly target: THREE.Vector3;
   facing: number;
   id: number;
+  name: string;
   lastY: number;
   seenAt: number;
 }
@@ -34,6 +35,21 @@ export class RemotePlayers {
   private readonly free: Remote[] = [];
   /** Names that arrived before the first position (join order on the server). */
   private readonly pendingNames = new Map<number, string>();
+  /** Players this viewer hid ("Jugadores en el lobby"); lobby ids live as long as their connection. */
+  private readonly hidden = new Set<number>();
+
+  /** Everyone in view, for the players panel (not per frame). */
+  list(): Array<{ id: number; name: string; hidden: boolean }> {
+    return this.active.map((r) => ({ id: r.id, name: r.name, hidden: this.hidden.has(r.id) }));
+  }
+
+  /** Hides (or shows again) a player's puppet and name for this viewer only. */
+  setHidden(id: number, on: boolean): void {
+    if (on) this.hidden.add(id);
+    else this.hidden.delete(id);
+    const r = this.byId.get(id);
+    if (r) r.ch.root.visible = r.tag.visible = !on;
+  }
 
   /** Roster entry: create on first sight, then only retarget. */
   place(id: number, x: number, y: number, z: number, facing: number): void {
@@ -42,7 +58,7 @@ export class RemotePlayers {
       r = this.free.pop() ?? this.build();
       r.id = id;
       r.ch.root.position.set(x, y, z);
-      r.ch.root.visible = r.tag.visible = true;
+      r.ch.root.visible = r.tag.visible = !this.hidden.has(id);
       this.byId.set(id, r);
       this.active.push(r);
       this.setTag(r, this.pendingNames.get(id) ?? "");
@@ -108,11 +124,12 @@ export class RemotePlayers {
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
     tag.scale.set(TAG_W, (TAG_W * TAG_PX_H) / TAG_PX_W, 1);
     this.group.add(ch.root, tag);
-    return { ch, tag, target: new THREE.Vector3(), facing: 0, id: -1, lastY: 0, seenAt: 0,
+    return { ch, tag, target: new THREE.Vector3(), facing: 0, id: -1, name: "", lastY: 0, seenAt: 0,
       pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike: null, facing: 0 } };
   }
 
   private setTag(r: Remote, text: string): void {
+    r.name = text;
     const D = THEME.lobbyDecor;
     r.tag.material.map?.dispose();
     r.tag.material.map = canvasTexture(TAG_PX_W, TAG_PX_H, (ctx) => {

@@ -164,3 +164,10 @@
 .fx-profile__elo[data-tier="platinum"] { color: var(--fx-platinum); }
 .fx-profile__elo[data-tier="diamond"] { color: var(--fx-diamond); }
 .fx-profile__elo[data-tier="legend"] { color: var(--fx-legend); }
+
+/* "Jugadores en el lobby" (ui/lobby-players.ts) */
+.fx-players { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow-y: auto; overflow-x: hidden; }
+.fx-players__row { display: flex; align-items: center; gap: 8px; }
+.fx-players__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-players__row .fx-btn { width: auto; flex: none; padding-inline: 12px; }
+.fx-players__empty { color: var(--fx-muted); }
