@@ -29,6 +29,7 @@ export class MenuUI {
   private settingsBack: Screen = "hidden";
   private reportText: ((note: string) => string) | null = null;
   private reportBack: Screen = "hidden";
+  private panelBack: Screen = "hidden";
   private openedAt = -Infinity; // last pause/lobby-menu open, for the Esc debounce
   private readonly openCbs: Listener<boolean>[] = [];
   private readonly settingsCbs: Listener<Settings>[] = [];
@@ -85,8 +86,8 @@ export class MenuUI {
   }
   /** A lobby menu sub-panel (e.g. "Jugadores en el lobby"); its back returns to the lobby menu. */
   openPanel(build: (back: () => void) => HTMLElement): void {
-    const back: Screen = this.screen === "lobby" ? "lobby" : "hidden";
-    this.mount("panel", build(() => this.render(back)));
+    this.panelBack = this.screen === "lobby" ? "lobby" : "hidden";
+    this.mount("panel", build(() => this.render(this.panelBack)));
   }
   showPause(): void {
     if (!this.inGame) return;
@@ -146,6 +147,7 @@ export class MenuUI {
     if (this.screen === "pause") this.resume();
     else if (this.screen === "settings") this.render(this.inGame ? "pause" : this.settingsBack);
     else if (this.screen === "report") this.backFromReport();
+    else if (this.screen === "panel") this.render(this.panelBack);
     else this.hide(); // setup, lobby menu
   }
 

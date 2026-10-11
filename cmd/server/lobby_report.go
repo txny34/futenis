@@ -27,7 +27,10 @@ func (l *lobby) setKey(id int, key string) {
 func (l *lobby) report(from, target int) (name string, hidden bool) {
 	l.mu.Lock()
 	src, t := l.peers[from], l.peers[target]
-	if src == nil || t == nil || from == target || t.flagged || src.key == t.key {
+	// Only someone actually in the lobby (placed) reports, once per network, a
+	// real chosen name; a repeat returns "" (nothing to log).
+	if src == nil || t == nil || from == target || t.flagged || !src.placed || src.key == t.key ||
+		t.name == "" || t.name == fallbackName || t.reportedBy[src.key] {
 		l.mu.Unlock()
 		return "", false
 	}
