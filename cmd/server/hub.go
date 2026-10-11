@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -35,7 +36,7 @@ type hub struct {
 	ticker   func() (<-chan time.Time, func()) // injectable for tests
 	logger   *log.Logger
 	maxRooms int
-	conns    *connLimiter
+	conns    *netlimit.ConnLimiter
 	idle     time.Duration // injectable for tests
 	wait     time.Duration
 
@@ -54,7 +55,7 @@ type hub struct {
 	grace time.Duration      // how long a dropped seat is held (injectable)
 
 	lobbies     []*lobby                          // shared online lobbies (lobby.go), opened on demand
-	lobbyConns  *connLimiter                      // per-client cap for /lobby (stricter than matches)
+	lobbyConns  *netlimit.ConnLimiter             // per-client cap for /lobby (stricter than matches)
 	lobbyTicker func() (<-chan time.Time, func()) // injectable for tests
 	lobbyIdle   time.Duration
 	done        chan struct{} // never closed in production; stops the lobby loop in tests
@@ -62,8 +63,8 @@ type hub struct {
 
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
-		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
+		conns: netlimit.NewConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
+		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -127,12 +128,12 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "bad room code", http.StatusBadRequest)
 		return
 	}
-	ip := limitKey(clientIP(req, h.proxied))
-	if !h.conns.acquire(ip) {
+	ip := netlimit.LimitKey(netlimit.ClientIP(req, h.proxied))
+	if !h.conns.Acquire(ip) {
 		http.Error(w, "too many connections", http.StatusTooManyRequests)
 		return
 	}
-	defer h.conns.release(ip)
+	defer h.conns.Release(ip)
 	c, err := websocket.Accept(w, req, &websocket.AcceptOptions{OriginPatterns: h.origins})
 	if err != nil {
 		return // Accept already wrote the HTTP error
@@ -263,7 +264,7 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 	defer close(done)
 	var kicked atomic.Bool
 	go h.watchIdle(r, p, &lastSeen, &kicked, done)
-	var rate rateWindow
+	var rate netlimit.RateWindow
 	pong := make([]byte, pingMsgLen)
 	for {
 		typ, b, err := c.Read(ctx)
@@ -272,7 +273,7 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 			return !kicked.Load() && st != websocket.StatusNormalClosure && st != websocket.StatusGoingAway
 		}
 		lastSeen.Store(time.Now().UnixNano())
-		if !rate.allow(time.Now()) {
+		if !rate.AllowN(time.Now(), maxMsgsPerWindow) {
 			h.logger.Printf("room %s slot %d: rate limit", code, slot)
 			p.close(closeRate, "rate limit")
 			return false

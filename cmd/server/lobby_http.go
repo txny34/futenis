@@ -7,21 +7,22 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/names"
+	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 )
 
 // ServeLobby upgrades /lobby: same origin check and per-client caps as /ws.
 func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
-	ip := limitKey(clientIP(req, h.proxied))
-	if !h.conns.acquire(ip) {
+	ip := netlimit.LimitKey(netlimit.ClientIP(req, h.proxied))
+	if !h.conns.Acquire(ip) {
 		http.Error(w, "too many connections", http.StatusTooManyRequests)
 		return
 	}
-	defer h.conns.release(ip)
-	if !h.lobbyConns.acquire(ip) {
+	defer h.conns.Release(ip)
+	if !h.lobbyConns.Acquire(ip) {
 		http.Error(w, "too many lobby connections", http.StatusTooManyRequests)
 		return
 	}
-	defer h.lobbyConns.release(ip)
+	defer h.lobbyConns.Release(ip)
 	c, err := websocket.Accept(w, req, &websocket.AcceptOptions{OriginPatterns: h.origins})
 	if err != nil {
 		return // Accept already wrote the HTTP error
@@ -76,7 +77,7 @@ func (h *hub) pickLobby() *lobby {
 // garbage or stays silent for lobbyIdle (hidden tab).
 func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn) {
 	p := wsPeer{c}
-	var rate rateWindow
+	var rate netlimit.RateWindow
 	pong := make([]byte, pingMsgLen)
 	for {
 		rctx, cancel := context.WithTimeout(ctx, h.lobbyIdle)
@@ -85,7 +86,7 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn
 		if err != nil {
 			return
 		}
-		if !rate.allowN(time.Now(), maxLobbyMsgs) {
+		if !rate.AllowN(time.Now(), maxLobbyMsgs) {
 			p.close(closeRate, "rate limit")
 			return
 		}
