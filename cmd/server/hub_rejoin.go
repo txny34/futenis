@@ -14,27 +14,40 @@ type seatRef struct {
 
 // play runs a seated peer until it disconnects. A dropped connection in a
 // running match keeps the seat for h.grace (room_rejoin.go); anything else
-// leaves it for good.
-func (h *hub) play(ctx context.Context, code string, slot int, r *room, c *websocket.Conn) {
+// leaves it for good. kept reports that the seat is still taken (held, or
+// replaced by a newer connection of the same player): its ranked account
+// stays claimed until hub.expireSeat or the last play frees it.
+func (h *hub) play(ctx context.Context, code string, slot int, r *room, c *websocket.Conn) (kept bool) {
+	p := wsPeer{c}
 	defer c.CloseNow()
 	lost := h.readLoop(ctx, code, slot, r, c)
-	if lost && r.hold(slot, h.grace, func() { h.expireSeat(code, r, slot) }) {
+	if lost && r.hold(slot, p, h.grace, func() { h.expireSeat(code, r, slot) }) {
 		h.logger.Printf("room %s slot %d: connection lost, seat held", code, slot)
-		return
+		return true
 	}
-	r.leave(slot)
-	if r.isClosed() { // a 2v2 goes on (or keeps waiting) while people remain
+	left := r.leave(slot, p)
+	closed := r.isClosed()
+	if closed { // a 2v2 goes on (or keeps waiting) while people remain
 		h.forget(code, r)
 	}
+	return !left && !closed
 }
 
 func (h *hub) expireSeat(code string, r *room, slot int) {
-	if r.expireAway(slot) && r.isClosed() {
+	uid := r.seatedAccount(slot)
+	if !r.expireAway(slot) {
+		return // back in time
+	}
+	if uid != "" {
+		h.releaseRanked(uid)
+	}
+	if r.isClosed() {
 		h.forget(code, r)
 	}
 }
 
-// serveRejoin puts a dropped player back in its held seat (?rejoin=TOKEN).
+// serveRejoin puts a dropped player back in its seat (?rejoin=TOKEN): a held
+// seat, or one whose old connection the server still believes alive.
 func (h *hub) serveRejoin(ctx context.Context, token string, c *websocket.Conn) {
 	p := wsPeer{c}
 	h.mu.Lock()
@@ -45,5 +58,8 @@ func (h *hub) serveRejoin(ctx context.Context, token string, c *websocket.Conn) 
 		return
 	}
 	h.logger.Printf("room %s slot %d: rejoined", ref.r.code, ref.slot)
-	h.play(ctx, ref.r.code, ref.slot, ref.r, c)
+	uid := ref.r.seatedAccount(ref.slot)
+	if !h.play(ctx, ref.r.code, ref.slot, ref.r, c) && uid != "" {
+		h.releaseRanked(uid)
+	}
 }

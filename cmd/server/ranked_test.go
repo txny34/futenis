@@ -128,7 +128,7 @@ func TestRankedLeaverForfeits(t *testing.T) {
 	r.markRanked(1, userB, "net-b")
 	got := make(chan int, 2)
 	r.onOver = func(w int, _ [sim.MaxPlayers]string) { got <- w }
-	r.leave(0) // userA quits
+	r.leave(0, nil) // userA quits
 	select {
 	case w := <-got:
 		if w != 1 {
@@ -152,7 +152,7 @@ func TestRanked2v2LeaverEndsMatch(t *testing.T) {
 		r.markRanked(i, u, u)
 	}
 	r.onOver = func(int, [sim.MaxPlayers]string) {}
-	r.leave(2)
+	r.leave(2, nil)
 	if !r.isClosed() {
 		t.Fatal("ranked 2v2 kept going with a bot")
 	}

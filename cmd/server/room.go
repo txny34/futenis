@@ -56,7 +56,9 @@ type room struct {
 
 	tokens  [sim.MaxPlayers]string      // rejoin secret per seat (room_rejoin.go)
 	away    [sim.MaxPlayers]*time.Timer // seat held for a dropped connection; fires the leave
-	rejoins [sim.MaxPlayers]int         // holds used per seat (capped: nobody stalls a match forever)
+	holds   int                         // holds used in this room (capped: nobody stalls a match forever)
+	over    bool                        // game over reached: no more holds
+	release func(uid string)            // frees a held seat's ranked account when the room closes (set by announce)
 }
 
 // claimReport returns true exactly once: the caller reports the ranked result.

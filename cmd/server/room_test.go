@@ -148,7 +148,7 @@ func TestRoomFramesRotated(t *testing.T) {
 			}
 		}
 	}
-	r.leave(0)
+	r.leave(0, nil)
 	<-done
 }
 
@@ -167,8 +167,8 @@ func TestRoomLeave(t *testing.T) {
 	host, guest := &fakePeer{}, &fakePeer{}
 	r.join(host)
 	r.join(guest)
-	r.leave(1)
-	r.leave(0) // second leave is a no-op
+	r.leave(1, nil)
+	r.leave(0, nil) // second leave is a no-op
 	msgs, closed := host.snapshot()
 	if len(msgs) != 2 || msgs[0][0] != msgWaiting || msgs[1][0] != msgPeerLeft || !closed {
 		t.Fatalf("host msgs %v closed %v", msgs, closed)

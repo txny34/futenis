@@ -106,7 +106,7 @@ func TestHoldsAreCapped(t *testing.T) {
 	srv := newGraceHub(make(chan time.Time), time.Minute)
 	defer srv.Close()
 	c1, c2, token := startPair(ctx, t, srv)
-	for range maxRejoins {
+	for range maxHolds {
 		c2.CloseNow()
 		readMsg(ctx, t, c1, msgPeerAway, headerLen+8)
 		c2 = dialRejoin(ctx, t, srv, token)
@@ -135,4 +135,71 @@ func TestPausedOnlyWhereNoBotPlays(t *testing.T) {
 	if newRoom(sim.Mode1v1).pausedLocked() {
 		t.Fatal("no held seat: not paused")
 	}
+}
+
+func TestRejoinReplacesAConnectionNotSeenDropped(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tick := make(chan time.Time)
+	srv := newGraceHub(tick, time.Minute)
+	defer srv.Close()
+	c1, c2, token := startPair(ctx, t, srv)
+	back := dialRejoin(ctx, t, srv, token) // c2 still open: wifi -> 4G switch
+	readMsg(ctx, t, back, msgWelcome, welcomeLen)
+	readMsg(ctx, t, back, msgSeat, headerLen+tokenLen)
+	expectClose(ctx, t, c2, closeReplace)
+	tick <- time.Time{} // the match never paused nor ended
+	readMsg(ctx, t, c1, msgFrame, frameMsgLen)
+	readMsg(ctx, t, back, msgFrame, frameMsgLen)
+}
+
+func TestClosingTheTabLeaves(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv := newGraceHub(make(chan time.Time), time.Minute)
+	defer srv.Close()
+	c1, c2, _ := startPair(ctx, t, srv)
+	_ = c2.Close(websocket.StatusGoingAway, "")
+	readMsg(ctx, t, c1, msgPeerLeft, headerLen)
+}
+
+// startRanked starts a ranked 1v1 between userA and userB; it returns A's rejoin token.
+func startRanked(ctx context.Context, t *testing.T, srv *httptest.Server, iss *fakeIssuer, net string) (a, b *websocket.Conn, token string) {
+	t.Helper()
+	a = dialRanked(ctx, t, srv, net+".1", tokenFor(t, iss, userA))
+	readMsg(ctx, t, a, msgWaiting, headerLen)
+	b = dialRanked(ctx, t, srv, net+".2", tokenFor(t, iss, userB))
+	readMsg(ctx, t, a, msgWelcome, welcomeLen)
+	seat := readMsg(ctx, t, a, msgSeat, headerLen+tokenLen)
+	readWelcome(ctx, t, b)
+	return a, b, string(seat[headerLen:])
+}
+
+func TestRankedHeldSeatKeepsTheAccountBusy(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, iss, _ := newRankedHub(t)
+	a, b, token := startRanked(ctx, t, srv, iss, "10.4.1")
+	a.CloseNow()
+	readMsg(ctx, t, b, msgPeerAway, headerLen+8)
+	again := dialRanked(ctx, t, srv, "10.4.1.3", tokenFor(t, iss, userA)) // a second ranked match meanwhile
+	expectClose(ctx, t, again, closeFull)
+	back := dialRejoin(ctx, t, srv, token)
+	readMsg(ctx, t, back, msgWelcome, welcomeLen)
+}
+
+func TestRankedBothDroppedIsNoContest(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, iss, store := newRankedHub(t)
+	a, b, _ := startRanked(ctx, t, srv, iss, "10.4.2")
+	a.CloseNow()
+	readMsg(ctx, t, b, msgPeerAway, headerLen+8)
+	b.CloseNow() // nobody left to wait: the match ends without a result
+	time.Sleep(100 * time.Millisecond)
+	if got, _ := store.load(ctx, "1v1", []string{userA, userB}); len(got) != 0 {
+		t.Fatalf("ratings written %v, want none", got)
+	}
+	again := dialRanked(ctx, t, srv, "10.4.2.3", tokenFor(t, iss, userA)) // the account is free again
+	readMsg(ctx, t, again, msgWaiting, headerLen)
 }

@@ -90,7 +90,7 @@ func (h *hub) forget(code string, r *room) {
 	if h.rooms[code] == r {
 		delete(h.rooms, code)
 	}
-	for _, t := range r.tokens {
+	for _, t := range r.tokenList() {
 		if h.seats[t].r == r {
 			delete(h.seats, t)
 		}
@@ -161,7 +161,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	p := wsPeer{c}
 	var r *room
 	var slot, humans int
-	var start bool
+	var start, kept bool
 	rankedMode, ranked := rankedModes[queued]
 	network := "" // ranked: the client's limit key, seated next to its account
 	if ranked {
@@ -174,14 +174,18 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 			p.close(closeFull, "already in a ranked match")
 			return
 		}
-		defer h.releaseRanked(uid)
+		defer func() {
+			if !kept { // a held or replaced seat keeps the account claimed; hub.expireSeat frees it
+				h.releaseRanked(uid)
+			}
+		}()
 		network = key
 		key = "user:" + uid // one queued connection per account
 	}
 	if queued != "" {
 		code, r, slot, start, humans = h.joinQueue(queued, p, key)
 		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, key[len("user:"):], network) {
-			r.leave(slot)
+			r.leave(slot, p)
 			if r.isClosed() {
 				h.forget(code, r)
 			}
@@ -210,7 +214,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		stop := h.expireAlone(r, p)
 		defer stop()
 	}
-	h.play(ctx, code, slot, r, c)
+	kept = h.play(ctx, code, slot, r, c)
 }
 
 // expireAlone closes p's room if nobody else shows up within h.wait. While a
@@ -255,7 +259,8 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 	for {
 		typ, b, err := c.Read(ctx)
 		if err != nil {
-			return !kicked.Load() && websocket.CloseStatus(err) != websocket.StatusNormalClosure
+			st := websocket.CloseStatus(err) // 1000 leave, 1001 tab closed: both on purpose
+			return !kicked.Load() && st != websocket.StatusNormalClosure && st != websocket.StatusGoingAway
 		}
 		lastSeen.Store(time.Now().UnixNano())
 		if !rate.allow(time.Now()) {
@@ -301,6 +306,7 @@ func (h *hub) announce(r *room, rankedMode string) {
 	peers := r.peers
 	if rankedMode != "" && r.ranked {
 		r.onOver = func(w int, users [sim.MaxPlayers]string) { h.reportRanked(rankedMode, r, users, w) }
+		r.release = h.releaseRanked
 	}
 	r.mu.Unlock()
 	tokens := r.issueTokens()
@@ -332,6 +338,9 @@ func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, kicked *atomic.
 		case <-t.C:
 		}
 		startAt, started := r.startedAt()
+		if r.isPaused() {
+			lastSeen.Store(time.Now().UnixNano()) // waiting for a dropped rival never counts as idle
+		}
 		if !started {
 			t.Reset(h.idle / 4) // waiting for a rival never counts as idle
 			continue
