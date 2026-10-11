@@ -86,8 +86,7 @@ func (h *hub) roomFor(code string, mode sim.Mode) *room {
 		if r == nil && len(h.rooms) >= h.maxRooms {
 			return nil
 		}
-		r = newRoom(mode)
-		r.code = code
+		r = newRoom(mode, code)
 		h.rooms[code] = r
 	}
 	return r
@@ -299,7 +298,7 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 // armFill: the second person in a 2v2 room starts the countdown after which
 // bots fill the empty seats.
 func (h *hub) armFill(r *room, humans int, queued, code string) {
-	if r.mode != sim.Mode2v2 || humans != minHumans2v2 {
+	if r.Mode() != sim.Mode2v2 || humans != minHumans2v2 {
 		return
 	}
 	time.AfterFunc(h.fill, func() {
@@ -316,13 +315,10 @@ func (h *hub) armFill(r *room, humans int, queued, code string) {
 // announce sends WELCOME to every seated peer and starts the match loop.
 // rankedMode ("1v1"/"2v2", "" = casual) wires the ELO report at game over.
 func (h *hub) announce(r *room, rankedMode string) {
-	r.mu.Lock()
-	peers := r.peers
-	if rankedMode != "" && r.ranked {
-		r.onOver = func(w int, users [sim.MaxPlayers]string) { h.reportRanked(rankedMode, r, users, w) }
-		r.release = h.releaseRanked
+	if rankedMode != "" {
+		r.SetRankedHooks(func(w int, users [sim.MaxPlayers]string) { h.reportRanked(rankedMode, r, users, w) }, h.releaseRanked)
 	}
-	r.mu.Unlock()
+	peers := r.Peers()
 	tokens := r.issueTokens()
 	h.mu.Lock()
 	for i, p := range peers {

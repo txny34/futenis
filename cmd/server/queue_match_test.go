@@ -100,13 +100,13 @@ func closedSoon(p *fakePeer) bool {
 }
 
 func TestRequeueSkipsARoomThatStarted(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	r.join(&fakePeer{})
 	r.join(&fakePeer{}) // full: the match starts
 	if p, _ := r.requeueAlone(); p != nil || r.isClosed() {
 		t.Fatal("a started match must never be broken up")
 	}
-	lone := newRoom(sim.Mode1v1)
+	lone := newRoom(sim.Mode1v1, "test")
 	lone.join(&fakePeer{})
 	if p, _ := lone.requeueAlone(); p == nil || !lone.isClosed() {
 		t.Fatal("a lone waiter is moved and its room closed")

@@ -55,9 +55,9 @@ func (h *hub) serveRejoin(ctx context.Context, token string, c *websocket.Conn) 
 		p.Close(closeGone, "match over")
 		return
 	}
-	h.logger.Printf("room %s slot %d: rejoined", ref.r.code, ref.slot)
+	h.logger.Printf("room %s slot %d: rejoined", ref.r.Code(), ref.slot)
 	cl := ref.r.seatClaim(ref.slot)
-	if !h.play(ctx, ref.r.code, ref.slot, ref.r, c) {
+	if !h.play(ctx, ref.r.Code(), ref.slot, ref.r, c) {
 		h.releaseRanked(cl)
 	}
 }

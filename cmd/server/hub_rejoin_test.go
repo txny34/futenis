@@ -122,7 +122,7 @@ func TestHoldsAreCapped(t *testing.T) {
 
 func TestPausedOnlyWhereNoBotPlays(t *testing.T) {
 	held := func(mode sim.Mode, ranked bool) bool {
-		r := newRoom(mode)
+		r := newRoom(mode, "test")
 		r.ranked = ranked
 		r.away[1] = time.NewTimer(time.Hour)
 		defer r.away[1].Stop()
@@ -134,7 +134,7 @@ func TestPausedOnlyWhereNoBotPlays(t *testing.T) {
 	if held(sim.Mode2v2, false) {
 		t.Fatal("casual 2v2 goes on with the bot")
 	}
-	if newRoom(sim.Mode1v1).pausedLocked() {
+	if newRoom(sim.Mode1v1, "test").pausedLocked() {
 		t.Fatal("no held seat: not paused")
 	}
 }

@@ -100,12 +100,41 @@ func (r *room) markRanked(slot int, c ranked.Claim, network string) bool {
 	return true
 }
 
-func newRoom(mode sim.Mode) *room {
+func newRoom(mode sim.Mode, code string) *room {
 	order := seats1v1
 	if mode == sim.Mode2v2 {
 		order = seats2v2
 	}
-	return &room{mode: mode, seats: len(order), order: order, stop: make(chan struct{})}
+	return &room{mode: mode, code: code, seats: len(order), order: order, stop: make(chan struct{})}
+}
+
+// Code is the hub key of the room; Mode and Seats never change either.
+func (r *room) Code() string   { return r.code }
+func (r *room) Mode() sim.Mode { return r.mode }
+func (r *room) SeatCount() int { return r.seats }
+
+// Peers is a snapshot of who is seated (nil = empty or held seat).
+func (r *room) Peers() [sim.MaxPlayers]peer {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.peers
+}
+
+// Claims is a snapshot of the seats' ranked reservations.
+func (r *room) Claims() [sim.MaxPlayers]ranked.Claim {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.claims
+}
+
+// SetRankedHooks wires the ELO report at game over and the release of held
+// accounts when the room closes; a casual room ignores them. Call before run.
+func (r *room) SetRankedHooks(onOver func(winner int, users [sim.MaxPlayers]string), release func(ranked.Claim)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.ranked {
+		r.onOver, r.release = onOver, release
+	}
 }
 
 // join adds p and returns its slot (-1 if full, closed or already started).

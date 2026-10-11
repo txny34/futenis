@@ -96,7 +96,7 @@ func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
 	_ = store.Save(context.Background(), "1v1", []ranked.Row{{ID: userA, Elo: 1000}, {ID: userB, Elo: 1000}})
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	h.ratings = store
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	pa, pb := &fakePeer{}, &fakePeer{}
 	r.join(pa)
 	r.join(pb)
@@ -125,7 +125,7 @@ func TestGameOverWinner(t *testing.T) {
 
 // Leaving a started ranked match is a forfeit: the leaver's team loses, once.
 func TestRankedLeaverForfeits(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	r.join(&fakePeer{})
 	r.join(&fakePeer{})
 	r.markRanked(0, ranked.Claim{UID: userA}, "net-a")
@@ -148,7 +148,7 @@ func TestRankedLeaverForfeits(t *testing.T) {
 
 // A ranked 2v2 never hands a seat to a bot: a leaver ends the match.
 func TestRanked2v2LeaverEndsMatch(t *testing.T) {
-	r := newRoom(sim.Mode2v2)
+	r := newRoom(sim.Mode2v2, "test")
 	for i := 0; i < 4; i++ {
 		r.join(&fakePeer{})
 	}
@@ -186,7 +186,7 @@ func TestRankedOneActiveConnectionPerAccount(t *testing.T) {
 }
 
 func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	r.join(&fakePeer{})
 	r.join(&fakePeer{})
 	if !r.markRanked(0, ranked.Claim{UID: userA}, "10.0.0.1") {

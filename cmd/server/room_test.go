@@ -62,7 +62,7 @@ func decodeBody(b []byte) []float64 {
 }
 
 func TestRoomJoinFull(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	if slot, start, _ := r.join(&fakePeer{}); slot != 0 || start {
 		t.Fatal("first join")
 	}
@@ -78,7 +78,7 @@ func TestRoomJoinFull(t *testing.T) {
 // before anything else, so WELCOME is never followed by WAITING.
 func TestRoomWaitingOrder(t *testing.T) {
 	for range 50 {
-		r := newRoom(sim.Mode1v1)
+		r := newRoom(sim.Mode1v1, "test")
 		host, guest := &fakePeer{}, &fakePeer{}
 		var wg sync.WaitGroup
 		starts := make(chan bool, 2)
@@ -124,7 +124,7 @@ func btoi(b bool) int {
 }
 
 func TestRoomFramesRotated(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	host, guest := &fakePeer{}, &fakePeer{}
 	r.join(host)
 	r.join(guest)
@@ -154,7 +154,7 @@ func TestRoomFramesRotated(t *testing.T) {
 }
 
 func TestRoomGuestInputRotated(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	in := sim.PlayerInput{MoveX: 1, MoveZ: -0.5, TargetX: 4, TargetZ: 2, Buttons: 3, Spin: 1}
 	r.setInput(0, nil, in)
 	r.setInput(1, nil, in)
@@ -164,7 +164,7 @@ func TestRoomGuestInputRotated(t *testing.T) {
 }
 
 func TestRoomLeave(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
+	r := newRoom(sim.Mode1v1, "test")
 	host, guest := &fakePeer{}, &fakePeer{}
 	r.join(host)
 	r.join(guest)

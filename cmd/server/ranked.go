@@ -52,11 +52,8 @@ func (h *hub) authenticate(ctx context.Context, c *websocket.Conn) (auth.Account
 // Runs off the match loop (network I/O).
 func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, winner int) {
 	teams := [2][]string{}
-	for i := 0; i < r.seats; i++ {
-		team := i
-		if r.mode == sim.Mode2v2 {
-			team = i / 2
-		}
+	for i := 0; i < r.SeatCount(); i++ {
+		team := r.teamOf(i)
 		teams[team] = append(teams[team], users[i])
 	}
 	ids := append(append([]string{}, teams[0]...), teams[1]...)
@@ -78,9 +75,7 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 			return // nothing saved: no RESULT
 		}
 	}
-	r.mu.Lock()
-	peers := r.peers
-	r.mu.Unlock()
+	peers := r.Peers()
 	for i, p := range peers {
 		if p != nil && users[i] != "" {
 			sendTo(p, wire.EncodeResult(ranked.RatingOf(before, users[i]), after[users[i]]))
@@ -90,11 +85,9 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 
 // resultRows pairs every seated account with its new ELO, win flag and public name.
 func resultRows(r *room, users [sim.MaxPlayers]string, after map[string]int, winner int) []ranked.Row {
-	r.mu.Lock()
-	claims := r.claims
-	r.mu.Unlock()
-	rows := make([]ranked.Row, 0, r.seats)
-	for i := 0; i < r.seats; i++ {
+	claims := r.Claims()
+	rows := make([]ranked.Row, 0, r.SeatCount())
+	for i := 0; i < r.SeatCount(); i++ {
 		rows = append(rows, ranked.Row{ID: users[i], Elo: after[users[i]], Won: r.teamOf(i) == winner, Name: claims[i].Name})
 	}
 	return rows
