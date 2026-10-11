@@ -84,11 +84,11 @@ func (r *room) waitingAlone() bool {
 // requeueAlone closes the room iff it still waits with exactly one person
 // (atomically with join: a rival arriving now is refused and retries) and
 // returns that person and their ranked claim; nil when the room moved on.
-func (r *room) requeueAlone() (peer, claim) {
+func (r *room) requeueAlone() (peer, ranked.Claim) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.started || r.closed || r.humansLocked() != 1 {
-		return nil, claim{}
+		return nil, ranked.Claim{}
 	}
 	for i, p := range r.peers {
 		if p != nil {
@@ -98,7 +98,7 @@ func (r *room) requeueAlone() (peer, claim) {
 			return p, r.claims[i]
 		}
 	}
-	return nil, claim{}
+	return nil, ranked.Claim{}
 }
 
 // ratingFor is the account's current ELO in mode (eloDefault when unknown or unreachable).

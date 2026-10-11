@@ -170,7 +170,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	var r *room
 	var slot, humans int
 	var start, kept bool
-	var cl claim // ranked reservation (zero outside ranked)
+	var cl ranked.Claim // ranked reservation (zero outside ranked)
 	rankedMode, isRanked := rankedModes[queued]
 	network := "" // ranked: the client's limit key, seated next to its account
 	if isRanked {
@@ -195,7 +195,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	if queued != "" {
 		elo := ranked.EloDefault
 		if isRanked {
-			elo = h.ratingFor(ctx, rankedMode, cl.uid)
+			elo = h.ratingFor(ctx, rankedMode, cl.UID)
 		}
 		code, r, slot, start, humans = h.joinQueue(queued, p, key, elo)
 		if isRanked && r != nil && slot >= 0 && !r.markRanked(slot, cl, network) {

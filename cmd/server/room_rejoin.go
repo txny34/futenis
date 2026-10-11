@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
@@ -47,7 +48,7 @@ func (r *room) tokenList() [sim.MaxPlayers]string {
 }
 
 // seatClaim is slot's ranked reservation (zero outside ranked).
-func (r *room) seatClaim(slot int) claim {
+func (r *room) seatClaim(slot int) ranked.Claim {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.claims[slot]
@@ -157,8 +158,8 @@ func (r *room) markOver() {
 
 // stopHoldsLocked cancels pending holds of a closing room and returns their
 // ranked accounts (the caller frees them through r.release).
-func (r *room) stopHoldsLocked() []claim {
-	var gone []claim
+func (r *room) stopHoldsLocked() []ranked.Claim {
+	var gone []ranked.Claim
 	for i, t := range r.away {
 		if t != nil {
 			t.Stop()

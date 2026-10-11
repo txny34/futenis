@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/game"
 	"github.com/txny34/futenis/sim"
@@ -55,12 +56,12 @@ type room struct {
 	onOver   func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
 	reported bool                                           // ranked result already sent (game over or forfeit)
 
-	tokens  [sim.MaxPlayers]string      // rejoin secret per seat (room_rejoin.go)
-	away    [sim.MaxPlayers]*time.Timer // seat held for a dropped connection; fires the leave
-	holds   int                         // holds used in this room (capped: nobody stalls a match forever)
-	over    bool                        // game over reached: no more holds
-	claims  [sim.MaxPlayers]claim       // ranked reservation per seat
-	release func(c claim)               // frees a held seat's ranked account when the room closes (set by announce)
+	tokens  [sim.MaxPlayers]string       // rejoin secret per seat (room_rejoin.go)
+	away    [sim.MaxPlayers]*time.Timer  // seat held for a dropped connection; fires the leave
+	holds   int                          // holds used in this room (capped: nobody stalls a match forever)
+	over    bool                         // game over reached: no more holds
+	claims  [sim.MaxPlayers]ranked.Claim // ranked reservation per seat
+	release func(c ranked.Claim)         // frees a held seat's ranked account when the room closes (set by announce)
 }
 
 // claimReport returns true exactly once: the caller reports the ranked result.
@@ -86,8 +87,8 @@ func (r *room) teamOf(slot int) int {
 // room becomes ranked. It refuses an account or a network already seated:
 // nobody plays against themselves, and two accounts from one network can't
 // trade wins.
-func (r *room) markRanked(slot int, c claim, network string) bool {
-	user := c.uid
+func (r *room) markRanked(slot int, c ranked.Claim, network string) bool {
+	user := c.UID
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i := range r.users {

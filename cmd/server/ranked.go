@@ -95,7 +95,7 @@ func resultRows(r *room, users [sim.MaxPlayers]string, after map[string]int, win
 	r.mu.Unlock()
 	rows := make([]ranked.Row, 0, r.seats)
 	for i := 0; i < r.seats; i++ {
-		rows = append(rows, ranked.Row{ID: users[i], Elo: after[users[i]], Won: r.teamOf(i) == winner, Name: claims[i].name})
+		rows = append(rows, ranked.Row{ID: users[i], Elo: after[users[i]], Won: r.teamOf(i) == winner, Name: claims[i].Name})
 	}
 	return rows
 }
@@ -118,32 +118,25 @@ func gameOverWinner(out []float64) (int, bool) {
 // parallel matches whose rating writes could overwrite each other.
 // Each claim has its own generation: a late release from an old connection
 // (replaced, or of a finished match) never frees the account's newer claim.
-func (h *hub) claimRanked(acc auth.Account) (claim, bool) {
+func (h *hub) claimRanked(acc auth.Account) (ranked.Claim, bool) {
 	uid := acc.ID
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if _, busy := h.active[uid]; busy {
-		return claim{}, false
+		return ranked.Claim{}, false
 	}
 	h.claimSeq++
 	h.active[uid] = h.claimSeq
-	return claim{uid: uid, gen: h.claimSeq, name: acc.Name}, true
+	return ranked.Claim{UID: uid, Gen: h.claimSeq, Name: acc.Name}, true
 }
 
 // releaseRanked frees c if it is still the account's live claim ("" = none).
-func (h *hub) releaseRanked(c claim) {
+func (h *hub) releaseRanked(c ranked.Claim) {
 	h.mu.Lock()
-	if c.uid != "" && h.active[c.uid] == c.gen {
-		delete(h.active, c.uid)
+	if c.UID != "" && h.active[c.UID] == c.Gen {
+		delete(h.active, c.UID)
 	}
 	h.mu.Unlock()
-}
-
-// claim is one ranked reservation of an account.
-type claim struct {
-	uid  string
-	gen  uint64
-	name string // public name for the leaderboard (cleaned; "" = keep the stored one)
 }
 
 // distinct reports whether every id appears once (defense in depth for reports).

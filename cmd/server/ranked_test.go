@@ -128,8 +128,8 @@ func TestRankedLeaverForfeits(t *testing.T) {
 	r := newRoom(sim.Mode1v1)
 	r.join(&fakePeer{})
 	r.join(&fakePeer{})
-	r.markRanked(0, claim{uid: userA}, "net-a")
-	r.markRanked(1, claim{uid: userB}, "net-b")
+	r.markRanked(0, ranked.Claim{UID: userA}, "net-a")
+	r.markRanked(1, ranked.Claim{UID: userB}, "net-b")
 	got := make(chan int, 2)
 	r.onOver = func(w int, _ [sim.MaxPlayers]string) { got <- w }
 	r.leave(0, nil, false) // userA quits
@@ -153,7 +153,7 @@ func TestRanked2v2LeaverEndsMatch(t *testing.T) {
 		r.join(&fakePeer{})
 	}
 	for i, u := range []string{userA, userB, userA + "c", userA + "d"} {
-		r.markRanked(i, claim{uid: u}, u)
+		r.markRanked(i, ranked.Claim{UID: u}, u)
 	}
 	r.onOver = func(int, [sim.MaxPlayers]string) {}
 	r.leave(2, nil, false)
@@ -189,13 +189,13 @@ func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
 	r := newRoom(sim.Mode1v1)
 	r.join(&fakePeer{})
 	r.join(&fakePeer{})
-	if !r.markRanked(0, claim{uid: userA}, "10.0.0.1") {
+	if !r.markRanked(0, ranked.Claim{UID: userA}, "10.0.0.1") {
 		t.Fatal("first seat refused")
 	}
-	if r.markRanked(1, claim{uid: userA}, "10.0.0.2") {
+	if r.markRanked(1, ranked.Claim{UID: userA}, "10.0.0.2") {
 		t.Fatal("same account on both seats accepted")
 	}
-	if r.markRanked(1, claim{uid: userB}, "10.0.0.1") {
+	if r.markRanked(1, ranked.Claim{UID: userB}, "10.0.0.1") {
 		t.Fatal("two accounts from one network accepted")
 	}
 }
