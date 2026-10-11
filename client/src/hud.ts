@@ -111,6 +111,7 @@ export class Hud {
     if (this.lastMode !== Mode.Playground || e.kind !== EventKind.Point) this.banner.onEvent(e, shot, HUMAN_TEAM, nowMs);
     this.training.onEvent(e, nowMs);
     if (e.kind === EventKind.Dash && e.player === HUMAN_SLOT) this.dashAt = nowMs;
+    if (e.kind === EventKind.Kick && e.player === HUMAN_SLOT) this.charge.release(nowMs);
   }
 
   /** Crowd moment (feel/hype.ts); Entrenamiento has no rival, so no moments. */

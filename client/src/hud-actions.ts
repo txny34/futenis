@@ -1,4 +1,5 @@
 import { actionFigure, type IconId } from "./hud-action-icons";
+import { FULL_CHARGE, svgNode } from "./hud-svg";
 import { t } from "./i18n/t";
 import { keyHint } from "./ui/key-hints";
 import type { KeyAction } from "./ui/keybinds";
@@ -14,14 +15,11 @@ import { Extra, FLAG_LOB, PLAYER_DASH, PLAYER_EXTRA } from "./snapshot";
 const RING_R = 25;
 const RING_C = 2 * Math.PI * RING_R;
 const RING_STEPS = 60;
-const FULL_CHARGE = 0.999;
-const SVG_NS = "http://www.w3.org/2000/svg";
 
-type ActionId = IconId;
 
 /** `bind` = remappable keyboard action (label follows Ajustes), else the fixed `key` text. */
 interface ActionDef {
-  readonly id: ActionId; readonly label: string; readonly key: string; readonly bind?: KeyAction; readonly ring: boolean;
+  readonly id: IconId; readonly label: string; readonly key: string; readonly bind?: KeyAction; readonly ring: boolean;
 }
 
 const ACTIONS: readonly ActionDef[] = [
@@ -40,24 +38,19 @@ interface Slot {
   lastCooling: boolean;
 }
 
-function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Readonly<Record<string, string>>): SVGElementTagNameMap[K] {
-  const e = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-  return e;
-}
 
 function button(def: ActionDef): Slot {
   const root = document.createElement("div");
   root.className = `act act--${def.id}`;
-  const icon = svg("svg", { viewBox: "0 0 64 64", class: "act__svg", "aria-hidden": "true" });
+  const icon = svgNode("svg", { viewBox: "0 0 64 64", class: "act__svg", "aria-hidden": "true" });
   icon.append(
-    svg("circle", { cx: "32", cy: "32", r: String(RING_R + 3), class: "act__wave" }),
-    svg("circle", { cx: "32", cy: "32", r: String(RING_R), class: "act__track" }),
-    svg("ellipse", { cx: "32", cy: "20", rx: "17", ry: "10", class: "act__gloss" }),
+    svgNode("circle", { cx: "32", cy: "32", r: String(RING_R + 3), class: "act__wave" }),
+    svgNode("circle", { cx: "32", cy: "32", r: String(RING_R), class: "act__track" }),
+    svgNode("ellipse", { cx: "32", cy: "20", rx: "17", ry: "10", class: "act__gloss" }),
   );
   let ring: SVGCircleElement | null = null;
   if (def.ring) {
-    ring = svg("circle", {
+    ring = svgNode("circle", {
       cx: "32", cy: "32", r: String(RING_R), class: "act__ring",
       "stroke-dasharray": RING_C.toFixed(2), "stroke-dashoffset": RING_C.toFixed(2), transform: "rotate(-90 32 32)",
     });
@@ -76,7 +69,7 @@ function button(def: ActionDef): Slot {
 
 export class ActionBar {
   readonly root = document.createElement("div");
-  private readonly slots: Readonly<Record<ActionId, Slot>>;
+  private readonly slots: Readonly<Record<IconId, Slot>>;
   private lastFull = false;
 
   constructor() {

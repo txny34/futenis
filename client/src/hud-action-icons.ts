@@ -1,7 +1,7 @@
 // Action bar art: a little "toy athlete" doing each move, drawn as a sticker
 // (thick dark outline under a white body) inside the 64x64 button, plus an
 // effect layer (speed lines / ball trail) and the ball where it applies.
-const SVG_NS = "http://www.w3.org/2000/svg";
+import { svgNode } from "./hud-svg";
 
 export type IconId = "dash" | "strike" | "lob";
 
@@ -35,25 +35,19 @@ const FIGURES: Readonly<Record<IconId, Figure>> = {
 const HEAD_R = 4.5;
 const BALL_R = 3.6;
 
-function node<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Readonly<Record<string, string>>): SVGElementTagNameMap[K] {
-  const e = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-  return e;
-}
-
 function dot(cls: string, at: readonly [number, number], r: number): SVGCircleElement {
-  return node("circle", { class: cls, cx: String(at[0]), cy: String(at[1]), r: String(r) });
+  return svgNode("circle", { class: cls, cx: String(at[0]), cy: String(at[1]), r: String(r) });
 }
 
 /** The figure group for one action (fx, outline, body, head, ball). */
 export function actionFigure(id: IconId): SVGGElement {
   const f = FIGURES[id];
-  const g = node("g", { class: "act__fig" });
+  const g = svgNode("g", { class: "act__fig" });
   g.append(
-    node("path", { d: f.fx, class: "act__fx" }),
-    node("path", { d: f.body, class: "act__outline" }),
+    svgNode("path", { d: f.fx, class: "act__fx" }),
+    svgNode("path", { d: f.body, class: "act__outline" }),
     dot("act__outline act__outline--dot", f.head, HEAD_R),
-    node("path", { d: f.body, class: "act__body" }),
+    svgNode("path", { d: f.body, class: "act__body" }),
     dot("act__head", f.head, HEAD_R),
   );
   if (f.ball) g.append(dot("act__ball", f.ball, BALL_R));

@@ -56,23 +56,23 @@
   width: calc(104px * var(--hud-scale)); height: calc(104px * var(--hud-scale)); overflow: visible;
   transition: transform .12s cubic-bezier(.3, 1.8, .5, 1);
 }
-.act__track { fill: var(--act-fill); stroke: rgba(4, 8, 24, .85); stroke-width: 2.5; transition: filter .2s; }
+.act__track { fill: var(--act-fill); stroke: color-mix(in srgb, var(--hud-ink) 85%, transparent); stroke-width: 2.5; transition: filter .2s; }
 .act__gloss { fill: rgba(255, 255, 255, .28); pointer-events: none; }
 .act__wave { fill: none; stroke: var(--act-fill); stroke-width: 2; opacity: 0; transform-origin: 32px 32px; }
 .act__ring { fill: none; stroke: var(--hud-text); stroke-width: 3.5; stroke-linecap: round; }
 .act__fig { transform-origin: 32px 40px; animation: act-bob 2.4s ease-in-out infinite; }
 .act--strike .act__fig { animation-delay: -.8s; }
 .act--lob .act__fig { animation-delay: -1.6s; }
-.act__outline { fill: none; stroke: rgba(4, 8, 24, .9); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
-.act__outline--dot { fill: rgba(4, 8, 24, .9); stroke-width: 3.5; }
+.act__outline { fill: none; stroke: color-mix(in srgb, var(--hud-ink) 90%, transparent); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.act__outline--dot { fill: color-mix(in srgb, var(--hud-ink) 90%, transparent); stroke-width: 3.5; }
 .act__body { fill: none; stroke: var(--hud-text); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
 .act__head { fill: var(--hud-text); }
-.act__ball { fill: var(--hud-ring); stroke: rgba(4, 8, 24, .9); stroke-width: 2; }
+.act__ball { fill: var(--hud-ring); stroke: color-mix(in srgb, var(--hud-ink) 90%, transparent); stroke-width: 2; }
 .act__fx { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 3 4; }
 .act--dash .act__fx { stroke-dasharray: none; }
 .act__key {
   font: 700 calc(14px * var(--hud-scale)) / 1.6 var(--fx-body, system-ui); color: var(--hud-text);
-  padding: 0 7px; background: rgba(4, 8, 24, .75); border: 1px solid rgba(255, 255, 255, .15); border-radius: 5px; white-space: nowrap;
+  padding: 0 7px; background: color-mix(in srgb, var(--hud-ink) 75%, transparent); border: 1px solid rgba(255, 255, 255, .15); border-radius: 5px; white-space: nowrap;
 }
 .act.is-active .act__svg { transform: scale(1.14) rotate(-4deg); }
 .act.is-active .act__track { filter: brightness(1.25) drop-shadow(0 0 10px var(--act-fill)); }
@@ -98,8 +98,8 @@
 #crosshair[hidden] { display: none; }
 #crosshair { transition: transform .12s ease-out; }
 #crosshair.is-charging { transform: translate(-50%, -50%) scale(.8); }
-#crosshair.is-full { animation: cross-shake .09s linear infinite; }
-#crosshair.is-release { animation: cross-pop .35s cubic-bezier(.3, 1.8, .5, 1); }
+#crosshair.is-release-a { animation: cross-pop-a .35s cubic-bezier(.3, 1.8, .5, 1); }
+#crosshair.is-release-b { animation: cross-pop-b .35s cubic-bezier(.3, 1.8, .5, 1); }
 
 /* Strike charge on the crosshair (hud-charge.ts): fill + spinning ticks, full-charge pulse, release burst */
 .charge {
@@ -117,14 +117,18 @@
 #crosshair.is-full .charge__spin { animation-duration: .35s; }
 #crosshair.is-full .charge__ticks { stroke: var(--hud-ring); }
 #crosshair.is-full .charge__arc { stroke: var(--hud-ring); animation: charge-full .32s ease-in-out infinite alternate; }
-#crosshair.is-release .charge__burst { animation: charge-burst .45s ease-out; }
-#crosshair.is-release .charge__burst--late { animation: charge-burst .52s .08s ease-out backwards; stroke: var(--hud-gold); }
+#crosshair.is-release-a .charge__burst { animation: charge-burst-a .45s ease-out; }
+#crosshair.is-release-b .charge__burst { animation: charge-burst-b .45s ease-out; }
+#crosshair.is-release-a .charge__burst--late { animation: charge-burst-a .52s .08s ease-out backwards; stroke: var(--hud-gold); }
+#crosshair.is-release-b .charge__burst--late { animation: charge-burst-b .52s .08s ease-out backwards; stroke: var(--hud-gold); }
+#crosshair.is-full { animation: cross-shake .09s linear infinite; } /* after the release rules: a new full charge shakes */
 
 /* Golpe button at full charge: breathing glow */
 .act--strike.is-full .act__track { animation: act-full .32s ease-in-out infinite alternate; }
 .act--strike.is-full .act__ring { stroke: var(--hud-ring); }
 
-@keyframes cross-pop { 40% { transform: translate(-50%, -50%) scale(1.6); } }
+@keyframes cross-pop-a { from, to { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.6); } }
+@keyframes cross-pop-b { from, to { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.6); } }
 @keyframes cross-shake {
   25% { transform: translate(calc(-50% + 1px), calc(-50% - 1px)) scale(.8); }
   75% { transform: translate(calc(-50% - 1px), calc(-50% + 1px)) scale(.8); }
@@ -135,9 +139,11 @@
   from { stroke-width: 6; filter: drop-shadow(0 0 5px var(--hud-ring)); }
   to { stroke-width: 9; filter: drop-shadow(0 0 16px var(--hud-ring)); }
 }
-@keyframes charge-burst { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
+@keyframes charge-burst-a { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
+@keyframes charge-burst-b { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
 @keyframes act-full { from { filter: brightness(1.1) drop-shadow(0 0 6px var(--act-fill)); } to { filter: brightness(1.4) drop-shadow(0 0 16px var(--hud-ring)); } }
-@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track { animation: none !important; }
+  .act__svg, .charge__track { transition: none; } }
 
 @media (max-width: 640px) {
   #actions { gap: 8px; bottom: 24px; }
