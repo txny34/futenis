@@ -75,8 +75,9 @@ func TestSupabaseRatingsFallsBackBeforeTheMigration(t *testing.T) {
 	defer srv.Close()
 	s := newSupabaseRatings(srv.URL, "secret")
 	s.base = srv.URL
-	if err := s.save(context.Background(), "1v1", []rankedRow{{ID: "a", Elo: 1116}}); err != nil {
-		t.Fatal(err)
+	err := s.save(context.Background(), "1v1", []rankedRow{{ID: "a", Elo: 1116}})
+	if legacy, ok := err.(errLegacySave); !ok || legacy.err != nil {
+		t.Fatalf("want a logged legacy save with the ELO stored, got %v", err)
 	}
 	if len(upsert) != 1 || upsert[0]["user_id"] != "a" || upsert[0]["elo_1v1"] != float64(1116) {
 		t.Fatalf("upsert %v", upsert)

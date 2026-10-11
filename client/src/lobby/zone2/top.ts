@@ -27,7 +27,7 @@ function row(raw: unknown, col: string): TopRow | null {
 export async function fetchTop(kind: TopKind): Promise<TopRow[] | null> {
   const { col, filter } = QUERY[kind];
   try {
-    const url = `${SUPABASE_URL}/rest/v1/ratings?select=user_id,name,${col}&${filter}&order=${col}.desc&limit=${TOP_SIZE}`;
+    const url = `${SUPABASE_URL}/rest/v1/ratings?select=user_id,name,${col}&${filter}&order=${col}.desc,user_id.asc&limit=${TOP_SIZE}`;
     const res = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
     if (!res.ok) return null;
     const raw: unknown = await res.json();

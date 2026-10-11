@@ -74,7 +74,9 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 	after := applyElo(before, teams, winner)
 	if err := h.ratings.save(ctx, mode, resultRows(r, users, after, winner)); err != nil {
 		h.logger.Printf("ranked %s: %v", mode, err)
-		return
+		if legacy, ok := err.(errLegacySave); !ok || legacy.err != nil {
+			return // nothing saved: no RESULT
+		}
 	}
 	r.mu.Lock()
 	peers := r.peers
