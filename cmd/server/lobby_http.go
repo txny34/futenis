@@ -34,7 +34,7 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer l.leave(id)
-	l.setKey(id, ip)
+	l.setClient(id, ip, req.URL.Query().Get("v") == compactLobbyFlag)
 	h.lobbyLoop(req.Context(), l, id, c)
 }
 

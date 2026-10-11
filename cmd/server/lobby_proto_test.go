@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"math"
 	"testing"
 )
@@ -56,5 +57,22 @@ func TestEncodeRoster(t *testing.T) {
 func TestSanitizeNameDropsCombiningMarks(t *testing.T) {
 	if got := sanitizeName("z̶̶̶a⃝"); got != "za" {
 		t.Fatalf("got %q: stacked combining marks (zalgo) kept", got)
+	}
+}
+
+func TestEncodeRosterQ(t *testing.T) {
+	dst := make([]byte, rosterQLen(2))
+	n := encodeRosterQ(dst, []lobbyEntry{{id: 70000, p: presence{x: -12.345, y: 1.5, z: 3.21, facing: -math.Pi}}, {id: 9}})
+	le := binary.LittleEndian
+	b := dst[rosterQHead:]
+	if n != rosterQLen(2) || n != headerLen+4+24 || dst[0] != msgRosterQ || le.Uint32(dst[headerLen:]) != 2 {
+		t.Fatalf("len %d head %#x count %d", n, dst[0], le.Uint32(dst[headerLen:]))
+	}
+	if le.Uint32(b) != 70000 || int16(le.Uint16(b[4:])) != -1235 || le.Uint16(b[6:]) != 150 ||
+		int16(le.Uint16(b[8:])) != 321 || int16(le.Uint16(b[10:])) != -math.MaxInt16 {
+		t.Fatalf("entry %v", b[:rosterQStride])
+	}
+	if got := rosterQLen(47); got*3 > rosterMsgLen(47) {
+		t.Fatalf("compact roster %d bytes is not ~3x smaller than %d", got, rosterMsgLen(47))
 	}
 }

@@ -13,11 +13,11 @@ func isReportMsg(b []byte) bool {
 	return len(b) == headerLen+8 && b[0] == msgReport && b[1] == protoVersion
 }
 
-// setKey records id's network (limit key) for report counting.
-func (l *lobby) setKey(id int, key string) {
+// setClient records id's network (limit key, for report counting) and roster format.
+func (l *lobby) setClient(id int, key string, compact bool) {
 	l.mu.Lock()
 	if lp := l.peers[id]; lp != nil {
-		lp.key = key
+		lp.key, lp.compact = key, compact
 	}
 	l.mu.Unlock()
 }
