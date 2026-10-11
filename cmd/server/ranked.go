@@ -7,6 +7,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
+	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -67,15 +68,15 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ratingsTimeout)
 	defer cancel()
-	before, err := h.ratings.load(ctx, mode, ids)
+	before, err := h.ratings.Load(ctx, mode, ids)
 	if err != nil {
 		h.logger.Printf("ranked %s: %v", mode, err)
 		return
 	}
-	after := applyElo(before, teams, winner)
-	if err := h.ratings.save(ctx, mode, resultRows(r, users, after, winner)); err != nil {
+	after := ranked.ApplyElo(before, teams, winner)
+	if err := h.ratings.Save(ctx, mode, resultRows(r, users, after, winner)); err != nil {
 		h.logger.Printf("ranked %s: %v", mode, err)
-		if legacy, ok := err.(errLegacySave); !ok || legacy.err != nil {
+		if legacy, ok := err.(ranked.ErrLegacy); !ok || legacy.Err != nil {
 			return // nothing saved: no RESULT
 		}
 	}
@@ -84,19 +85,19 @@ func (h *hub) reportRanked(mode string, r *room, users [sim.MaxPlayers]string, w
 	r.mu.Unlock()
 	for i, p := range peers {
 		if p != nil && users[i] != "" {
-			sendTo(p, encodeResult(ratingOf(before, users[i]), after[users[i]]))
+			sendTo(p, encodeResult(ranked.RatingOf(before, users[i]), after[users[i]]))
 		}
 	}
 }
 
 // resultRows pairs every seated account with its new ELO, win flag and public name.
-func resultRows(r *room, users [sim.MaxPlayers]string, after map[string]int, winner int) []rankedRow {
+func resultRows(r *room, users [sim.MaxPlayers]string, after map[string]int, winner int) []ranked.Row {
 	r.mu.Lock()
 	claims := r.claims
 	r.mu.Unlock()
-	rows := make([]rankedRow, 0, r.seats)
+	rows := make([]ranked.Row, 0, r.seats)
 	for i := 0; i < r.seats; i++ {
-		rows = append(rows, rankedRow{ID: users[i], Elo: after[users[i]], Won: r.teamOf(i) == winner, Name: claims[i].name})
+		rows = append(rows, ranked.Row{ID: users[i], Elo: after[users[i]], Won: r.teamOf(i) == winner, Name: claims[i].name})
 	}
 	return rows
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
+	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -21,10 +22,10 @@ const (
 	userB   = "8d1c7a3e-0000-4000-8000-00000000000b"
 )
 
-func newRankedHub(t *testing.T) (*httptest.Server, *authtest.Issuer, *memRatings) {
+func newRankedHub(t *testing.T) (*httptest.Server, *authtest.Issuer, *ranked.Mem) {
 	t.Helper()
 	iss := authtest.NewIssuer(t)
-	store := newMemRatings()
+	store := ranked.NewMem()
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	h.proxied = true
 	h.ticker = func() (<-chan time.Time, func()) { return make(chan time.Time), func() {} }
@@ -90,8 +91,8 @@ func TestRankedDisabledWithoutConfig(t *testing.T) {
 }
 
 func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
-	store := newMemRatings()
-	_ = store.save(context.Background(), "1v1", []rankedRow{{ID: userA, Elo: 1000}, {ID: userB, Elo: 1000}})
+	store := ranked.NewMem()
+	_ = store.Save(context.Background(), "1v1", []ranked.Row{{ID: userA, Elo: 1000}, {ID: userB, Elo: 1000}})
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	h.ratings = store
 	r := newRoom(sim.Mode1v1)
@@ -99,7 +100,7 @@ func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
 	r.join(pa)
 	r.join(pb)
 	h.reportRanked("1v1", r, [sim.MaxPlayers]string{userA, userB}, 1)
-	got, _ := store.load(context.Background(), "1v1", []string{userA, userB})
+	got, _ := store.Load(context.Background(), "1v1", []string{userA, userB})
 	if got[userA] != 984 || got[userB] != 1016 {
 		t.Fatalf("stored %v", got)
 	}
@@ -199,8 +200,8 @@ func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
 }
 
 func TestApplyEloCeiling(t *testing.T) {
-	next := applyElo(map[string]int{"a": eloCeiling, "b": eloCeiling}, [2][]string{{"a"}, {"b"}}, 0)
-	if next["a"] > eloCeiling {
+	next := ranked.ApplyElo(map[string]int{"a": ranked.EloCeiling, "b": ranked.EloCeiling}, [2][]string{{"a"}, {"b"}}, 0)
+	if next["a"] > ranked.EloCeiling {
 		t.Fatalf("rating %d above the table's limit", next["a"])
 	}
 }

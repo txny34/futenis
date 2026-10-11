@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"time"
+
+	"github.com/txny34/futenis/cmd/server/internal/ranked"
 )
 
 // Ranked rebalancing: two lonely ranked rooms (one person each) never meet on
@@ -103,10 +105,10 @@ func (r *room) requeueAlone() (peer, claim) {
 func (h *hub) ratingFor(ctx context.Context, mode, uid string) int {
 	ctx, cancel := context.WithTimeout(ctx, ratingLookupTimeout)
 	defer cancel()
-	got, err := h.ratings.load(ctx, mode, []string{uid})
+	got, err := h.ratings.Load(ctx, mode, []string{uid})
 	if err != nil {
-		h.logger.Printf("ranked %s: rating lookup: %v (queued as %d)", mode, err, eloDefault)
-		return eloDefault
+		h.logger.Printf("ranked %s: rating lookup: %v (queued as %d)", mode, err, ranked.EloDefault)
+		return ranked.EloDefault
 	}
-	return ratingOf(got, uid)
+	return ranked.RatingOf(got, uid)
 }

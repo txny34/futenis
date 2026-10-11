@@ -1,4 +1,4 @@
-package main
+package ranked
 
 import (
 	"bytes"
@@ -12,32 +12,32 @@ import (
 	"time"
 )
 
-// ratingStore reads and writes ranked ELO per user and mode ("1v1"/"2v2").
+// Store reads and writes ranked ELO per user and mode ("1v1"/"2v2").
 // Only the server writes: the table's RLS allows public reads and no writes,
 // and the server uses a secret key that bypasses RLS.
-type ratingStore interface {
-	load(ctx context.Context, mode string, ids []string) (map[string]int, error)
-	save(ctx context.Context, mode string, rows []rankedRow) error
+type Store interface {
+	Load(ctx context.Context, mode string, ids []string) (map[string]int, error)
+	Save(ctx context.Context, mode string, rows []Row) error
 }
 
-// rankedRow is one player's outcome of a ranked match.
-type rankedRow struct {
+// Row is one player's outcome of a ranked match.
+type Row struct {
 	ID   string `json:"user_id"`
 	Elo  int    `json:"elo"`
 	Won  bool   `json:"won"`
 	Name string `json:"name"`
 }
 
-// supabaseRatings talks to PostgREST: table public.ratings(user_id uuid pk,
+// Supabase talks to PostgREST: table public.ratings(user_id uuid pk,
 // elo_1v1 int, elo_2v2 int, updated_at timestamptz).
-type supabaseRatings struct {
+type Supabase struct {
 	base   string // https://<ref>.supabase.co/rest/v1
 	key    string // secret API key (Fly secret SUPABASE_SECRET_KEY), never logged
 	client *http.Client
 }
 
-func newSupabaseRatings(projectURL, key string) *supabaseRatings {
-	return &supabaseRatings{base: strings.TrimRight(projectURL, "/") + "/rest/v1", key: key, client: &http.Client{Timeout: 5 * time.Second}}
+func NewSupabase(projectURL, key string) *Supabase {
+	return &Supabase{base: strings.TrimRight(projectURL, "/") + "/rest/v1", key: key, client: &http.Client{Timeout: 5 * time.Second}}
 }
 
 func column(mode string) (string, error) {
@@ -48,7 +48,7 @@ func column(mode string) (string, error) {
 	return "", fmt.Errorf("ratings: unknown mode %q", mode)
 }
 
-func (s *supabaseRatings) do(ctx context.Context, method, path string, body []byte, prefer string) (*http.Response, error) {
+func (s *Supabase) do(ctx context.Context, method, path string, body []byte, prefer string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, s.base+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (s *supabaseRatings) do(ctx context.Context, method, path string, body []by
 	return s.client.Do(req)
 }
 
-func (s *supabaseRatings) load(ctx context.Context, mode string, ids []string) (map[string]int, error) {
+func (s *Supabase) Load(ctx context.Context, mode string, ids []string) (map[string]int, error) {
 	col, err := column(mode)
 	if err != nil {
 		return nil, err
@@ -89,10 +89,10 @@ func (s *supabaseRatings) load(ctx context.Context, mode string, ids []string) (
 	return out, nil
 }
 
-// save records a ranked result through ranked_result (migration 003: ELO,
+// Save records a ranked result through ranked_result (migration 003: ELO,
 // games, wins and public name, atomically). A database without that function
 // yet gets the plain ELO upsert, so ranked keeps working before the migration.
-func (s *supabaseRatings) save(ctx context.Context, mode string, rows []rankedRow) error {
+func (s *Supabase) Save(ctx context.Context, mode string, rows []Row) error {
 	col, err := column(mode)
 	if err != nil {
 		return err
@@ -112,22 +112,22 @@ func (s *supabaseRatings) save(ctx context.Context, mode string, rows []rankedRo
 	if res.StatusCode != http.StatusNotFound {
 		return fmt.Errorf("ratings save: rpc status %d", res.StatusCode)
 	}
-	return errLegacySave{s.upsertElo(ctx, col, rows)}
+	return ErrLegacy{s.upsertElo(ctx, col, rows)}
 }
 
-// errLegacySave: the ELO went through the plain upsert (ranked_result missing,
+// ErrLegacy: the ELO went through the plain upsert (ranked_result missing,
 // migration 003 not run or schema cache stale): games, wins and names were not
 // recorded. err is the upsert's own result (nil = ELO saved).
-type errLegacySave struct{ err error }
+type ErrLegacy struct{ Err error }
 
-func (e errLegacySave) Error() string {
-	if e.err != nil {
-		return "ratings save (legacy): " + e.err.Error()
+func (e ErrLegacy) Error() string {
+	if e.Err != nil {
+		return "ratings save (legacy): " + e.Err.Error()
 	}
 	return "ratings saved without ranked_result (run migration 003): games/wins not counted"
 }
 
-func (s *supabaseRatings) upsertElo(ctx context.Context, col string, rows []rankedRow) error {
+func (s *Supabase) upsertElo(ctx context.Context, col string, rows []Row) error {
 	plain := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
 		plain = append(plain, map[string]any{"user_id": r.ID, col: r.Elo, "updated_at": time.Now().UTC().Format(time.RFC3339)})
@@ -147,15 +147,15 @@ func (s *supabaseRatings) upsertElo(ctx context.Context, col string, rows []rank
 	return nil
 }
 
-// memRatings is the in-process store for tests and local dev without Supabase.
-type memRatings struct {
+// Mem is the in-process store for tests and local dev without Supabase.
+type Mem struct {
 	mu sync.Mutex
 	m  map[string]map[string]int
 }
 
-func newMemRatings() *memRatings { return &memRatings{m: map[string]map[string]int{}} }
+func NewMem() *Mem { return &Mem{m: map[string]map[string]int{}} }
 
-func (s *memRatings) load(_ context.Context, mode string, ids []string) (map[string]int, error) {
+func (s *Mem) Load(_ context.Context, mode string, ids []string) (map[string]int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := map[string]int{}
@@ -167,7 +167,7 @@ func (s *memRatings) load(_ context.Context, mode string, ids []string) (map[str
 	return out, nil
 }
 
-func (s *memRatings) save(_ context.Context, mode string, rows []rankedRow) error {
+func (s *Mem) Save(_ context.Context, mode string, rows []Row) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.m[mode] == nil {

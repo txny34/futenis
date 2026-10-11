@@ -1,4 +1,4 @@
-package main
+package ranked
 
 import "testing"
 
@@ -22,7 +22,7 @@ func TestEloDelta(t *testing.T) {
 
 func TestApplyElo2v2UsesTeamAverages(t *testing.T) {
 	r := map[string]int{"a": 1200, "b": 800, "c": 1000, "d": 1000}
-	next := applyElo(r, [2][]string{{"a", "b"}, {"c", "d"}}, 0)
+	next := ApplyElo(r, [2][]string{{"a", "b"}, {"c", "d"}}, 0)
 	if next["a"]-1200 != 16 || next["b"]-800 != 16 || next["c"]-1000 != -16 {
 		t.Fatalf("got %v", next)
 	}

@@ -198,7 +198,7 @@ func TestRankedBothDroppedIsNoContest(t *testing.T) {
 	readMsg(ctx, t, b, msgPeerAway, headerLen+8)
 	b.CloseNow() // nobody left to wait: the match ends without a result
 	time.Sleep(100 * time.Millisecond)
-	if got, _ := store.load(ctx, "1v1", []string{userA, userB}); len(got) != 0 {
+	if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); len(got) != 0 {
 		t.Fatalf("ratings written %v, want none", got)
 	}
 	again := dialRanked(ctx, t, srv, "10.4.2.3", tokenFor(t, iss, userA)) // the account is free again
@@ -215,11 +215,11 @@ func TestRankedLeavingWhileRivalHeldIsAForfeit(t *testing.T) {
 	_ = b.Close(websocket.StatusNormalClosure, "") // B quits on purpose to dodge the loss
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if got, _ := store.load(ctx, "1v1", []string{userA, userB}); got[userB] != 0 && got[userB] < got[userA] {
+		if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); got[userB] != 0 && got[userB] < got[userA] {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	got, _ := store.load(ctx, "1v1", []string{userA, userB})
+	got, _ := store.Load(ctx, "1v1", []string{userA, userB})
 	t.Fatalf("ratings %v: want B's forfeit recorded", got)
 }

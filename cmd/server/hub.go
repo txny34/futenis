@@ -12,6 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
+	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -50,7 +51,7 @@ type hub struct {
 	auth     *auth.Verifier    // Supabase token check; nil = ranked disabled
 	active   map[string]uint64 // accounts with a live ranked connection (one each) -> claim generation
 	claimSeq uint64
-	ratings  ratingStore // ranked ELO store; nil = ranked disabled
+	ratings  ranked.Store // ranked ELO store; nil = ranked disabled
 
 	seats map[string]seatRef // rejoin token -> held seat (room_rejoin.go)
 	grace time.Duration      // how long a dropped seat is held (injectable)
@@ -168,9 +169,9 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	var slot, humans int
 	var start, kept bool
 	var cl claim // ranked reservation (zero outside ranked)
-	rankedMode, ranked := rankedModes[queued]
+	rankedMode, isRanked := rankedModes[queued]
 	network := "" // ranked: the client's limit key, seated next to its account
-	if ranked {
+	if isRanked {
 		acc, ok := h.authenticate(ctx, c)
 		uid := acc.ID
 		if !ok {
@@ -190,12 +191,12 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		key = "user:" + uid // one queued connection per account
 	}
 	if queued != "" {
-		elo := eloDefault
-		if ranked {
+		elo := ranked.EloDefault
+		if isRanked {
 			elo = h.ratingFor(ctx, rankedMode, cl.uid)
 		}
 		code, r, slot, start, humans = h.joinQueue(queued, p, key, elo)
-		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, cl, network) {
+		if isRanked && r != nil && slot >= 0 && !r.markRanked(slot, cl, network) {
 			r.leave(slot, p, false)
 			if r.isClosed() {
 				h.forget(code, r)
