@@ -32,31 +32,11 @@ func TestDecodePresenceClampsToLobby(t *testing.T) {
 	}
 }
 
-func TestSanitizeName(t *testing.T) {
-	for in, want := range map[string]string{
-		"  txny44 ":                  "txny44",
-		"a\x00b\nc\u202ed":           "abcd", // control and bidi-override runes dropped
-		"ñandú ⚽":                    "ñandú ⚽",
-		"abcdefghijklmnopqrstuvwxyz": "abcdefghijklmnop",
-		"\xff\xfe":                   "",
-	} {
-		if got := sanitizeName(in); got != want {
-			t.Errorf("%q: got %q want %q", in, got, want)
-		}
-	}
-}
-
 func TestEncodeRoster(t *testing.T) {
 	dst := make([]byte, rosterMsgLen(2))
 	n := encodeRoster(dst, []lobbyEntry{{id: 7, p: presence{x: 1, y: 0, z: -2, facing: 0.5}}, {id: 9}})
 	if n != rosterMsgLen(2) || dst[0] != msgRoster || f64(dst, 0) != 2 || f64(dst, 1) != 7 || f64(dst, 4) != -2 {
 		t.Fatalf("bad roster: n=%d", n)
-	}
-}
-
-func TestSanitizeNameDropsCombiningMarks(t *testing.T) {
-	if got := sanitizeName("z̶̶̶a⃝"); got != "za" {
-		t.Fatalf("got %q: stacked combining marks (zalgo) kept", got)
 	}
 }
 

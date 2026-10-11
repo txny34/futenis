@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/txny34/futenis/cmd/server/internal/names"
 )
 
 func TestLobbyReportsHideANameAfterTwoNetworks(t *testing.T) {
@@ -38,13 +40,13 @@ func TestLobbyReportsHideANameAfterTwoNetworks(t *testing.T) {
 	l.mu.Lock()
 	got := l.peers[target].name
 	l.mu.Unlock()
-	if got != fallbackName {
-		t.Fatalf("name %q, want %q", got, fallbackName)
+	if got != names.Fallback {
+		t.Fatalf("name %q, want %q", got, names.Fallback)
 	}
 	l.setName(target, "OtroNombre", time.Now().Add(time.Minute))
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.peers[target].name != fallbackName {
+	if l.peers[target].name != names.Fallback {
 		t.Fatal("a hidden name can't be changed back")
 	}
 }

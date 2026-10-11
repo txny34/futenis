@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/names"
 )
 
 // ServeLobby upgrades /lobby: same origin check and per-client caps as /ws.
@@ -100,7 +101,7 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn
 				h.logger.Printf("lobby report: %q (player %d) by player %d, hidden=%v", name, int(f64(b, 0)), id, hidden)
 			}
 		case isNameMsg(b):
-			l.setName(id, cleanName(string(b[headerLen:])), time.Now())
+			l.setName(id, names.Clean(string(b[headerLen:])), time.Now())
 		default:
 			pos, err := decodePresence(b)
 			if err != nil {

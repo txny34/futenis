@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coder/websocket"
 	"net/http"
 	"net/http/httptest"
+
+	"github.com/coder/websocket"
 )
 
 // newQueueHub trusts Fly-Client-IP so each test client can have its own IP.

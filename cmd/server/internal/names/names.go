@@ -1,12 +1,13 @@
-package main
+package names
 
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Public names (shared lobby, global leaderboard) go through cleanName: a
-// name with a slur or an insult becomes fallbackName. Names are normalized
+// name with a slur or an insult becomes Fallback. Names are normalized
 // first (lowercase, fullwidth and accents folded, leetspeak, repeated letters
 // squeezed), so "P3ND3J0", "ｐｕｔａ" or "pendeeejo" are caught. Stems match
 // inside a word; across words only long stems (≥ gluedStemMin letters) and
@@ -14,7 +15,9 @@ import (
 // stay clean. Mixed Latin/Cyrillic/Greek and math-styled letters are refused
 // outright: they exist to dodge filters.
 const (
-	fallbackName  = "Jugador"
+	// MaxRunes caps a public name (lobby tag, leaderboard).
+	MaxRunes      = 16
+	Fallback      = "Jugador"
 	gluedStemMin  = 6
 	spelledOutMax = 2 // letters per word for a name read as spelled out
 )
@@ -40,12 +43,12 @@ var (
 	)
 )
 
-// cleanName returns the sanitized name ("" stays ""), or fallbackName when it is offensive.
+// Clean returns the sanitized name ("" stays ""), or fallbackName when it is offensive.
 // The full input is checked too: cutting to the length cap must not hide a word.
-func cleanName(raw string) string {
-	s := sanitizeName(raw)
+func Clean(raw string) string {
+	s := Sanitize(raw)
 	if s != "" && (evasive(raw) || offensive(raw) || offensive(s)) {
-		return fallbackName
+		return Fallback
 	}
 	return s
 }
@@ -147,4 +150,23 @@ func toSet(ws []string) map[string]bool {
 		m[w] = true
 	}
 	return m
+}
+
+// Sanitize keeps printable runes only (no control, format/bidi overrides
+// or combining marks, so no "zalgo" stacks), trims spaces and caps the length.
+// Invalid UTF-8 is dropped.
+func Sanitize(s string) string {
+	var b strings.Builder
+	n := 0
+	for _, r := range strings.TrimSpace(s) {
+		if r == utf8.RuneError || !unicode.IsPrint(r) || unicode.In(r, unicode.Cf, unicode.Mn, unicode.Me) {
+			continue
+		}
+		if n == MaxRunes {
+			break
+		}
+		b.WriteRune(r)
+		n++
+	}
+	return strings.TrimSpace(b.String())
 }

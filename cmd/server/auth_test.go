@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/txny34/futenis/cmd/server/internal/names"
 )
 
 // fakeIssuer plays Supabase Auth: an ES256 key published as a JWKS.
@@ -68,7 +70,7 @@ func TestVerifyAcceptsSupabaseToken(t *testing.T) {
 		t.Fatalf("account=%+v err=%v", acc, err)
 	}
 	c["user_metadata"] = map[string]any{"full_name": "Pendejo Total"}
-	if acc, _ := v.verify(f.token(t, c)); acc.name != fallbackName {
+	if acc, _ := v.verify(f.token(t, c)); acc.name != names.Fallback {
 		t.Fatalf("offensive name kept: %q", acc.name)
 	}
 }

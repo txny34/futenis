@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/txny34/futenis/cmd/server/internal/names"
 )
 
 // Supabase session tokens are ES256 JWTs; the public keys are published as a
@@ -97,7 +99,7 @@ func (v *verifier) verify(token string) (account, error) {
 			name = n
 		}
 	}
-	return account{id: c.Sub, name: cleanName(name)}, nil
+	return account{id: c.Sub, name: names.Clean(name)}, nil
 }
 
 func (v *verifier) claimsOK(c jwtClaims) bool {
