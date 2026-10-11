@@ -28,41 +28,64 @@
 
 /* Serve hint sits above the action bar */
 #hint {
-  position: absolute; bottom: calc(132px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(196px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
   font-size: calc(15px * var(--hud-scale)); padding: 6px 14px; border-radius: 10px; white-space: nowrap;
   background: var(--hud-card); border: 1px solid var(--hud-border); color: var(--hud-text);
 }
 
-/* Action bar: bottom-center, big solid round buttons (label above, key below), no panel */
+/* Action bar: raised off the bottom edge, big glossy "sticker" buttons with a
+   little athlete doing each move (label above, key below), no panel. */
 #actions {
-  position: absolute; bottom: calc(14px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(52px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
   display: flex; align-items: flex-start; gap: calc(22px * var(--hud-scale));
   font-family: var(--fx-body, system-ui); color: var(--hud-text);
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .5));
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .55));
 }
 .act {
   --act-fill: var(--hud-accent);
   display: flex; flex-direction: column; align-items: center; gap: calc(4px * var(--hud-scale));
   width: calc(92px * var(--hud-scale));
 }
-.act--strike { --act-fill: var(--hud-ring); }
+.act--strike { --act-fill: var(--hud-gold); }
 .act--lob { --act-fill: var(--train-machine); }
 .act__label {
-  order: -1; font-size: calc(13px * var(--hud-scale)); font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 3px #000;
+  order: -1; font: 800 calc(13px * var(--hud-scale)) / 1 var(--fx-display, system-ui); letter-spacing: .1em;
+  text-transform: uppercase; white-space: nowrap; color: var(--act-fill); text-shadow: 0 0 8px var(--act-fill), 0 1px 2px #000;
 }
-.act__svg { width: calc(84px * var(--hud-scale)); height: calc(84px * var(--hud-scale)); overflow: visible; transition: transform .08s; }
-.act__track { fill: var(--act-fill); stroke: rgba(0, 0, 0, .35); stroke-width: 2; }
-.act__ring { fill: none; stroke: var(--hud-text); stroke-width: 4; stroke-linecap: round; }
-.act__icon { fill: none; stroke: #000; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+.act__svg {
+  width: calc(84px * var(--hud-scale)); height: calc(84px * var(--hud-scale)); overflow: visible;
+  transition: transform .12s cubic-bezier(.3, 1.8, .5, 1);
+}
+.act__track { fill: var(--act-fill); stroke: rgba(4, 8, 24, .85); stroke-width: 2.5; transition: filter .2s; }
+.act__gloss { fill: rgba(255, 255, 255, .28); pointer-events: none; }
+.act__wave { fill: none; stroke: var(--act-fill); stroke-width: 2; opacity: 0; transform-origin: 32px 32px; }
+.act__ring { fill: none; stroke: var(--hud-text); stroke-width: 3.5; stroke-linecap: round; }
+.act__fig { transform-origin: 32px 40px; animation: act-bob 2.4s ease-in-out infinite; }
+.act--strike .act__fig { animation-delay: -.8s; }
+.act--lob .act__fig { animation-delay: -1.6s; }
+.act__outline { fill: none; stroke: rgba(4, 8, 24, .9); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.act__outline--dot { fill: rgba(4, 8, 24, .9); stroke-width: 3.5; }
+.act__body { fill: none; stroke: var(--hud-text); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.act__head { fill: var(--hud-text); }
+.act__ball { fill: var(--hud-ring); stroke: rgba(4, 8, 24, .9); stroke-width: 2; }
+.act__fx { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 3 4; }
+.act--dash .act__fx { stroke-dasharray: none; }
 .act__key {
   font: 700 calc(12px * var(--hud-scale)) / 1.6 var(--fx-body, system-ui); color: var(--hud-text);
-  padding: 0 6px; background: rgba(0, 0, 0, .65); border-radius: 4px; white-space: nowrap;
+  padding: 0 7px; background: rgba(4, 8, 24, .75); border: 1px solid rgba(255, 255, 255, .15); border-radius: 5px; white-space: nowrap;
 }
-.act.is-active .act__svg { transform: scale(1.08); }
-.act.is-active .act__track { stroke: var(--hud-text); stroke-width: 4; filter: drop-shadow(0 0 6px var(--act-fill)); }
-.act.is-active .act__icon { opacity: 1; }
-.act.is-warn .act__ring { stroke: var(--hud-warn); }
+.act.is-active .act__svg { transform: scale(1.14) rotate(-4deg); }
+.act.is-active .act__track { filter: brightness(1.25) drop-shadow(0 0 10px var(--act-fill)); }
+.act.is-active .act__wave { animation: act-wave .45s ease-out; }
+.act.is-active .act__fig { animation: act-hit .25s ease-out; }
+.act.is-cooling .act__track { filter: saturate(.35) brightness(.6); }
+.act.is-cooling .act__fig { opacity: .55; }
+.act--dash:not(.is-cooling) .act__wave { animation: act-wave .6s ease-out; }
+
+@keyframes act-bob { 50% { transform: translateY(-1.5px); } }
+@keyframes act-hit { 40% { transform: translateX(2px) rotate(8deg) scale(1.08); } }
+@keyframes act-wave { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .act__fig, .act__wave { animation: none !important; } }
 
 /* Crosshair while the pointer is locked: above center like the reference (keep in sync with AIM_NDC_Y in input.ts) */
 #crosshair {
@@ -75,7 +98,7 @@
 #crosshair[hidden] { display: none; }
 
 @media (max-width: 640px) {
-  #actions { gap: 8px; }
+  #actions { gap: 8px; bottom: 24px; }
   .act { width: 56px; }
   .act__svg { width: 52px; height: 52px; }
   .act__key { display: none; }

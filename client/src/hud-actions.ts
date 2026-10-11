@@ -1,3 +1,4 @@
+import { actionFigure, type IconId } from "./hud-action-icons";
 import { t } from "./i18n/t";
 import { keyHint } from "./ui/key-hints";
 import type { KeyAction } from "./ui/keybinds";
@@ -15,23 +16,17 @@ const RING_C = 2 * Math.PI * RING_R;
 const RING_STEPS = 60;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-type ActionId = "dash" | "strike" | "lob";
+type ActionId = IconId;
 
 /** `bind` = remappable keyboard action (label follows Ajustes), else the fixed `key` text. */
 interface ActionDef {
-  readonly id: ActionId; readonly label: string; readonly key: string; readonly bind?: KeyAction; readonly icon: string; readonly ring: boolean;
+  readonly id: ActionId; readonly label: string; readonly key: string; readonly bind?: KeyAction; readonly ring: boolean;
 }
 
-const ICONS: Readonly<Record<ActionId, string>> = {
-  strike: "M32 18 a14 14 0 1 0 0.01 0 Z M14 32 H20 M44 32 H50 M32 14 V8",
-  lob: "M16 44 Q32 6 48 44 M42 40 L48 44 L50 37",
-  dash: "M16 24 H30 M12 32 H28 M16 40 H30 M34 20 L48 32 L34 44",
-};
-
 const ACTIONS: readonly ActionDef[] = [
-  { id: "dash", label: "Dash", key: "Q", bind: "dash", icon: ICONS.dash, ring: true },
-  { id: "strike", label: t("Golpe", "Strike"), key: "Click", icon: ICONS.strike, ring: true },
-  { id: "lob", label: t("Globo", "Lob"), key: t("Click der", "Right click"), icon: ICONS.lob, ring: false },
+  { id: "dash", label: "Dash", key: "Q", bind: "dash", ring: true },
+  { id: "strike", label: t("Golpe", "Strike"), key: "Click", ring: true },
+  { id: "lob", label: t("Globo", "Lob"), key: t("Click der", "Right click"), ring: false },
 ];
 
 interface Slot {
@@ -41,7 +36,7 @@ interface Slot {
   readonly ring: SVGCircleElement | null;
   lastRing: number;
   lastActive: boolean;
-  lastWarn: boolean;
+  lastCooling: boolean;
 }
 
 function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Readonly<Record<string, string>>): SVGElementTagNameMap[K] {
@@ -54,7 +49,11 @@ function button(def: ActionDef): Slot {
   const root = document.createElement("div");
   root.className = `act act--${def.id}`;
   const icon = svg("svg", { viewBox: "0 0 64 64", class: "act__svg", "aria-hidden": "true" });
-  icon.append(svg("circle", { cx: "32", cy: "32", r: String(RING_R), class: "act__track" }));
+  icon.append(
+    svg("circle", { cx: "32", cy: "32", r: String(RING_R + 3), class: "act__wave" }),
+    svg("circle", { cx: "32", cy: "32", r: String(RING_R), class: "act__track" }),
+    svg("ellipse", { cx: "32", cy: "20", rx: "17", ry: "10", class: "act__gloss" }),
+  );
   let ring: SVGCircleElement | null = null;
   if (def.ring) {
     ring = svg("circle", {
@@ -63,7 +62,7 @@ function button(def: ActionDef): Slot {
     });
     icon.append(ring);
   }
-  icon.append(svg("path", { d: def.icon, class: "act__icon" }));
+  icon.append(actionFigure(def.id));
   const label = document.createElement("span");
   label.className = "act__label";
   label.textContent = def.label;
@@ -71,7 +70,7 @@ function button(def: ActionDef): Slot {
   key.className = "act__key";
   key.textContent = def.bind ? keyHint(def.bind) : def.key;
   root.append(icon, label, key);
-  return { root, key, bind: def.bind, ring, lastRing: -1, lastActive: false, lastWarn: false };
+  return { root, key, bind: def.bind, ring, lastRing: -1, lastActive: false, lastCooling: false };
 }
 
 export class ActionBar {
@@ -94,12 +93,13 @@ export class ActionBar {
     const e = PLAYER_EXTRA[humanSlot];
     const flags = snap[e + Extra.Flags] | 0;
     const charge = snap[e + Extra.Charge];
-    this.set(this.slots.dash, dashReady, snap[PLAYER_DASH[humanSlot]] === 1, false);
+    this.set(this.slots.dash, dashReady, snap[PLAYER_DASH[humanSlot]] === 1, dashReady < 1);
     this.set(this.slots.strike, charge, charge > 0, false);
     this.set(this.slots.lob, 0, (flags & FLAG_LOB) !== 0, false);
   }
 
-  private set(s: Slot, fill: number, active: boolean, warn: boolean): void {
+  /** cooling: on cooldown (dimmed); dropping it plays the "ready" pulse in CSS. */
+  private set(s: Slot, fill: number, active: boolean, cooling: boolean): void {
     if (s.ring) {
       const q = Math.round(Math.max(0, Math.min(1, fill)) * RING_STEPS);
       if (q !== s.lastRing) {
@@ -111,9 +111,9 @@ export class ActionBar {
       s.lastActive = active;
       s.root.classList.toggle("is-active", active);
     }
-    if (warn !== s.lastWarn) {
-      s.lastWarn = warn;
-      s.root.classList.toggle("is-warn", warn);
+    if (cooling !== s.lastCooling) {
+      s.lastCooling = cooling;
+      s.root.classList.toggle("is-cooling", cooling);
     }
   }
 }
