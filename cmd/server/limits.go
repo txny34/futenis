@@ -25,6 +25,7 @@ const (
 	closeIdle        = 4003
 	closeRate        = 4004
 	closeNoRival     = 4005
+	closeGone        = 4007 // rejoin: the held seat is gone (match over or hold expired)
 )
 
 // connLimiter caps total connections and connections per client IP.

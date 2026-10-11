@@ -35,14 +35,14 @@ func TestQueuePairsArrivalsTwoByTwo(t *testing.T) {
 	a := dialQueue(ctx, t, srv, "10.0.0.1")
 	readMsg(ctx, t, a, msgWaiting, headerLen)
 	b := dialQueue(ctx, t, srv, "10.0.0.2")
-	readMsg(ctx, t, a, msgWelcome, welcomeLen)
-	readMsg(ctx, t, b, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, a)
+	readWelcome(ctx, t, b)
 	// The third player starts a new match instead of hitting a full room.
 	c := dialQueue(ctx, t, srv, "10.0.0.3")
 	readMsg(ctx, t, c, msgWaiting, headerLen)
 	d := dialQueue(ctx, t, srv, "10.0.0.4")
-	readMsg(ctx, t, c, msgWelcome, welcomeLen)
-	readMsg(ctx, t, d, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, c)
+	readWelcome(ctx, t, d)
 }
 
 func TestQueueSkipsAbandonedWait(t *testing.T) {
@@ -57,8 +57,8 @@ func TestQueueSkipsAbandonedWait(t *testing.T) {
 	b := dialQueue(ctx, t, srv, "10.0.0.6")
 	readMsg(ctx, t, b, msgWaiting, headerLen)
 	c := dialQueue(ctx, t, srv, "10.0.0.7")
-	readMsg(ctx, t, b, msgWelcome, welcomeLen)
-	readMsg(ctx, t, c, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, b)
+	readWelcome(ctx, t, c)
 }
 
 func TestQueueRejectsUnknownMode(t *testing.T) {

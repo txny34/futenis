@@ -74,8 +74,8 @@ func TestRankedPairsTwoAccountsNotOneTwice(t *testing.T) {
 	again := dialRanked(ctx, t, srv, "10.3.1.2", tokenFor(t, iss, userA)) // same account, other IP
 	expectClose(ctx, t, again, closeFull)
 	b := dialRanked(ctx, t, srv, "10.3.1.3", tokenFor(t, iss, userB))
-	readMsg(ctx, t, a, msgWelcome, welcomeLen)
-	readMsg(ctx, t, b, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, a)
+	readWelcome(ctx, t, b)
 }
 
 func TestRankedDisabledWithoutConfig(t *testing.T) {
@@ -124,11 +124,11 @@ func TestRankedLeaverForfeits(t *testing.T) {
 	r := newRoom(sim.Mode1v1)
 	r.join(&fakePeer{})
 	r.join(&fakePeer{})
-	r.markRanked(0, userA, "net-a")
-	r.markRanked(1, userB, "net-b")
+	r.markRanked(0, claim{uid: userA}, "net-a")
+	r.markRanked(1, claim{uid: userB}, "net-b")
 	got := make(chan int, 2)
 	r.onOver = func(w int, _ [sim.MaxPlayers]string) { got <- w }
-	r.leave(0) // userA quits
+	r.leave(0, nil, false) // userA quits
 	select {
 	case w := <-got:
 		if w != 1 {
@@ -149,10 +149,10 @@ func TestRanked2v2LeaverEndsMatch(t *testing.T) {
 		r.join(&fakePeer{})
 	}
 	for i, u := range []string{userA, userB, userA + "c", userA + "d"} {
-		r.markRanked(i, u, u)
+		r.markRanked(i, claim{uid: u}, u)
 	}
 	r.onOver = func(int, [sim.MaxPlayers]string) {}
-	r.leave(2)
+	r.leave(2, nil, false)
 	if !r.isClosed() {
 		t.Fatal("ranked 2v2 kept going with a bot")
 	}
@@ -185,13 +185,13 @@ func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
 	r := newRoom(sim.Mode1v1)
 	r.join(&fakePeer{})
 	r.join(&fakePeer{})
-	if !r.markRanked(0, userA, "10.0.0.1") {
+	if !r.markRanked(0, claim{uid: userA}, "10.0.0.1") {
 		t.Fatal("first seat refused")
 	}
-	if r.markRanked(1, userA, "10.0.0.2") {
+	if r.markRanked(1, claim{uid: userA}, "10.0.0.2") {
 		t.Fatal("same account on both seats accepted")
 	}
-	if r.markRanked(1, userB, "10.0.0.1") {
+	if r.markRanked(1, claim{uid: userB}, "10.0.0.1") {
 		t.Fatal("two accounts from one network accepted")
 	}
 }

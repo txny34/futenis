@@ -21,7 +21,10 @@ const (
 	maxRooms     = 256
 )
 
-var roomCode = regexp.MustCompile(`^[A-Z0-9]{3,12}$`)
+var (
+	roomCode    = regexp.MustCompile(`^[A-Z0-9]{3,12}$`)
+	rejoinToken = regexp.MustCompile(`^[0-9a-f]{32}$`)
+)
 
 // hub maps room codes to rooms.
 type hub struct {
@@ -40,9 +43,13 @@ type hub struct {
 	queueSeq int           // matchmaking room counter (queue.go)
 	queues   map[string]*queue
 
-	auth    *verifier       // Supabase token check; nil = ranked disabled
-	active  map[string]bool // accounts with a live ranked connection (one each)
-	ratings ratingStore     // ranked ELO store; nil = ranked disabled
+	auth     *verifier         // Supabase token check; nil = ranked disabled
+	active   map[string]uint64 // accounts with a live ranked connection (one each) -> claim generation
+	claimSeq uint64
+	ratings  ratingStore // ranked ELO store; nil = ranked disabled
+
+	seats map[string]seatRef // rejoin token -> held seat (room_rejoin.go)
+	grace time.Duration      // how long a dropped seat is held (injectable)
 
 	lobbies     []*lobby                          // shared online lobbies (lobby.go), opened on demand
 	lobbyConns  *connLimiter                      // per-client cap for /lobby (stricter than matches)
@@ -54,7 +61,7 @@ type hub struct {
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, active: map[string]bool{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
+		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -73,6 +80,7 @@ func (h *hub) roomFor(code string, mode sim.Mode) *room {
 			return nil
 		}
 		r = newRoom(mode)
+		r.code = code
 		h.rooms[code] = r
 	}
 	return r
@@ -82,6 +90,11 @@ func (h *hub) forget(code string, r *room) {
 	h.mu.Lock()
 	if h.rooms[code] == r {
 		delete(h.rooms, code)
+	}
+	for _, t := range r.tokenList() {
+		if h.seats[t].r == r {
+			delete(h.seats, t)
+		}
 	}
 	h.mu.Unlock()
 }
@@ -99,12 +112,16 @@ func (p wsPeer) close(code int, reason string) { _ = p.c.Close(websocket.StatusC
 
 func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
-	code, queued := q.Get("room"), q.Get("queue")
+	code, queued, rejoin := q.Get("room"), q.Get("queue"), q.Get("rejoin")
+	if q.Has("rejoin") && !rejoinToken.MatchString(rejoin) {
+		http.Error(w, "bad rejoin token", http.StatusBadRequest)
+		return
+	}
 	if _, ok := queueModes[queued]; q.Has("queue") && !ok {
 		http.Error(w, "bad queue", http.StatusBadRequest)
 		return
 	}
-	if queued == "" && !roomCode.MatchString(code) {
+	if queued == "" && rejoin == "" && !roomCode.MatchString(code) {
 		http.Error(w, "bad room code", http.StatusBadRequest)
 		return
 	}
@@ -119,6 +136,10 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return // Accept already wrote the HTTP error
 	}
 	c.SetReadLimit(readLimit)
+	if rejoin != "" {
+		h.serveRejoin(req.Context(), rejoin, c)
+		return
+	}
 	h.serve(req.Context(), code, queued, ip, c)
 }
 
@@ -141,7 +162,8 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	p := wsPeer{c}
 	var r *room
 	var slot, humans int
-	var start bool
+	var start, kept bool
+	var cl claim // ranked reservation (zero outside ranked)
 	rankedMode, ranked := rankedModes[queued]
 	network := "" // ranked: the client's limit key, seated next to its account
 	if ranked {
@@ -150,18 +172,22 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 			p.close(closeNoAuth, "sign in required")
 			return
 		}
-		if !h.claimRanked(uid) {
+		if cl, ok = h.claimRanked(uid); !ok {
 			p.close(closeFull, "already in a ranked match")
 			return
 		}
-		defer h.releaseRanked(uid)
+		defer func() {
+			if !kept { // a held or replaced seat keeps the account claimed; hub.expireSeat frees it
+				h.releaseRanked(cl)
+			}
+		}()
 		network = key
 		key = "user:" + uid // one queued connection per account
 	}
 	if queued != "" {
 		code, r, slot, start, humans = h.joinQueue(queued, p, key)
-		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, key[len("user:"):], network) {
-			r.leave(slot)
+		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, cl, network) {
+			r.leave(slot, p, false)
 			if r.isClosed() {
 				h.forget(code, r)
 			}
@@ -180,13 +206,6 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		p.close(closeFull, "room full")
 		return
 	}
-	defer func() {
-		r.leave(slot)
-		if r.isClosed() { // a 2v2 goes on (or keeps waiting) while people remain
-			h.forget(code, r)
-		}
-		c.CloseNow()
-	}()
 	if start {
 		h.announce(r, rankedMode)
 	} else {
@@ -197,7 +216,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		stop := h.expireAlone(r, p)
 		defer stop()
 	}
-	h.readLoop(ctx, code, slot, r, c)
+	kept = h.play(ctx, code, slot, r, c)
 }
 
 // expireAlone closes p's room if nobody else shows up within h.wait. While a
@@ -225,7 +244,9 @@ func (h *hub) expireAlone(r *room, p peer) (stop func()) {
 
 // readLoop applies INPUT/answers PING until the peer disconnects, idles out,
 // floods or sends garbage.
-func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *websocket.Conn) {
+// It reports lost when the connection dropped (not a normal close, nor one the
+// server made): the seat may then be held for a rejoin.
+func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *websocket.Conn) (lost bool) {
 	p := wsPeer{c}
 	// Idle only counts once the match runs: a waiting host often hides the tab
 	// to share the link (no rAF, no PING); the no-rival timeout covers that.
@@ -233,19 +254,21 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 	lastSeen.Store(time.Now().UnixNano())
 	done := make(chan struct{})
 	defer close(done)
-	go h.watchIdle(r, p, &lastSeen, done)
+	var kicked atomic.Bool
+	go h.watchIdle(r, p, &lastSeen, &kicked, done)
 	var rate rateWindow
 	pong := make([]byte, pingMsgLen)
 	for {
 		typ, b, err := c.Read(ctx)
 		if err != nil {
-			return
+			st := websocket.CloseStatus(err) // 1000 leave, 1001 tab closed: both on purpose
+			return !kicked.Load() && st != websocket.StatusNormalClosure && st != websocket.StatusGoingAway
 		}
 		lastSeen.Store(time.Now().UnixNano())
 		if !rate.allow(time.Now()) {
 			h.logger.Printf("room %s slot %d: rate limit", code, slot)
 			p.close(closeRate, "rate limit")
-			return
+			return false
 		}
 		if typ == websocket.MessageBinary && isPing(b) {
 			_ = p.send(encodePong(pong, b))
@@ -255,9 +278,9 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 		if typ != websocket.MessageBinary || err != nil {
 			h.logger.Printf("room %s slot %d: bad message (type %v, err %v)", code, slot, typ, err)
 			_ = c.Close(websocket.StatusUnsupportedData, "bad message")
-			return
+			return false
 		}
-		r.setInput(slot, in)
+		r.setInput(slot, p, in)
 	}
 }
 
@@ -285,17 +308,29 @@ func (h *hub) announce(r *room, rankedMode string) {
 	peers := r.peers
 	if rankedMode != "" && r.ranked {
 		r.onOver = func(w int, users [sim.MaxPlayers]string) { h.reportRanked(rankedMode, r, users, w) }
+		r.release = h.releaseRanked
 	}
 	r.mu.Unlock()
+	tokens := r.issueTokens()
+	h.mu.Lock()
+	for i, p := range peers {
+		if p != nil {
+			h.seats[tokens[i]] = seatRef{r: r, slot: i}
+		}
+	}
+	h.mu.Unlock()
 	for i, p := range peers {
 		sendTo(p, encodeWelcome(i)) // nil if that seat is empty
+		if p != nil {
+			sendTo(p, encodeSeat(tokens[i]))
+		}
 	}
 	tick, stop := h.ticker()
 	go func() { defer stop(); r.run(tick) }()
 }
 
 // watchIdle closes p once the match runs and nothing arrived for h.idle.
-func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, done <-chan struct{}) {
+func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, kicked *atomic.Bool, done <-chan struct{}) {
 	t := time.NewTimer(h.idle)
 	defer t.Stop()
 	for {
@@ -305,6 +340,9 @@ func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, done <-chan str
 		case <-t.C:
 		}
 		startAt, started := r.startedAt()
+		if r.isPaused() {
+			lastSeen.Store(time.Now().UnixNano()) // waiting for a dropped rival never counts as idle
+		}
 		if !started {
 			t.Reset(h.idle / 4) // waiting for a rival never counts as idle
 			continue
@@ -316,6 +354,7 @@ func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, done <-chan str
 		}
 		left := h.idle - time.Since(last)
 		if left <= 0 {
+			kicked.Store(true)
 			p.close(closeIdle, "idle")
 			return
 		}

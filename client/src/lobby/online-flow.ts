@@ -29,11 +29,13 @@ function statusText(s: NetStatus): string {
     case "desconectado por inactividad": return t("Desconectado por inactividad", "Disconnected due to inactivity");
     case "demasiados mensajes": return t("Desconectado: demasiados mensajes", "Disconnected: too many messages");
     case "iniciá sesión": return t("Las clasificatorias necesitan una cuenta: iniciá sesión", "Ranked needs an account: sign in");
+    case "reconectando": return t("Se cortó la conexión. Reconectando…", "Connection lost. Reconnecting…");
+    case "rival reconectando": return t("Rival reconectando…", "Opponent reconnecting…");
     default: return t("Desconectado del servidor", "Disconnected from the server");
   }
 }
 
-const LIVE: ReadonlySet<NetStatus> = new Set<NetStatus>(["conectando", "esperando rival", "jugando"]);
+const LIVE: ReadonlySet<NetStatus> = new Set<NetStatus>(["conectando", "esperando rival", "jugando", "reconectando", "rival reconectando"]);
 const BACK_MS = 2500; // time to read why the session ended before the lobby
 const NOTE_MS = 5000;
 const JOIN_POLL_MS = 200;
@@ -58,7 +60,8 @@ function onStatus(app: App, remote: RemoteEngine, s: NetStatus, ping: number): v
   if (waiting) searchPanel(app).show(statusText(s), shareLink);
   else panel?.hide();
   const unlocked = s === "jugando" && !app.controls.isLocked; // pointer free since the search panel
-  const text = unlocked ? CLICK_TO_PLAY : s === "jugando" ? `${ping} ms` : waiting ? "" : statusText(s);
+  const away = s === "rival reconectando" ? ` ${remote.awaySeconds()} s` : ""; // refreshed by every PONG
+  const text = unlocked ? CLICK_TO_PLAY : s === "jugando" ? `${ping} ms` : waiting ? "" : statusText(s) + away;
   app.hud.error(text);
   if (LIVE.has(s)) return;
   window.setTimeout(() => {

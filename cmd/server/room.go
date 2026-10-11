@@ -38,6 +38,7 @@ type peer interface {
 type room struct {
 	mu      sync.Mutex
 	mode    sim.Mode
+	code    string // hub key (set by hub.roomFor)
 	seats   int
 	order   []int
 	peers   [sim.MaxPlayers]peer
@@ -52,6 +53,13 @@ type room struct {
 	nets     [sim.MaxPlayers]string                         // client limit key per seat (ranked only)
 	onOver   func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
 	reported bool                                           // ranked result already sent (game over or forfeit)
+
+	tokens  [sim.MaxPlayers]string      // rejoin secret per seat (room_rejoin.go)
+	away    [sim.MaxPlayers]*time.Timer // seat held for a dropped connection; fires the leave
+	holds   int                         // holds used in this room (capped: nobody stalls a match forever)
+	over    bool                        // game over reached: no more holds
+	claims  [sim.MaxPlayers]claim       // ranked reservation per seat
+	release func(c claim)               // frees a held seat's ranked account when the room closes (set by announce)
 }
 
 // claimReport returns true exactly once: the caller reports the ranked result.
@@ -77,7 +85,8 @@ func (r *room) teamOf(slot int) int {
 // room becomes ranked. It refuses an account or a network already seated:
 // nobody plays against themselves, and two accounts from one network can't
 // trade wins.
-func (r *room) markRanked(slot int, user, network string) bool {
+func (r *room) markRanked(slot int, c claim, network string) bool {
+	user := c.uid
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i := range r.users {
@@ -85,7 +94,7 @@ func (r *room) markRanked(slot int, user, network string) bool {
 			return false
 		}
 	}
-	r.ranked, r.users[slot], r.nets[slot] = true, user, network
+	r.ranked, r.users[slot], r.nets[slot], r.claims[slot] = true, user, network, c
 	return true
 }
 
@@ -193,10 +202,13 @@ func (r *room) isClosed() bool {
 	return r.closed
 }
 
-// setInput stores slot's latest input, turned from the client's view into server space.
-func (r *room) setInput(slot int, in sim.PlayerInput) {
+// setInput stores slot's latest input from p (ignored once p was replaced),
+// turned from the client's view into server space.
+func (r *room) setInput(slot int, p peer, in sim.PlayerInput) {
 	in = game.ViewInput(in, slot, r.mode == sim.Mode2v2)
 	r.mu.Lock()
-	r.inputs[slot] = in
+	if r.peers[slot] == p {
+		r.inputs[slot] = in
+	}
 	r.mu.Unlock()
 }

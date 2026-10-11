@@ -44,7 +44,7 @@ func TestQueue2v2FourPlayersGetSeats0To3(t *testing.T) {
 		cs = append(cs, c)
 	}
 	for i, c := range cs {
-		if w := readMsg(ctx, t, c, msgWelcome, welcomeLen); int(w[2]) != seats2v2[i] {
+		if w := readWelcome(ctx, t, c); int(w[2]) != seats2v2[i] {
 			t.Fatalf("player %d got seat %d, want %d (first two are rivals)", i, w[2], seats2v2[i])
 		}
 	}
@@ -63,8 +63,8 @@ func TestQueue2v2BotsFillAfterWait(t *testing.T) {
 	readMsg(ctx, t, a, msgWaiting, headerLen)
 	b := dial2v2(ctx, t, srv, "10.2.1.2")
 	readMsg(ctx, t, b, msgWaiting, headerLen)
-	readMsg(ctx, t, a, msgWelcome, welcomeLen) // two people + two bots
-	readMsg(ctx, t, b, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, a) // two people + two bots
+	readWelcome(ctx, t, b)
 }
 
 func TestQueue2v2LoneWaiterNeverStartsWithBotsOnly(t *testing.T) {
@@ -89,8 +89,8 @@ func TestQueue2v2LeaverIsReplacedByBot(t *testing.T) {
 	readMsg(ctx, t, a, msgWaiting, headerLen)
 	b := dial2v2(ctx, t, srv, "10.2.3.2")
 	readMsg(ctx, t, b, msgWaiting, headerLen)
-	readMsg(ctx, t, a, msgWelcome, welcomeLen)
-	readMsg(ctx, t, b, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, a)
+	readWelcome(ctx, t, b)
 	b.Close(websocket.StatusNormalClosure, "")
 	time.Sleep(50 * time.Millisecond) // let the server see the leave
 	tick <- time.Time{}

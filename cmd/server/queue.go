@@ -103,7 +103,7 @@ func (h *hub) joinQueue(mode string, p peer, key string) (code string, r *room, 
 		case slot >= 0 && h.claimWait(mode, code, key):
 			return code, r, slot, false, humans
 		case slot >= 0:
-			r.leave(slot)
+			r.leave(slot, p, false)
 			if r.isClosed() {
 				h.forget(code, r)
 			}
