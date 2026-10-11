@@ -89,39 +89,55 @@
 
 /* Crosshair while the pointer is locked: above center like the reference (keep in sync with AIM_NDC_Y in input.ts) */
 #crosshair {
-  position: absolute; top: 37.5%; left: 50%; width: 14px; height: 14px; transform: translate(-50%, -50%);
+  position: absolute; top: 37.5%; left: 50%; width: calc(22px * var(--hud-scale)); height: calc(22px * var(--hud-scale)); transform: translate(-50%, -50%);
   background:
-    linear-gradient(var(--hud-text), var(--hud-text)) center / 2px 100% no-repeat,
-    linear-gradient(var(--hud-text), var(--hud-text)) center / 100% 2px no-repeat;
+    linear-gradient(var(--hud-text), var(--hud-text)) center / 3px 100% no-repeat,
+    linear-gradient(var(--hud-text), var(--hud-text)) center / 100% 3px no-repeat;
   opacity: .8; filter: drop-shadow(0 0 2px #000);
 }
 #crosshair[hidden] { display: none; }
 #crosshair { transition: transform .12s ease-out; }
-#crosshair.is-charging { transform: translate(-50%, -50%) scale(.82); }
-#crosshair.is-release { animation: cross-pop .3s ease-out; }
+#crosshair.is-charging { transform: translate(-50%, -50%) scale(.8); }
+#crosshair.is-full { animation: cross-shake .09s linear infinite; }
+#crosshair.is-release { animation: cross-pop .35s cubic-bezier(.3, 1.8, .5, 1); }
 
-/* Strike charge on the crosshair (hud-charge.ts): fill, full-charge pulse, release burst */
+/* Strike charge on the crosshair (hud-charge.ts): fill + spinning ticks, full-charge pulse, release burst */
 .charge {
-  position: absolute; left: 50%; top: 50%; width: calc(64px * var(--hud-scale)); height: calc(64px * var(--hud-scale));
+  position: absolute; left: 50%; top: 50%; width: calc(104px * var(--hud-scale)); height: calc(104px * var(--hud-scale));
   transform: translate(-50%, -50%); overflow: visible; pointer-events: none;
 }
-.charge circle { fill: none; }
-.charge__track { stroke: rgba(255, 255, 255, .18); stroke-width: 3; opacity: 0; transition: opacity .15s; }
-.charge__arc { stroke: var(--hud-gold); stroke-width: 4; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--hud-gold)); }
-.charge__burst { stroke: var(--hud-ring); stroke-width: 3; opacity: 0; transform-origin: 0 0; }
+.charge circle, .charge path { fill: none; }
+.charge__track { stroke: rgba(255, 255, 255, .2); stroke-width: 4; opacity: 0; transition: opacity .15s; }
+.charge__arc { stroke: var(--hud-gold); stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--hud-gold)); }
+.charge__ticks { stroke: var(--hud-text); stroke-width: 3; stroke-linecap: round; }
+.charge__spin { opacity: 0; transform-origin: 0 0; transition: opacity .15s; }
+.charge__burst { stroke: var(--hud-ring); stroke-width: 4; opacity: 0; transform-origin: 0 0; }
 #crosshair.is-charging .charge__track { opacity: 1; }
-#crosshair.is-full .charge__arc { stroke: var(--hud-ring); animation: charge-full .5s ease-in-out infinite alternate; }
-#crosshair.is-release .charge__burst { animation: charge-burst .38s ease-out; }
+#crosshair.is-charging .charge__spin { opacity: .9; animation: charge-spin 1.2s linear infinite; }
+#crosshair.is-full .charge__spin { animation-duration: .35s; }
+#crosshair.is-full .charge__ticks { stroke: var(--hud-ring); }
+#crosshair.is-full .charge__arc { stroke: var(--hud-ring); animation: charge-full .32s ease-in-out infinite alternate; }
+#crosshair.is-release .charge__burst { animation: charge-burst .45s ease-out; }
+#crosshair.is-release .charge__burst--late { animation: charge-burst .52s .08s ease-out backwards; stroke: var(--hud-gold); }
 
 /* Golpe button at full charge: breathing glow */
-.act--strike.is-full .act__track { animation: act-full .5s ease-in-out infinite alternate; }
+.act--strike.is-full .act__track { animation: act-full .32s ease-in-out infinite alternate; }
 .act--strike.is-full .act__ring { stroke: var(--hud-ring); }
 
-@keyframes cross-pop { 40% { transform: translate(-50%, -50%) scale(1.35); } }
-@keyframes charge-full { from { stroke-width: 4; filter: drop-shadow(0 0 3px var(--hud-ring)); } to { stroke-width: 6; filter: drop-shadow(0 0 10px var(--hud-ring)); } }
-@keyframes charge-burst { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes cross-pop { 40% { transform: translate(-50%, -50%) scale(1.6); } }
+@keyframes cross-shake {
+  25% { transform: translate(calc(-50% + 1px), calc(-50% - 1px)) scale(.8); }
+  75% { transform: translate(calc(-50% - 1px), calc(-50% + 1px)) scale(.8); }
+  0%, 50%, 100% { transform: translate(-50%, -50%) scale(.8); }
+}
+@keyframes charge-spin { to { transform: rotate(360deg); } }
+@keyframes charge-full {
+  from { stroke-width: 6; filter: drop-shadow(0 0 5px var(--hud-ring)); }
+  to { stroke-width: 9; filter: drop-shadow(0 0 16px var(--hud-ring)); }
+}
+@keyframes charge-burst { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
 @keyframes act-full { from { filter: brightness(1.1) drop-shadow(0 0 6px var(--act-fill)); } to { filter: brightness(1.4) drop-shadow(0 0 16px var(--hud-ring)); } }
-@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .act--strike .act__track { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track { animation: none !important; } }
 
 @media (max-width: 640px) {
   #actions { gap: 8px; bottom: 24px; }

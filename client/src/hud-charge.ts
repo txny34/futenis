@@ -7,7 +7,8 @@ const ARC_R = 20;
 const ARC_C = 2 * Math.PI * ARC_R;
 const STEPS = 48;
 const FULL = 0.999;
-const BURST_MS = 380;
+const BURST_MS = 520;
+const TICKS = "M0 -27 V-31 M27 0 H31 M0 27 V31 M-27 0 H-31"; // spin around the arc while charging
 
 function node<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Readonly<Record<string, string>>): SVGElementTagNameMap[K] {
   const e = document.createElementNS(SVG_NS, tag);
@@ -28,7 +29,9 @@ export class ChargeReticle {
     this.arc.setAttribute("stroke-dasharray", ARC_C.toFixed(2));
     this.arc.setAttribute("stroke-dashoffset", ARC_C.toFixed(2));
     this.arc.setAttribute("transform", "rotate(-90)");
-    svg.append(ring("charge__track"), ring("charge__burst"), this.arc);
+    const ticks = node("g", { class: "charge__spin" });
+    ticks.append(node("path", { d: TICKS, class: "charge__ticks" }));
+    svg.append(ring("charge__track"), ring("charge__burst"), ring("charge__burst charge__burst--late"), ticks, this.arc);
     root.append(svg);
   }
 
