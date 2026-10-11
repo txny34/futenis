@@ -2,6 +2,7 @@ import { applyThemeCss } from "./env/theme";
 import type { HypeMoment } from "./feel/hype";
 import type { ShotKindId } from "./feel/shots";
 import { ActionBar } from "./hud-actions";
+import { ChargeReticle } from "./hud-charge";
 import { Callouts } from "./hud-callouts";
 import { CallTracker } from "./hud-calls";
 import { Popups, POPUP_GOOD, POPUP_MISS, POPUP_PERFECT } from "./hud-popups";
@@ -9,7 +10,7 @@ import { Scoreboard } from "./hud-score";
 import { TrainingHud } from "./hud-training";
 import { t } from "./i18n/t";
 import { keyHint, moveHint } from "./ui/key-hints";
-import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
+import { EventKind, Extra, Mode, PLAYER_EXTRA, Phase, Quality, SimEvent, Snap } from "./snapshot";
 
 const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const; // team colors come from the theme, so no color names
 const lobbyHelp = (): string =>
@@ -47,6 +48,7 @@ export class Hud {
   private readonly popups = new Popups();
   private readonly training = new TrainingHud(LAUNCH_KEY);
   private readonly actions: ActionBar;
+  private readonly charge: ChargeReticle;
   private callUntil = 0;
   private lastPhase = UNSET;
   private lastServer = UNSET;
@@ -65,6 +67,7 @@ export class Hud {
     applyThemeCss(root);
     this.crosshair.hidden = true;
     this.actions = new ActionBar();
+    this.charge = new ChargeReticle(this.crosshair);
     root.append(
       this.board.score, this.board.shots, this.msg, this.banner.root, this.call, this.hint,
       this.popups.root, this.replayTag, this.training.root, this.training.pop, this.crosshair, this.actions.root, this.fps, this.help, this.err,
@@ -131,6 +134,7 @@ export class Hud {
   update(snap: Float64Array, nowMs: number): void {
     const ready = this.dashCooldownMs <= 0 ? 1 : Math.min(1, (nowMs - this.dashAt) / this.dashCooldownMs);
     this.actions.update(snap, HUMAN_SLOT, ready);
+    this.charge.update(snap[PLAYER_EXTRA[HUMAN_SLOT] + Extra.Charge], nowMs);
     this.board.update(snap);
     this.banner.update(nowMs);
     this.popups.update(nowMs);

@@ -1,7 +1,8 @@
 /* Lobby (docs/design/lobby.md §7): bottom bar. Colors come from the
    theme tokens (env/theme.ts -> --hud-* custom properties on #hud) and the
    menu's --fx-* palette; nothing new is hardcoded here. */
-#hud.is-lobby #score, #hud.is-lobby #shots, #hud.is-lobby #train, #hud.is-lobby #msg, #hud.is-lobby #hint { display: none; }
+#hud.is-lobby #score, #hud.is-lobby #shots, #hud.is-lobby #train, #hud.is-lobby #msg, #hud.is-lobby #hint,
+#hud.is-lobby #actions { display: none; }
 
 .fx-lobby {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;

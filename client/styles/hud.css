@@ -96,6 +96,32 @@
   opacity: .8; filter: drop-shadow(0 0 2px #000);
 }
 #crosshair[hidden] { display: none; }
+#crosshair { transition: transform .12s ease-out; }
+#crosshair.is-charging { transform: translate(-50%, -50%) scale(.82); }
+#crosshair.is-release { animation: cross-pop .3s ease-out; }
+
+/* Strike charge on the crosshair (hud-charge.ts): fill, full-charge pulse, release burst */
+.charge {
+  position: absolute; left: 50%; top: 50%; width: calc(64px * var(--hud-scale)); height: calc(64px * var(--hud-scale));
+  transform: translate(-50%, -50%); overflow: visible; pointer-events: none;
+}
+.charge circle { fill: none; }
+.charge__track { stroke: rgba(255, 255, 255, .18); stroke-width: 3; opacity: 0; transition: opacity .15s; }
+.charge__arc { stroke: var(--hud-gold); stroke-width: 4; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--hud-gold)); }
+.charge__burst { stroke: var(--hud-ring); stroke-width: 3; opacity: 0; transform-origin: 0 0; }
+#crosshair.is-charging .charge__track { opacity: 1; }
+#crosshair.is-full .charge__arc { stroke: var(--hud-ring); animation: charge-full .5s ease-in-out infinite alternate; }
+#crosshair.is-release .charge__burst { animation: charge-burst .38s ease-out; }
+
+/* Golpe button at full charge: breathing glow */
+.act--strike.is-full .act__track { animation: act-full .5s ease-in-out infinite alternate; }
+.act--strike.is-full .act__ring { stroke: var(--hud-ring); }
+
+@keyframes cross-pop { 40% { transform: translate(-50%, -50%) scale(1.35); } }
+@keyframes charge-full { from { stroke-width: 4; filter: drop-shadow(0 0 3px var(--hud-ring)); } to { stroke-width: 6; filter: drop-shadow(0 0 10px var(--hud-ring)); } }
+@keyframes charge-burst { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes act-full { from { filter: brightness(1.1) drop-shadow(0 0 6px var(--act-fill)); } to { filter: brightness(1.4) drop-shadow(0 0 16px var(--hud-ring)); } }
+@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .act--strike .act__track { animation: none !important; } }
 
 @media (max-width: 640px) {
   #actions { gap: 8px; bottom: 24px; }

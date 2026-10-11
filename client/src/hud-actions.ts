@@ -14,6 +14,7 @@ import { Extra, FLAG_LOB, PLAYER_DASH, PLAYER_EXTRA } from "./snapshot";
 const RING_R = 25;
 const RING_C = 2 * Math.PI * RING_R;
 const RING_STEPS = 60;
+const FULL_CHARGE = 0.999;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 type ActionId = IconId;
@@ -76,6 +77,7 @@ function button(def: ActionDef): Slot {
 export class ActionBar {
   readonly root = document.createElement("div");
   private readonly slots: Readonly<Record<ActionId, Slot>>;
+  private lastFull = false;
 
   constructor() {
     this.root.id = "actions";
@@ -95,6 +97,11 @@ export class ActionBar {
     const charge = snap[e + Extra.Charge];
     this.set(this.slots.dash, dashReady, snap[PLAYER_DASH[humanSlot]] === 1, dashReady < 1);
     this.set(this.slots.strike, charge, charge > 0, false);
+    const full = charge >= FULL_CHARGE;
+    if (full !== this.lastFull) {
+      this.lastFull = full;
+      this.slots.strike.root.classList.toggle("is-full", full);
+    }
     this.set(this.slots.lob, 0, (flags & FLAG_LOB) !== 0, false);
   }
 
