@@ -2,10 +2,9 @@ import { HumanInput, OUT_LEN, StepEngine, StepResult, emptyEvent, readEventsInto
 import { MAX_EVENTS, SNAP_LEN, SimEvent } from "../snapshot";
 import { LagQueue, OwnBytes } from "./lag-queue";
 import {
-  CLOSE_GONE, CLOSE_STATUS, NORMAL_CLOSE, REJOINABLE, REJOIN_EVERY_MS, REJOIN_WINDOW_MS, authMessage, rejoinToken, rejoinUrl, type NetStatus,
+  CLOSE_GONE, CLOSE_REQUEUE, CLOSE_STATUS, NORMAL_CLOSE, REJOINABLE, REJOIN_EVERY_MS, REJOIN_WINDOW_MS, authMessage, rejoinToken, rejoinUrl, type NetStatus,
 } from "./net-status";
 import { HEADER, INPUT_MSG_LEN, Msg, PING_MSG_LEN, PROTO_VERSION, f64At, setF64At, writeHeader } from "./protocol";
-
 export type { NetStatus } from "./net-status";
 
 const FRAME_BYTES = HEADER + OUT_LEN * 8;
@@ -77,6 +76,7 @@ export class RemoteEngine implements StepEngine {
   }
 
   private closed(code: number): void {
+    if (code === CLOSE_REQUEUE && this.status === "esperando rival") { this.open(this.url); return; } // same search, closer room
     const dropped = CLOSE_STATUS[code] === undefined && code !== CLOSE_GONE && code !== NORMAL_CLOSE;
     if (dropped && this.token !== "" && REJOINABLE.has(this.status)) { this.retry(); return; }
     if (this.status !== "esperando rival" && this.status !== "conectando" && !REJOINABLE.has(this.status)) return;
