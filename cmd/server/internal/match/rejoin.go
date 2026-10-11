@@ -16,11 +16,10 @@ import (
 // with the seat's secret token (SEAT message, sent after WELCOME), also when
 // the server has not noticed the drop yet (the new connection replaces the old).
 const (
-	RejoinGrace  = 20 * time.Second
-	MaxHolds     = 4 // per room: pauses can't be chained to stall a match
-	tokenBytes   = 16
-	TokenLen     = 2 * tokenBytes // hex
-	CloseReplace = 4008           // old connection of a player who rejoined
+	RejoinGrace = 20 * time.Second
+	MaxHolds    = 4 // per room: pauses can't be chained to stall a match
+	tokenBytes  = 16
+	TokenLen    = 2 * tokenBytes // hex
 )
 
 func newToken() string {
@@ -41,6 +40,7 @@ func (r *Room) IssueTokens() [sim.MaxPlayers]string {
 	return r.tokens
 }
 
+// TokenList is a copy of the seats' rejoin tokens ("" = none issued).
 func (r *Room) TokenList() [sim.MaxPlayers]string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -115,7 +115,7 @@ func (r *Room) Reattach(slot int, token string, p Peer) bool {
 	SendTo(p, wire.EncodeWelcome(slot))
 	SendTo(p, wire.EncodeSeat(token))
 	if old != nil {
-		go old.Close(CloseReplace, "replaced") // the close handshake waits on a peer that may be dead
+		go old.Close(wire.CloseReplace, "replaced") // the close handshake waits on a peer that may be dead
 	}
 	if t != nil {
 		back := wire.EncodeSignal(wire.MsgPeerBack)
@@ -134,6 +134,7 @@ func (r *Room) pausedLocked() bool {
 	return (r.mode != sim.Mode2v2 || r.ranked) && r.anyAwayLocked()
 }
 
+// IsPaused reports a match stopped while a dropped player may come back.
 func (r *Room) IsPaused() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

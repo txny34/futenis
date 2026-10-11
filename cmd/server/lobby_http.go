@@ -34,7 +34,7 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 	p := wsPeer{c}
 	l, id, ok := h.joinLobby(p)
 	if !ok {
-		p.Close(closeFull, "lobby full")
+		p.Close(wire.CloseFull, "lobby full")
 		return
 	}
 	defer l.Leave(id)
@@ -43,7 +43,7 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 }
 
 // joinLobby seats p in the first lobby with room, opening another (with its
-// own broadcast loop) when all are full, up to maxLobbyShard. The join itself
+// own broadcast loop) when all are full, up to lobby.MaxShards. The join itself
 // (which sends) runs outside the hub lock; a lobby that filled meanwhile is retried.
 func (h *hub) joinLobby(p lobby.Peer) (l *lobby.Lobby, id int, ok bool) {
 	for range 3 {
@@ -89,7 +89,7 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby.Lobby, id int, c *websocke
 			return
 		}
 		if !rate.AllowN(time.Now(), lobby.MaxMsgs) {
-			p.Close(closeRate, "rate limit")
+			p.Close(wire.CloseRate, "rate limit")
 			return
 		}
 		if typ != websocket.MessageBinary {

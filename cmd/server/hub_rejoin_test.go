@@ -78,8 +78,8 @@ func TestHoldExpiryEndsMatch(t *testing.T) {
 	readMsg(ctx, t, c1, wire.MsgPeerAway, wire.HeaderLen+8)
 	readMsg(ctx, t, c1, wire.MsgPeerLeft, wire.HeaderLen)
 	late := dialRejoin(ctx, t, srv, token)
-	if _, _, err := late.Read(ctx); websocket.CloseStatus(err) != closeGone {
-		t.Fatalf("late rejoin: %v, want close %d", err, closeGone)
+	if _, _, err := late.Read(ctx); websocket.CloseStatus(err) != wire.CloseGone {
+		t.Fatalf("late rejoin: %v, want close %d", err, wire.CloseGone)
 	}
 }
 
@@ -89,8 +89,8 @@ func TestRejoinUnknownTokenRefused(t *testing.T) {
 	srv := newGraceHub(make(chan time.Time), time.Minute)
 	defer srv.Close()
 	c := dialRejoin(ctx, t, srv, "0123456789abcdef0123456789abcdef")
-	if _, _, err := c.Read(ctx); websocket.CloseStatus(err) != closeGone {
-		t.Fatalf("unknown token: %v, want close %d", err, closeGone)
+	if _, _, err := c.Read(ctx); websocket.CloseStatus(err) != wire.CloseGone {
+		t.Fatalf("unknown token: %v, want close %d", err, wire.CloseGone)
 	}
 	res, err := srv.Client().Get(srv.URL + "/?rejoin=nothex")
 	if err != nil {
@@ -130,7 +130,7 @@ func TestRejoinReplacesAConnectionNotSeenDropped(t *testing.T) {
 	back := dialRejoin(ctx, t, srv, token) // c2 still open: wifi -> 4G switch
 	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
 	readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+match.TokenLen)
-	expectClose(ctx, t, c2, match.CloseReplace)
+	expectClose(ctx, t, c2, wire.CloseReplace)
 	tick <- time.Time{} // the match never paused nor ended
 	readMsg(ctx, t, c1, wire.MsgFrame, wire.FrameLen)
 	readMsg(ctx, t, back, wire.MsgFrame, wire.FrameLen)
@@ -166,7 +166,7 @@ func TestRankedHeldSeatKeepsTheAccountBusy(t *testing.T) {
 	a.CloseNow()
 	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
 	again := dialRanked(ctx, t, srv, "10.4.1.3", tokenFor(t, iss, userA)) // a second ranked match meanwhile
-	expectClose(ctx, t, again, closeFull)
+	expectClose(ctx, t, again, wire.CloseFull)
 	back := dialRejoin(ctx, t, srv, token)
 	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
 }

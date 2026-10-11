@@ -17,7 +17,6 @@ const (
 	FrameInterval   = time.Second / 60
 	ticksPerFrame   = sim.TickRate / 60
 	roomPointsToWin = 5
-	closeNormal     = 1000
 	// MinHumans2v2: a 2v2 room may start early (bots fill the rest) once this
 	// many people are in; see hub.fillWait.
 	MinHumans2v2 = 2
@@ -27,7 +26,7 @@ const (
 // people become rivals, each with a bot partner until more arrive.
 var (
 	seats1v1 = []int{0, 1}
-	Seats2v2 = []int{0, 2, 1, 3}
+	seats2v2 = []int{0, 2, 1, 3}
 )
 
 // Peer is one connected browser; send must be safe for concurrent use.
@@ -43,7 +42,7 @@ type Peer interface {
 type Room struct {
 	mu      sync.Mutex
 	mode    sim.Mode
-	code    string // hub key (set by hub.roomFor)
+	code    string // hub key (given to NewRoom)
 	seats   int
 	order   []int
 	peers   [sim.MaxPlayers]Peer
@@ -103,15 +102,24 @@ func (r *Room) MarkRanked(slot int, c ranked.Claim, network string) bool {
 	return true
 }
 
+// NewRoom is an empty room of mode, known to the hub as code.
 func NewRoom(mode sim.Mode, code string) *Room {
 	order := seats1v1
 	if mode == sim.Mode2v2 {
-		order = Seats2v2
+		order = seats2v2
 	}
 	return &Room{mode: mode, code: code, seats: len(order), order: order, stop: make(chan struct{})}
 }
 
-// Code is the hub key of the room; Mode and Seats never change either.
+// SeatOrder is the fill order of mode's seats (a copy: rooms share the original).
+func SeatOrder(mode sim.Mode) []int {
+	if mode == sim.Mode2v2 {
+		return append([]int(nil), seats2v2...)
+	}
+	return append([]int(nil), seats1v1...)
+}
+
+// Code is the hub key of the room; Mode and SeatCount never change either.
 func (r *Room) Code() string   { return r.code }
 func (r *Room) Mode() sim.Mode { return r.mode }
 func (r *Room) SeatCount() int { return r.seats }
@@ -230,6 +238,7 @@ func (r *Room) ExpireIfWaiting() bool {
 	return true
 }
 
+// IsClosed reports that the room ended (nobody can join or come back).
 func (r *Room) IsClosed() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -61,7 +61,7 @@ func tellLeft(others [sim.MaxPlayers]Peer) {
 	for _, o := range others {
 		if o != nil {
 			_ = o.Send(wire.EncodeSignal(wire.MsgPeerLeft))
-			o.Close(closeNormal, "peer left")
+			o.Close(wire.CloseNormal, "peer left")
 		}
 	}
 }
@@ -120,6 +120,7 @@ func (r *Room) Run(tick <-chan time.Time) {
 	}
 }
 
+// SendTo sends b to p when the seat is taken; a send error is left to p's read loop.
 func SendTo(p Peer, b []byte) {
 	if p != nil {
 		_ = p.Send(b) // a dead peer is detected by its read loop, which calls leave

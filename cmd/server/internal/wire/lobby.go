@@ -57,7 +57,7 @@ func IsNameMsg(b []byte) bool {
 
 func RosterLen(n int) int { return HeaderLen + (1+n*RosterStride)*8 }
 
-// EncodeRoster writes a ROSTER for entries into dst (len >= rosterMsgLen) and
+// EncodeRoster writes a ROSTER for entries into dst (len >= RosterLen) and
 // returns its length.
 func EncodeRoster(dst []byte, entries []Entry) int {
 	PutHeader(dst, MsgRoster)
@@ -73,6 +73,7 @@ func EncodeRoster(dst []byte, entries []Entry) int {
 	return RosterLen(len(entries))
 }
 
+// EncodeLobbyName is a PLAYER_NAME: id, then the UTF-8 name.
 func EncodeLobbyName(id int, name string) []byte {
 	b := make([]byte, HeaderLen+8+len(name))
 	PutHeader(b, MsgLobbyName)
@@ -81,6 +82,7 @@ func EncodeLobbyName(id int, name string) []byte {
 	return b
 }
 
+// EncodeGone is a GONE: player id left the lobby.
 func EncodeGone(id int) []byte {
 	b := make([]byte, HeaderLen+8)
 	PutHeader(b, MsgGone)

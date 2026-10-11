@@ -92,7 +92,7 @@ func TestQueueOnePerIP(t *testing.T) {
 	a := dialQueue(ctx, t, srv, "10.0.0.8")
 	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	b := dialQueue(ctx, t, srv, "10.0.0.8") // same IP: never paired with itself
-	expectClose(ctx, t, b, closeFull)
+	expectClose(ctx, t, b, wire.CloseFull)
 }
 
 func TestQueueRejoinAfterLeaving(t *testing.T) {
@@ -118,8 +118,8 @@ func TestQueueDuplicateRejectionKeepsOwner(t *testing.T) {
 	a := dialQueue(ctx, t, srv, "10.0.3.1")
 	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	b := dialQueue(ctx, t, srv, "10.0.3.1")
-	expectClose(ctx, t, b, closeFull)
+	expectClose(ctx, t, b, wire.CloseFull)
 	time.Sleep(50 * time.Millisecond) // the server runs b's cleanup
 	c := dialQueue(ctx, t, srv, "10.0.3.1")
-	expectClose(ctx, t, c, closeFull)
+	expectClose(ctx, t, c, wire.CloseFull)
 }

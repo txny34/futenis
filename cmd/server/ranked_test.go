@@ -68,7 +68,7 @@ func TestRankedNeedsAValidToken(t *testing.T) {
 	defer cancel()
 	srv, _, _ := newRankedHub(t)
 	c := dialRanked(ctx, t, srv, "10.3.0.1", "forged.token.here")
-	expectClose(ctx, t, c, closeNoAuth)
+	expectClose(ctx, t, c, wire.CloseNoAuth)
 }
 
 func TestRankedPairsTwoAccountsNotOneTwice(t *testing.T) {
@@ -78,7 +78,7 @@ func TestRankedPairsTwoAccountsNotOneTwice(t *testing.T) {
 	a := dialRanked(ctx, t, srv, "10.3.1.1", tokenFor(t, iss, userA))
 	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	again := dialRanked(ctx, t, srv, "10.3.1.2", tokenFor(t, iss, userA)) // same account, other IP
-	expectClose(ctx, t, again, closeFull)
+	expectClose(ctx, t, again, wire.CloseFull)
 	b := dialRanked(ctx, t, srv, "10.3.1.3", tokenFor(t, iss, userB))
 	readWelcome(ctx, t, a)
 	readWelcome(ctx, t, b)
@@ -90,7 +90,7 @@ func TestRankedDisabledWithoutConfig(t *testing.T) {
 	srv := newQueueHub()
 	defer srv.Close()
 	c := dialRanked(ctx, t, srv, "10.3.2.1", "x")
-	expectClose(ctx, t, c, closeNoAuth)
+	expectClose(ctx, t, c, wire.CloseNoAuth)
 }
 
 func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
@@ -128,7 +128,7 @@ func TestRankedOneActiveConnectionPerAccount(t *testing.T) {
 		_, m, err := c.Read(ctx)
 		if err == nil && m[0] == wire.MsgWaiting {
 			got++
-		} else if websocket.CloseStatus(err) != closeFull {
+		} else if websocket.CloseStatus(err) != wire.CloseFull {
 			t.Fatalf("unexpected: %v", err)
 		}
 	}

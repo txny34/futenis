@@ -25,7 +25,7 @@ const (
 	MaxMsgs      = 30 // per second: 10 PRESENCE + 1 PING need far less than the match cap
 	nameEvery    = 2 * time.Second
 	Interval     = time.Second / 10
-	Idle         = 30 * time.Second // nothing received (hidden tab, dead Peer): close
+	Idle         = 30 * time.Second // nothing received (hidden tab, dead peer): close
 )
 
 type lobbyPeer struct {
@@ -139,9 +139,9 @@ func (l *Lobby) othersLocked(id int) []Peer {
 	return out
 }
 
-// broadcast sends every Peer a ROSTER of the others that have a position.
-// Messages are built under the lock and sent after it: a slow Peer never
-// blocks joins or position updates. Each Peer's buffer is only reused on the
+// broadcast sends every peer a ROSTER of the others that have a position.
+// Messages are built under the lock and sent after it: a slow peer never
+// blocks joins or position updates. Each peer's buffer is only reused on the
 // next tick, by this same goroutine.
 func (l *Lobby) broadcast() {
 	l.mu.Lock()
@@ -168,7 +168,7 @@ func (l *Lobby) broadcast() {
 	}
 	l.mu.Unlock()
 	for _, o := range l.out {
-		_ = o.p.Send(o.msg) // bounded by the write timeout; a dead Peer leaves via its read loop
+		_ = o.p.Send(o.msg) // bounded by the write timeout; a dead peer leaves via its read loop
 	}
 }
 

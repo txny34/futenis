@@ -1,6 +1,6 @@
 import { HEADER, Msg, writeHeader } from "./protocol";
 
-// Online session states and the server's close codes (cmd/server/limits.go, internal/match, ranked.go).
+// Online session states and the server's close codes (cmd/server/internal/wire/close.go).
 export type NetStatus =
   | "conectando"
   | "esperando rival"

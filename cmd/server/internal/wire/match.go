@@ -41,7 +41,7 @@ const (
 	maxButtons = 255
 )
 
-var ErrBadMessage = errors.New("server: malformed message")
+var ErrBadMessage = errors.New("wire: malformed message")
 
 func PutHeader(b []byte, typ byte) {
 	clear(b[:HeaderLen])
@@ -116,7 +116,7 @@ func EncodeSignal(typ byte) []byte {
 	return b
 }
 
-// EncodeFrame writes a FRAME message for out into dst (len frameMsgLen).
+// EncodeFrame writes a FRAME message for out into dst (len FrameLen).
 func EncodeFrame(dst []byte, out []float64) {
 	PutHeader(dst, MsgFrame)
 	game.EncodeFloats(dst[HeaderLen:], out)

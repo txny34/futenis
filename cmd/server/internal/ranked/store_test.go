@@ -3,6 +3,7 @@ package ranked
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -76,7 +77,8 @@ func TestSupabaseRatingsFallsBackBeforeTheMigration(t *testing.T) {
 	s := NewSupabase(srv.URL, "secret")
 	s.base = srv.URL
 	err := s.Save(context.Background(), "1v1", []Row{{ID: "a", Elo: 1116}})
-	if legacy, ok := err.(ErrLegacy); !ok || legacy.Err != nil {
+	var legacy ErrLegacy
+	if !errors.As(err, &legacy) || legacy.Err != nil {
 		t.Fatalf("want a logged legacy save with the ELO stored, got %v", err)
 	}
 	if len(upsert) != 1 || upsert[0]["user_id"] != "a" || upsert[0]["elo_1v1"] != float64(1116) {

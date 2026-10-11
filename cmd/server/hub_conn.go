@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,6 +24,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	var r *match.Room
 	var slot, humans int
 	var start, kept bool
+	var joinErr error
 	var cl ranked.Claim // ranked reservation (zero outside ranked)
 	rankedMode, isRanked := rankedModes[queued]
 	network := "" // ranked: the client's limit key, seated next to its account
@@ -30,11 +32,11 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		acc, ok := h.authenticate(ctx, c)
 		uid := acc.ID
 		if !ok {
-			p.Close(closeNoAuth, "sign in required")
+			p.Close(wire.CloseNoAuth, "sign in required")
 			return
 		}
 		if cl, ok = h.claimRanked(acc); !ok {
-			p.Close(closeFull, "already in a ranked match")
+			p.Close(wire.CloseFull, "already in a ranked match")
 			return
 		}
 		defer func() {
@@ -50,25 +52,26 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		if isRanked {
 			elo = h.ratingFor(ctx, rankedMode, cl.UID)
 		}
-		code, r, slot, start, humans = h.joinQueue(queued, p, key, elo)
-		if isRanked && r != nil && slot >= 0 && !r.MarkRanked(slot, cl, network) {
+		code, r, slot, start, humans, joinErr = h.joinQueue(queued, p, key, elo)
+		if isRanked && joinErr == nil && !r.MarkRanked(slot, cl, network) {
 			r.Leave(slot, p, false)
 			if r.IsClosed() {
 				h.forget(code, r)
 			}
 			h.leaveQueue(queued, code, key)
-			p.Close(closeFull, "same account or network already in this match")
+			p.Close(wire.CloseFull, "same account or network already in this match")
 			return
 		}
 	} else {
 		r, slot, start, humans = h.join(code, sim.Mode1v1, p)
+		joinErr = seatErr(r, slot)
 	}
-	if r == nil {
-		p.Close(closeBusy, "server full")
+	switch {
+	case errors.Is(joinErr, errBusy):
+		p.Close(wire.CloseBusy, "server full")
 		return
-	}
-	if slot < 0 {
-		p.Close(closeFull, "room full")
+	case joinErr != nil:
+		p.Close(wire.CloseFull, "room full")
 		return
 	}
 	if start {
@@ -92,7 +95,7 @@ func (h *hub) expireAlone(r *match.Room, p match.Peer) (stop func()) {
 	var t *time.Timer
 	check := func() {
 		if r.ExpireIfWaiting() {
-			p.Close(closeNoRival, "no rival")
+			p.Close(wire.CloseNoRival, "no rival")
 			return
 		}
 		if _, started := r.StartedAt(); !started && !r.IsClosed() {
@@ -132,7 +135,7 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *match.Room
 		lastSeen.Store(time.Now().UnixNano())
 		if !rate.AllowN(time.Now(), maxMsgsPerWindow) {
 			h.logger.Printf("room %s slot %d: rate limit", code, slot)
-			p.Close(closeRate, "rate limit")
+			p.Close(wire.CloseRate, "rate limit")
 			return false
 		}
 		if typ == websocket.MessageBinary && wire.IsPing(b) {
@@ -175,7 +178,7 @@ func (h *hub) watchIdle(r *match.Room, p match.Peer, lastSeen *atomic.Int64, kic
 		left := h.idle - time.Since(last)
 		if left <= 0 {
 			kicked.Store(true)
-			p.Close(closeIdle, "idle")
+			p.Close(wire.CloseIdle, "idle")
 			return
 		}
 		t.Reset(max(left, h.idle/4))

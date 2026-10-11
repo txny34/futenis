@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"regexp"
@@ -20,8 +21,6 @@ import (
 const (
 	writeTimeout = 100 * time.Millisecond
 	readLimit    = 1024
-	closeFull    = 4001
-	closeBusy    = 4002
 	maxRooms     = 256
 )
 
@@ -57,7 +56,7 @@ type hub struct {
 	seats map[string]seatRef // rejoin token -> held seat (internal/match/rejoin.go)
 	grace time.Duration      // how long a dropped seat is held (injectable)
 
-	lobbies     []*lobby.Lobby                    // shared online lobbies (lobby.go), opened on demand
+	lobbies     []*lobby.Lobby                    // shared online lobbies (internal/lobby), opened on demand
 	lobbyConns  *netlimit.ConnLimiter             // per-client cap for /lobby (stricter than matches)
 	lobbyTicker func() (<-chan time.Time, func()) // injectable for tests
 	lobbyIdle   time.Duration
@@ -65,9 +64,27 @@ type hub struct {
 }
 
 func newHub(origins []string, logger *log.Logger) *hub {
-	return &hub{rooms: map[string]*match.Room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
-		conns: netlimit.NewConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: match.RejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(lobby.Max*lobby.MaxShards, lobby.MaxPerClient), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobby.Idle, done: make(chan struct{})}
+	return &hub{
+		rooms:    map[string]*match.Room{},
+		origins:  origins,
+		logger:   logger,
+		ticker:   realTicker,
+		maxRooms: maxRooms,
+		conns:    netlimit.NewConnLimiter(maxConns, maxConnsPerIP),
+		idle:     idleTimeout,
+		wait:     rivalTimeout,
+		fill:     fillWait,
+		queues:   map[string]*queue{},
+		seats:    map[string]seatRef{},
+		grace:    match.RejoinGrace,
+		active:   map[string]uint64{},
+
+		matchTicker: realMatchTicker,
+		lobbyConns:  netlimit.NewConnLimiter(lobby.Max*lobby.MaxShards, lobby.MaxPerClient),
+		lobbyTicker: realLobbyTicker,
+		lobbyIdle:   lobby.Idle,
+		done:        make(chan struct{}),
+	}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -146,6 +163,22 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.serve(req.Context(), code, queued, ip, c)
+}
+
+var (
+	errBusy    = errors.New("hub: at its room cap")
+	errRefused = errors.New("hub: no seat (room full or already queued)")
+)
+
+// seatErr classifies a join result: no room (hub full) or no seat.
+func seatErr(r *match.Room, slot int) error {
+	switch {
+	case r == nil:
+		return errBusy
+	case slot < 0:
+		return errRefused
+	}
+	return nil
 }
 
 // join finds or creates the room for code and joins p, retrying once if the

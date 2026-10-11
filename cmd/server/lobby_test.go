@@ -138,7 +138,7 @@ func TestLobbyRateLimit(t *testing.T) {
 	for i := 0; i < lobby.MaxMsgs+5; i++ {
 		_ = a.Write(ctx, websocket.MessageBinary, wire.EncodePresence(0, 0, 0, 0))
 	}
-	if _, _, err := a.Read(ctx); websocket.CloseStatus(err) != closeRate {
+	if _, _, err := a.Read(ctx); websocket.CloseStatus(err) != wire.CloseRate {
 		t.Fatalf("flood not closed: %v", err)
 	}
 }

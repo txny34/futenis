@@ -25,7 +25,7 @@ func quant(v, scale float64) int16 {
 	return int16(math.Max(math.MinInt16, math.Min(math.MaxInt16, math.Round(v*scale))))
 }
 
-// EncodeRosterQ writes a compact ROSTER for entries into dst (len >= rosterQLen) and returns its length.
+// EncodeRosterQ writes a compact ROSTER for entries into dst (len >= RosterQLen) and returns its length.
 func EncodeRosterQ(dst []byte, entries []Entry) int {
 	PutHeader(dst, MsgRosterQ)
 	le := binary.LittleEndian

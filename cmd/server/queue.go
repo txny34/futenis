@@ -148,24 +148,24 @@ func (h *hub) leaveQueue(mode, code, key string) {
 	h.mu.Unlock()
 }
 
-// joinQueue seats p in mode's open room, or rejects it (slot -1 with a non-nil
-// room: already queued / no room found). Rooms that filled, started or went
-// stale concurrently are skipped (bounded retries).
-func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int) (code string, r *match.Room, slot int, start bool, humans int) {
+// joinQueue seats p in mode's open room. err is errBusy (hub at its room cap)
+// or errRefused (already queued, or no room took p). Rooms that filled,
+// started or went stale concurrently are skipped (bounded retries).
+func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int) (code string, r *match.Room, slot int, start bool, humans int, err error) {
 	for range 3 {
 		code, ok := h.queueRoom(mode, key, elo)
 		if !ok {
-			return code, &match.Room{}, -1, false, 0
+			return code, nil, -1, false, 0, errRefused
 		}
 		if r, slot, start, humans = h.join(code, queueModes[mode], p); r == nil {
-			return code, nil, -1, false, 0
+			return code, nil, -1, false, 0, errBusy
 		}
 		switch {
 		case slot >= 0 && start:
 			h.closeQueueRoom(mode, code)
-			return code, r, slot, true, humans
+			return code, r, slot, true, humans, nil
 		case slot >= 0 && h.claimWait(mode, code, key):
-			return code, r, slot, false, humans
+			return code, r, slot, false, humans, nil
 		case slot >= 0:
 			r.Leave(slot, p, false)
 			if r.IsClosed() {
@@ -175,5 +175,5 @@ func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int) (code st
 			h.closeQueueRoom(mode, code)
 		}
 	}
-	return code, &match.Room{}, -1, false, 0
+	return code, nil, -1, false, 0, errRefused
 }

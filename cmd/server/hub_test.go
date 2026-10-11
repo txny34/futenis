@@ -110,7 +110,7 @@ func TestHubThirdPeerRejected(t *testing.T) {
 	// at the handshake, before the server-side join runs).
 	readWelcome(ctx, t, c2)
 	c3 := dial(ctx, t, srv)
-	if _, _, err := c3.Read(ctx); websocket.CloseStatus(err) != closeFull {
+	if _, _, err := c3.Read(ctx); websocket.CloseStatus(err) != wire.CloseFull {
 		t.Fatalf("third peer err %v", err)
 	}
 }
@@ -136,7 +136,7 @@ func TestHubServerFull(t *testing.T) {
 	c1 := dialRoom(ctx, t, srv, "AAA")
 	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	c2 := dialRoom(ctx, t, srv, "BBB")
-	if _, _, err := c2.Read(ctx); websocket.CloseStatus(err) != closeBusy {
+	if _, _, err := c2.Read(ctx); websocket.CloseStatus(err) != wire.CloseBusy {
 		t.Fatalf("second room err %v", err)
 	}
 }

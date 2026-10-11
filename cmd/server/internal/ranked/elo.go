@@ -44,6 +44,7 @@ func ApplyElo(ratings map[string]int, teams [2][]string, winner int) map[string]
 	return next
 }
 
+// RatingOf is id's rating in r, or EloDefault for a player never rated.
 func RatingOf(r map[string]int, id string) int {
 	if v, ok := r[id]; ok {
 		return v

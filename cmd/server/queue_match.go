@@ -6,16 +6,16 @@ import (
 
 	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 // Ranked rebalancing: two lonely ranked rooms (one person each) never meet on
 // their own, since a waiter can't move between rooms. Every matchEvery the
 // newer of two lonely rooms whose ratings now fit (the older room's window
-// widened) has its waiter closed with closeRequeue; the client queues again at
+// widened) has its waiter closed with wire.CloseRequeue; the client queues again at
 // once and lands in the older room.
 const (
 	matchEvery          = time.Second
-	closeRequeue        = 4009
 	ratingLookupTimeout = 2 * time.Second // a slow database must not hold the queue join
 )
 
@@ -69,8 +69,8 @@ func (h *hub) rebalance(mode string, now time.Time) {
 	h.mu.Unlock()
 	for _, r := range move {
 		if p, c := r.RequeueAlone(); p != nil {
-			h.releaseRanked(c)                  // before the close: the client's immediate reconnect must find the account free
-			go p.Close(closeRequeue, "requeue") // the close handshake may wait on the client
+			h.releaseRanked(c)                       // before the close: the client's immediate reconnect must find the account free
+			go p.Close(wire.CloseRequeue, "requeue") // the close handshake may wait on the client
 		}
 	}
 }

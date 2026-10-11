@@ -44,7 +44,7 @@ func TestHubIdleKick(t *testing.T) {
 	readMsg(ctx, t, c1, wire.MsgWaiting, wire.HeaderLen)
 	c2 := dial(ctx, t, srv)
 	go keepAlive(ctx, c2) // only the host goes idle
-	expectClose(ctx, t, c1, closeIdle)
+	expectClose(ctx, t, c1, wire.CloseIdle)
 }
 
 func keepAlive(ctx context.Context, c *websocket.Conn) {
@@ -63,7 +63,7 @@ func TestHubWaitingHostNotIdle(t *testing.T) {
 	srv := newTestHubWith(func(h *hub) { h.idle = 20 * time.Millisecond; h.wait = 300 * time.Millisecond })
 	defer srv.Close()
 	start := time.Now()
-	expectClose(ctx, t, dial(ctx, t, srv), closeNoRival)
+	expectClose(ctx, t, dial(ctx, t, srv), wire.CloseNoRival)
 	if time.Since(start) < 250*time.Millisecond {
 		t.Fatal("waiting host closed before the no-rival timeout")
 	}
@@ -82,7 +82,7 @@ func TestHubIdleClockStartsWithMatch(t *testing.T) {
 	c2 := dial(ctx, t, srv)
 	go keepAlive(ctx, c2)
 	joined := time.Now()
-	expectClose(ctx, t, c1, closeIdle)
+	expectClose(ctx, t, c1, wire.CloseIdle)
 	if time.Since(joined) < 150*time.Millisecond {
 		t.Fatalf("host kicked %v after the match started: waiting time counted as idle", time.Since(joined))
 	}
@@ -93,7 +93,7 @@ func TestHubNoRival(t *testing.T) {
 	defer cancel()
 	srv := newTestHubWith(func(h *hub) { h.wait = 50 * time.Millisecond })
 	defer srv.Close()
-	expectClose(ctx, t, dial(ctx, t, srv), closeNoRival)
+	expectClose(ctx, t, dial(ctx, t, srv), wire.CloseNoRival)
 }
 
 func TestHubRateLimit(t *testing.T) {
@@ -109,7 +109,7 @@ func TestHubRateLimit(t *testing.T) {
 			break // the server may close before the last write lands
 		}
 	}
-	expectClose(ctx, t, c, closeRate)
+	expectClose(ctx, t, c, wire.CloseRate)
 }
 
 func TestHubPerIPLimit(t *testing.T) {

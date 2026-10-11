@@ -10,6 +10,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
+	"github.com/txny34/futenis/sim"
 )
 
 func newFillHub(tick chan time.Time, fill time.Duration) *httptest.Server {
@@ -45,9 +46,10 @@ func TestQueue2v2FourPlayersGetSeats0To3(t *testing.T) {
 		}
 		cs = append(cs, c)
 	}
+	order := match.SeatOrder(sim.Mode2v2)
 	for i, c := range cs {
-		if w := readWelcome(ctx, t, c); int(w[2]) != match.Seats2v2[i] {
-			t.Fatalf("player %d got seat %d, want %d (first two are rivals)", i, w[2], match.Seats2v2[i])
+		if w := readWelcome(ctx, t, c); int(w[2]) != order[i] {
+			t.Fatalf("player %d got seat %d, want %d (first two are rivals)", i, w[2], order[i])
 		}
 	}
 	tick <- time.Time{}
@@ -116,5 +118,5 @@ func TestQueue2v2WaiterNotStrandedAfterFillFails(t *testing.T) {
 	readMsg(ctx, t, b, wire.MsgWaiting, wire.HeaderLen)
 	time.Sleep(80 * time.Millisecond) // a's no-rival timer fired with 2 people in
 	b.Close(websocket.StatusNormalClosure, "")
-	expectClose(ctx, t, a, closeNoRival)
+	expectClose(ctx, t, a, wire.CloseNoRival)
 }

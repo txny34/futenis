@@ -11,11 +11,7 @@ const (
 	idleTimeout = 20 * time.Second
 	// rivalTimeout closes a host still alone in its room.
 	rivalTimeout = 5 * time.Minute
-	// Window/maxMsgsPerWindow: INPUT is sent at <= 120 Hz plus 1 PING/s;
+	// maxMsgsPerWindow (per netlimit.Window): INPUT is sent at <= 120 Hz plus 1 PING/s;
 	// twice that leaves room for jitter bursts.
 	maxMsgsPerWindow = 2 * (120 + 1)
-	closeIdle        = 4003
-	closeRate        = 4004
-	closeNoRival     = 4005
-	closeGone        = 4007 // rejoin: the held seat is gone (match over or hold expired)
 )

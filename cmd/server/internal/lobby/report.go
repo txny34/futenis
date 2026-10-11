@@ -22,8 +22,8 @@ func (l *Lobby) SetClient(id int, key string, compact bool) {
 	l.mu.Unlock()
 }
 
-// Report counts one Report of target's name by from (network key). It returns
-// the reported name and whether this Report hid it.
+// Report counts one report of target's name by from (network key). It returns
+// the reported name and whether this report hid it.
 func (l *Lobby) Report(from, target int) (name string, hidden bool) {
 	l.mu.Lock()
 	src, t := l.peers[from], l.peers[target]

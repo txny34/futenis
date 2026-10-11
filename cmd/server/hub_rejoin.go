@@ -5,6 +5,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/match"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 // seatRef locates a rejoin token's seat.
@@ -53,7 +54,7 @@ func (h *hub) serveRejoin(ctx context.Context, token string, c *websocket.Conn) 
 	ref, ok := h.seats[token]
 	h.mu.Unlock()
 	if !ok || !ref.r.Reattach(ref.slot, token, p) {
-		p.Close(closeGone, "match over")
+		p.Close(wire.CloseGone, "match over")
 		return
 	}
 	h.logger.Printf("room %s slot %d: rejoined", ref.r.Code(), ref.slot)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 // queue identity; no bot fill; at game over the server computes and stores
 // the new ELO and tells each player (RESULT).
 const (
-	closeNoAuth    = 4006
 	authWait       = 5 * time.Second
 	authReadLimit  = 4096 // JWTs are larger than game messages
 	ratingsTimeout = 10 * time.Second
@@ -72,7 +72,8 @@ func (h *hub) reportRanked(mode string, r *match.Room, users [sim.MaxPlayers]str
 	after := ranked.ApplyElo(before, teams, winner)
 	if err := h.ratings.Save(ctx, mode, resultRows(r, users, after, winner)); err != nil {
 		h.logger.Printf("ranked %s: %v", mode, err)
-		if legacy, ok := err.(ranked.ErrLegacy); !ok || legacy.Err != nil {
+		var legacy ranked.ErrLegacy
+		if !errors.As(err, &legacy) || legacy.Err != nil {
 			return // nothing saved: no RESULT
 		}
 	}
