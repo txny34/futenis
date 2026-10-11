@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { buildCourt } from "./court";
 import { Arena } from "./env/arena";
 import { LobbyView } from "./lobby/lobby-view";
-import { Contact, Extra, PLAYER_CONTACT, PLAYER_EXTRA, PLAYER_POS, Phase, Snap, teamOf } from "./snapshot";
+import { Contact, PLAYER_CONTACT, PLAYER_POS, Phase, Snap, teamOf } from "./snapshot";
 import type { Quality } from "./ui/settings";
 import { BallView } from "./view/ball";
 import { CameraRig } from "./view/camera";
@@ -119,7 +119,7 @@ export class CourtView {
     this.players.update(prev, curr, alpha, dt);
     const hasHuman = human.slot < (curr[Snap.NumPlayers] | 0);
     if (hasHuman) this.players.feet(human.slot, prev, curr, alpha, this.humanFeet);
-    this.updateOverlays(curr, human, hasHuman);
+    this.updateOverlays(human, hasHuman);
     this.updatePrediction(prev, curr, alpha, human, hasHuman);
     this.fx.update(dt);
     this.machine.update(curr, dt);
@@ -170,12 +170,11 @@ export class CourtView {
     }
   }
 
-  private updateOverlays(curr: Float64Array, h: HumanView, hasHuman: boolean): void {
+  private updateOverlays(h: HumanView, hasHuman: boolean): void {
     const visible = h.showOverlays && hasHuman;
     this.overlays.setVisible(visible);
     if (!visible) return;
-    const e = PLAYER_EXTRA[h.slot];
-    this.overlays.update(this.humanFeet, h.targetX, h.targetZ, curr[e + Extra.Charge]);
+    this.overlays.update(h.targetX, h.targetZ);
   }
 
   private resize(): void {

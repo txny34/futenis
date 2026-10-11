@@ -2,6 +2,7 @@ import { applyThemeCss } from "./env/theme";
 import type { HypeMoment } from "./feel/hype";
 import type { ShotKindId } from "./feel/shots";
 import { ActionBar } from "./hud-actions";
+import { ChargeReticle } from "./hud-charge";
 import { Callouts } from "./hud-callouts";
 import { CallTracker } from "./hud-calls";
 import { Popups, POPUP_GOOD, POPUP_MISS, POPUP_PERFECT } from "./hud-popups";
@@ -9,21 +10,16 @@ import { Scoreboard } from "./hud-score";
 import { TrainingHud } from "./hud-training";
 import { t } from "./i18n/t";
 import { keyHint, moveHint } from "./ui/key-hints";
-import { EventKind, Mode, Phase, Quality, SimEvent, Snap } from "./snapshot";
+import { EventKind, Extra, Mode, PLAYER_EXTRA, Phase, Quality, SimEvent, Snap } from "./snapshot";
 
 const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const; // team colors come from the theme, so no color names
-const helpText = (): string =>
-  t(
-    `${moveHint()} mover · Mouse cámara · Rueda zoom · Click golpe · Click der. lob · ${keyHint("jump")} salto · ${keyHint("dash")} dash · ${keyHint("free")} mouse libre · Esc pausa · Mando: stick izq mover, der cámara, RT golpe, LT lob, A salto, LB/RB dash`,
-    `${moveHint()} move · Mouse camera · Wheel zoom · Click strike · Right-click lob · ${keyHint("jump")} jump · ${keyHint("dash")} dash · ${keyHint("free")} free mouse · Esc pause · Gamepad: left stick move, right camera, RT strike, LT lob, A jump, LB/RB dash`,
-  );
 const lobbyHelp = (): string =>
   t(
     `${moveHint()} mover · Mouse cámara · ${keyHint("jump")} salto · ${keyHint("free")} mouse libre · Esc menú`,
     `${moveHint()} move · Mouse camera · ${keyHint("jump")} jump · ${keyHint("free")} free mouse · Esc menu`,
   );
 const LAUNCH_KEY = "B"; // mirrors main.ts FEED_KEY (KeyB): Match.Feed() in Entrenamiento
-const PLAYGROUND_HELP = t(` · ${LAUNCH_KEY} lanzar bola`, ` · ${LAUNCH_KEY} launch ball`);
+const PLAYGROUND_HELP = t(`${LAUNCH_KEY} lanzar bola`, `${LAUNCH_KEY} launch ball`);
 const CALL_MS = 1800;
 const SERVE_HINT = t(
   "Click: soltar · picá detrás de la línea · soltá para sacar al cuadro cruzado",
@@ -52,6 +48,7 @@ export class Hud {
   private readonly popups = new Popups();
   private readonly training = new TrainingHud(LAUNCH_KEY);
   private readonly actions: ActionBar;
+  private readonly charge: ChargeReticle;
   private callUntil = 0;
   private lastPhase = UNSET;
   private lastServer = UNSET;
@@ -61,7 +58,6 @@ export class Hud {
   private dashCooldownMs = DEFAULT_DASH_COOLDOWN_S * MS_PER_S;
 
   constructor(private readonly root: HTMLElement) {
-    this.help.textContent = helpText();
     this.fps.hidden = true;
     this.call.hidden = true;
     this.hint.hidden = true;
@@ -71,6 +67,7 @@ export class Hud {
     applyThemeCss(root);
     this.crosshair.hidden = true;
     this.actions = new ActionBar();
+    this.charge = new ChargeReticle(this.crosshair);
     root.append(
       this.board.score, this.board.shots, this.msg, this.banner.root, this.call, this.hint,
       this.popups.root, this.replayTag, this.training.root, this.training.pop, this.crosshair, this.actions.root, this.fps, this.help, this.err,
@@ -114,6 +111,7 @@ export class Hud {
     if (this.lastMode !== Mode.Playground || e.kind !== EventKind.Point) this.banner.onEvent(e, shot, HUMAN_TEAM, nowMs);
     this.training.onEvent(e, nowMs);
     if (e.kind === EventKind.Dash && e.player === HUMAN_SLOT) this.dashAt = nowMs;
+    if (e.kind === EventKind.Kick && e.player === HUMAN_SLOT) this.charge.release(nowMs);
   }
 
   /** Crowd moment (feel/hype.ts); Entrenamiento has no rival, so no moments. */
@@ -137,6 +135,7 @@ export class Hud {
   update(snap: Float64Array, nowMs: number): void {
     const ready = this.dashCooldownMs <= 0 ? 1 : Math.min(1, (nowMs - this.dashAt) / this.dashCooldownMs);
     this.actions.update(snap, HUMAN_SLOT, ready);
+    this.charge.update(snap[PLAYER_EXTRA[HUMAN_SLOT] + Extra.Charge], nowMs);
     this.board.update(snap);
     this.banner.update(nowMs);
     this.popups.update(nowMs);
@@ -153,7 +152,7 @@ export class Hud {
     this.root.classList.toggle("is-lobby", mode === Mode.Lobby); // lobby.md §7: no scoreboard/streak
     this.msg.textContent = playground ? "" : message(phase, server); // RACHA owns the top in Entrenamiento
     this.hint.hidden = playground || phase !== Phase.Serve || server !== HUMAN_TEAM;
-    this.help.textContent = mode === Mode.Lobby ? lobbyHelp() : playground ? helpText() + PLAYGROUND_HELP : helpText();
+    this.help.textContent = mode === Mode.Lobby ? lobbyHelp() : playground ? PLAYGROUND_HELP : ""; // in a match the action bar is the only key guide
   }
 
   error(text: string): void { this.err.textContent = text; }

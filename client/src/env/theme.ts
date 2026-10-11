@@ -67,6 +67,7 @@ export interface Theme {
 
 export interface HudTheme {
   readonly card: string;
+  readonly ink: string; // dark sticker outlines / key chips on the action bar and crosshair
   readonly cardBorder: string;
   readonly text: string;
   readonly muted: string;
@@ -128,6 +129,7 @@ export const THEME: Theme = {
   fx: FX,
   hud: {
     card: "rgba(8, 16, 38, 0.62)",
+    ink: "#040818",
     cardBorder: "rgba(25, 227, 255, 0.35)",
     text: "#eef6ff",
     muted: "#8ea3c7",
@@ -147,7 +149,7 @@ export const THEME: Theme = {
 /** CSS custom properties mirroring the HUD tokens (single source of truth). */
 export function applyThemeCss(root: HTMLElement, t: HudTheme = THEME.hud): void {
   const vars: ReadonlyArray<readonly [string, string]> = [
-    ["--hud-card", t.card], ["--hud-border", t.cardBorder], ["--hud-text", t.text],
+    ["--hud-card", t.card], ["--hud-ink", t.ink], ["--hud-border", t.cardBorder], ["--hud-text", t.text],
     ["--hud-muted", t.muted], ["--hud-accent", t.accent], ["--hud-warn", t.warn],
     ["--hud-ring", t.ring], ["--hud-gold", t.gold], ["--hud-team0", t.team0], ["--hud-team1", t.team1],
     ["--train-machine", t.trainMachine], ["--train-bounce", t.trainBounce],

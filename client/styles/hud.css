@@ -28,50 +28,127 @@
 
 /* Serve hint sits above the action bar */
 #hint {
-  position: absolute; bottom: calc(132px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(220px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
   font-size: calc(15px * var(--hud-scale)); padding: 6px 14px; border-radius: 10px; white-space: nowrap;
   background: var(--hud-card); border: 1px solid var(--hud-border); color: var(--hud-text);
 }
 
-/* Action bar: bottom-center round buttons */
+/* Action bar: raised off the bottom edge, big glossy "sticker" buttons with a
+   little athlete doing each move (label above, key below), no panel. */
 #actions {
-  position: absolute; bottom: calc(14px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
-  display: flex; align-items: flex-start; gap: calc(14px * var(--hud-scale));
-  padding: calc(8px * var(--hud-scale)) calc(14px * var(--hud-scale));
-  border-radius: calc(18px * var(--hud-scale));
-  background: var(--hud-card); border: 1px solid var(--hud-border);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  position: absolute; bottom: calc(52px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: flex-start; gap: calc(26px * var(--hud-scale));
   font-family: var(--fx-body, system-ui); color: var(--hud-text);
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .55));
 }
-.act { display: flex; flex-direction: column; align-items: center; gap: 2px; width: calc(64px * var(--hud-scale)); }
-.act__svg { width: calc(52px * var(--hud-scale)); height: calc(52px * var(--hud-scale)); overflow: visible; }
-.act__track { fill: rgba(255, 255, 255, .04); stroke: rgba(255, 255, 255, .14); stroke-width: 3; }
-.act__ring { fill: none; stroke: var(--hud-accent); stroke-width: 4; stroke-linecap: round; }
-.act--strike .act__ring { stroke: var(--hud-ring); }
-.act__icon { fill: none; stroke: var(--hud-text); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
-.act__label { font-size: calc(12px * var(--hud-scale)); font-weight: 600; white-space: nowrap; }
+.act {
+  --act-fill: var(--hud-accent);
+  display: flex; flex-direction: column; align-items: center; gap: calc(4px * var(--hud-scale));
+  width: calc(112px * var(--hud-scale));
+}
+.act--strike { --act-fill: var(--hud-gold); }
+.act--lob { --act-fill: var(--train-machine); }
+.act__label {
+  order: -1; font: 800 calc(15px * var(--hud-scale)) / 1 var(--fx-display, system-ui); letter-spacing: .1em;
+  text-transform: uppercase; white-space: nowrap; color: var(--act-fill); text-shadow: 0 0 8px var(--act-fill), 0 1px 2px #000;
+}
+.act__svg {
+  width: calc(104px * var(--hud-scale)); height: calc(104px * var(--hud-scale)); overflow: visible;
+  transition: transform .12s cubic-bezier(.3, 1.8, .5, 1);
+}
+.act__track { fill: var(--act-fill); stroke: color-mix(in srgb, var(--hud-ink) 85%, transparent); stroke-width: 2.5; transition: filter .2s; }
+.act__gloss { fill: rgba(255, 255, 255, .28); pointer-events: none; }
+.act__wave { fill: none; stroke: var(--act-fill); stroke-width: 2; opacity: 0; transform-origin: 32px 32px; }
+.act__ring { fill: none; stroke: var(--hud-text); stroke-width: 3.5; stroke-linecap: round; }
+.act__fig { transform-origin: 32px 40px; animation: act-bob 2.4s ease-in-out infinite; }
+.act--strike .act__fig { animation-delay: -.8s; }
+.act--lob .act__fig { animation-delay: -1.6s; }
+.act__outline { fill: none; stroke: color-mix(in srgb, var(--hud-ink) 90%, transparent); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.act__outline--dot { fill: color-mix(in srgb, var(--hud-ink) 90%, transparent); stroke-width: 3.5; }
+.act__body { fill: none; stroke: var(--hud-text); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.act__head { fill: var(--hud-text); }
+.act__ball { fill: var(--hud-ring); stroke: color-mix(in srgb, var(--hud-ink) 90%, transparent); stroke-width: 2; }
+.act__fx { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 3 4; }
+.act--dash .act__fx { stroke-dasharray: none; }
 .act__key {
-  font: 600 calc(10px * var(--hud-scale)) / 1.4 var(--fx-body, system-ui); color: var(--hud-muted);
-  padding: 0 5px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 4px; white-space: nowrap;
+  font: 700 calc(14px * var(--hud-scale)) / 1.6 var(--fx-body, system-ui); color: var(--hud-text);
+  padding: 0 7px; background: color-mix(in srgb, var(--hud-ink) 75%, transparent); border: 1px solid rgba(255, 255, 255, .15); border-radius: 5px; white-space: nowrap;
 }
-.act.is-active .act__track { fill: rgba(25, 227, 255, .18); stroke: var(--hud-accent); }
-.act.is-active .act__icon { opacity: 1; filter: drop-shadow(0 0 4px var(--hud-accent)); }
-.act.is-warn .act__ring { stroke: var(--hud-warn); }
-.act.is-warn .act__icon { stroke: var(--hud-warn); fill: var(--hud-warn); }
+.act.is-active .act__svg { transform: scale(1.14) rotate(-4deg); }
+.act.is-active .act__track { filter: brightness(1.25) drop-shadow(0 0 10px var(--act-fill)); }
+.act.is-active .act__wave { animation: act-wave .45s ease-out; }
+.act.is-active .act__fig { animation: act-hit .25s ease-out; }
+.act.is-cooling .act__track { filter: saturate(.35) brightness(.6); }
+.act.is-cooling .act__fig { opacity: .55; }
+.act--dash:not(.is-cooling) .act__wave { animation: act-wave .6s ease-out; }
+
+@keyframes act-bob { 50% { transform: translateY(-1.5px); } }
+@keyframes act-hit { 40% { transform: translateX(2px) rotate(8deg) scale(1.08); } }
+@keyframes act-wave { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .act__fig, .act__wave { animation: none !important; } }
 
 /* Crosshair while the pointer is locked: above center like the reference (keep in sync with AIM_NDC_Y in input.ts) */
 #crosshair {
-  position: absolute; top: 37.5%; left: 50%; width: 14px; height: 14px; transform: translate(-50%, -50%);
+  position: absolute; top: 37.5%; left: 50%; width: calc(22px * var(--hud-scale)); height: calc(22px * var(--hud-scale)); transform: translate(-50%, -50%);
   background:
-    linear-gradient(var(--hud-text), var(--hud-text)) center / 2px 100% no-repeat,
-    linear-gradient(var(--hud-text), var(--hud-text)) center / 100% 2px no-repeat;
+    linear-gradient(var(--hud-text), var(--hud-text)) center / 3px 100% no-repeat,
+    linear-gradient(var(--hud-text), var(--hud-text)) center / 100% 3px no-repeat;
   opacity: .8; filter: drop-shadow(0 0 2px #000);
 }
 #crosshair[hidden] { display: none; }
+#crosshair { transition: transform .12s ease-out; }
+#crosshair.is-charging { transform: translate(-50%, -50%) scale(.8); }
+#crosshair.is-release-a { animation: cross-pop-a .35s cubic-bezier(.3, 1.8, .5, 1); }
+#crosshair.is-release-b { animation: cross-pop-b .35s cubic-bezier(.3, 1.8, .5, 1); }
+
+/* Strike charge on the crosshair (hud-charge.ts): fill + spinning ticks, full-charge pulse, release burst */
+.charge {
+  position: absolute; left: 50%; top: 50%; width: calc(104px * var(--hud-scale)); height: calc(104px * var(--hud-scale));
+  transform: translate(-50%, -50%); overflow: visible; pointer-events: none;
+}
+.charge circle, .charge path { fill: none; }
+.charge__track { stroke: rgba(255, 255, 255, .2); stroke-width: 4; opacity: 0; transition: opacity .15s; }
+.charge__arc { stroke: var(--hud-gold); stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 5px var(--hud-gold)); }
+.charge__ticks { stroke: var(--hud-text); stroke-width: 3; stroke-linecap: round; }
+.charge__spin { opacity: 0; transform-origin: 0 0; transition: opacity .15s; }
+.charge__burst { stroke: var(--hud-ring); stroke-width: 4; opacity: 0; transform-origin: 0 0; }
+#crosshair.is-charging .charge__track { opacity: 1; }
+#crosshair.is-charging .charge__spin { opacity: .9; animation: charge-spin 1.2s linear infinite; }
+#crosshair.is-full .charge__spin { animation-duration: .35s; }
+#crosshair.is-full .charge__ticks { stroke: var(--hud-ring); }
+#crosshair.is-full .charge__arc { stroke: var(--hud-ring); animation: charge-full .32s ease-in-out infinite alternate; }
+#crosshair.is-release-a .charge__burst { animation: charge-burst-a .45s ease-out; }
+#crosshair.is-release-b .charge__burst { animation: charge-burst-b .45s ease-out; }
+#crosshair.is-release-a .charge__burst--late { animation: charge-burst-a .52s .08s ease-out backwards; stroke: var(--hud-gold); }
+#crosshair.is-release-b .charge__burst--late { animation: charge-burst-b .52s .08s ease-out backwards; stroke: var(--hud-gold); }
+#crosshair.is-full { animation: cross-shake .09s linear infinite; } /* after the release rules: a new full charge shakes */
+
+/* Golpe button at full charge: breathing glow */
+.act--strike.is-full .act__track { animation: act-full .32s ease-in-out infinite alternate; }
+.act--strike.is-full .act__ring { stroke: var(--hud-ring); }
+
+@keyframes cross-pop-a { from, to { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.6); } }
+@keyframes cross-pop-b { from, to { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.6); } }
+@keyframes cross-shake {
+  25% { transform: translate(calc(-50% + 1px), calc(-50% - 1px)) scale(.8); }
+  75% { transform: translate(calc(-50% - 1px), calc(-50% + 1px)) scale(.8); }
+  0%, 50%, 100% { transform: translate(-50%, -50%) scale(.8); }
+}
+@keyframes charge-spin { to { transform: rotate(360deg); } }
+@keyframes charge-full {
+  from { stroke-width: 6; filter: drop-shadow(0 0 5px var(--hud-ring)); }
+  to { stroke-width: 9; filter: drop-shadow(0 0 16px var(--hud-ring)); }
+}
+@keyframes charge-burst-a { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
+@keyframes charge-burst-b { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
+@keyframes act-full { from { filter: brightness(1.1) drop-shadow(0 0 6px var(--act-fill)); } to { filter: brightness(1.4) drop-shadow(0 0 16px var(--hud-ring)); } }
+@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track { animation: none !important; }
+  .act__svg, .charge__track { transition: none; } }
 
 @media (max-width: 640px) {
-  #actions { gap: 6px; padding: 6px 8px; }
-  .act { width: 52px; }
+  #actions { gap: 8px; bottom: 24px; }
+  .act { width: 56px; }
+  .act__svg { width: 52px; height: 52px; }
   .act__key { display: none; }
 }
 
