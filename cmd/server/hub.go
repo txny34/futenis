@@ -43,10 +43,10 @@ type hub struct {
 	queueSeq int           // matchmaking room counter (queue.go)
 	queues   map[string]*queue
 
-	auth    *verifier       // Supabase token check; nil = ranked disabled
+	auth     *verifier         // Supabase token check; nil = ranked disabled
 	active   map[string]uint64 // accounts with a live ranked connection (one each) -> claim generation
 	claimSeq uint64
-	ratings ratingStore     // ranked ELO store; nil = ranked disabled
+	ratings  ratingStore // ranked ELO store; nil = ranked disabled
 
 	seats map[string]seatRef // rejoin token -> held seat (room_rejoin.go)
 	grace time.Duration      // how long a dropped seat is held (injectable)
