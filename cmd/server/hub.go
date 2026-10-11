@@ -39,9 +39,11 @@ type hub struct {
 	idle     time.Duration // injectable for tests
 	wait     time.Duration
 
-	fill     time.Duration // 2v2: wait before bots fill the empty seats (injectable)
-	queueSeq int           // matchmaking room counter (queue.go)
-	queues   map[string]*queue
+	fill        time.Duration // 2v2: wait before bots fill the empty seats (injectable)
+	queueSeq    int           // matchmaking room counter (queue.go)
+	queues      map[string]*queue
+	matching    bool                              // ranked rebalancing loop started (queue_match.go)
+	matchTicker func() (<-chan time.Time, func()) // injectable for tests
 
 	auth     *verifier         // Supabase token check; nil = ranked disabled
 	active   map[string]uint64 // accounts with a live ranked connection (one each) -> claim generation
@@ -61,7 +63,7 @@ type hub struct {
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
+		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -186,7 +188,11 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		key = "user:" + uid // one queued connection per account
 	}
 	if queued != "" {
-		code, r, slot, start, humans = h.joinQueue(queued, p, key)
+		elo := eloDefault
+		if ranked {
+			elo = h.ratingFor(ctx, rankedMode, cl.uid)
+		}
+		code, r, slot, start, humans = h.joinQueue(queued, p, key, elo)
 		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, cl, network) {
 			r.leave(slot, p, false)
 			if r.isClosed() {

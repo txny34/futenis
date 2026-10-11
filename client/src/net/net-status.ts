@@ -32,6 +32,8 @@ export const CLOSE_STATUS: Readonly<Record<number, NetStatus | undefined>> = {
 
 /** cmd/server closeGone: the held seat is gone (match over or the hold ran out). */
 export const CLOSE_GONE = 4007;
+/** cmd/server closeRequeue: ranked matchmaking moves a lone waiter to a closer room; queue again at once. */
+export const CLOSE_REQUEUE = 4009;
 
 /** Same server, ?rejoin=TOKEN instead of the room/queue (cmd/server/hub_rejoin.go). */
 export function rejoinUrl(url: string, token: string): string {

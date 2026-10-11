@@ -76,7 +76,7 @@ func TestQueueRejectsUnknownMode(t *testing.T) {
 
 func TestQueueCodesAreNotJoinableByURL(t *testing.T) {
 	h := newHub([]string{"*"}, nil)
-	if code, _ := h.queueRoom("1v1", "k"); roomCode.MatchString(code) {
+	if code, _ := h.queueRoom("1v1", "k", eloDefault); roomCode.MatchString(code) {
 		t.Fatalf("queue code %q passes the URL room filter", code)
 	}
 }
