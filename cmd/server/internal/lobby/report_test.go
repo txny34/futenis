@@ -5,15 +5,16 @@ import (
 	"time"
 
 	"github.com/txny34/futenis/cmd/server/internal/names"
+	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 func TestLobbyReportsHideANameAfterTwoNetworks(t *testing.T) {
 	l := New()
-	target, _ := l.Join(&fakePeer{})
-	a, _ := l.Join(&fakePeer{})
-	a2, _ := l.Join(&fakePeer{}) // second tab of a
-	b, _ := l.Join(&fakePeer{})
+	target, _ := l.Join(&peertest.Peer{})
+	a, _ := l.Join(&peertest.Peer{})
+	a2, _ := l.Join(&peertest.Peer{}) // second tab of a
+	b, _ := l.Join(&peertest.Peer{})
 	l.SetClient(target, "net-t", false)
 	l.SetClient(a, "net-a", false)
 	l.SetClient(a2, "net-a", false)
@@ -54,8 +55,8 @@ func TestLobbyReportsHideANameAfterTwoNetworks(t *testing.T) {
 
 func TestLobbyReportFromSameNetworkIgnored(t *testing.T) {
 	l := New()
-	target, _ := l.Join(&fakePeer{})
-	sib, _ := l.Join(&fakePeer{})
+	target, _ := l.Join(&peertest.Peer{})
+	sib, _ := l.Join(&peertest.Peer{})
 	l.SetClient(target, "net", false)
 	l.SetClient(sib, "net", false)
 	l.SetName(target, "Alguien", time.Now())
@@ -67,8 +68,8 @@ func TestLobbyReportFromSameNetworkIgnored(t *testing.T) {
 
 func TestLobbyReportNeedsAChosenNameAndAPlacedReporter(t *testing.T) {
 	l := New()
-	target, _ := l.Join(&fakePeer{})
-	a, _ := l.Join(&fakePeer{})
+	target, _ := l.Join(&peertest.Peer{})
+	a, _ := l.Join(&peertest.Peer{})
 	l.SetClient(target, "t", false)
 	l.SetClient(a, "a", false)
 	l.SetName(target, "Alguien", time.Now())
@@ -76,7 +77,7 @@ func TestLobbyReportNeedsAChosenNameAndAPlacedReporter(t *testing.T) {
 		t.Fatal("a reporter that never walked in the lobby doesn't count")
 	}
 	l.SetPos(a, wire.Presence{})
-	nameless, _ := l.Join(&fakePeer{})
+	nameless, _ := l.Join(&peertest.Peer{})
 	l.SetClient(nameless, "n", false)
 	if name, _ := l.Report(a, nameless); name != "" {
 		t.Fatal("a player without a name can't be muted before choosing one")

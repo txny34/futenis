@@ -49,11 +49,11 @@ func (h *hub) rebalance(mode string, now time.Time) {
 	q := h.queueFor(mode)
 	var lonely []*openRoom // oldest first (q.open is in opening order)
 	for _, o := range q.open {
-		if r := h.rooms[o.code]; r != nil && !r.isClosed() && r.waitingAlone() {
+		if r := h.rooms[o.code]; r != nil && !r.IsClosed() && r.WaitingAlone() {
 			lonely = append(lonely, o)
 		}
 	}
-	var move []*room // candidates; requeueAlone re-checks each under its own lock
+	var move []*Room // candidates; requeueAlone re-checks each under its own lock
 	taken := map[*openRoom]bool{}
 	for i, old := range lonely {
 		for _, newer := range lonely[i+1:] {
@@ -67,7 +67,7 @@ func (h *hub) rebalance(mode string, now time.Time) {
 	}
 	h.mu.Unlock()
 	for _, r := range move {
-		if p, c := r.requeueAlone(); p != nil {
+		if p, c := r.RequeueAlone(); p != nil {
 			h.releaseRanked(c)                  // before the close: the client's immediate reconnect must find the account free
 			go p.Close(closeRequeue, "requeue") // the close handshake may wait on the client
 		}

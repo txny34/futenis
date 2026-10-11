@@ -9,7 +9,7 @@ import (
 	"github.com/txny34/futenis/sim"
 )
 
-// leave frees slot when p still owns it (nil: whoever does; a replaced
+// Leave frees slot when p still owns it (nil: whoever does; a replaced
 // connection must not free its successor's seat) and reports whether it did.
 // In 1v1 the room ends and the rival is told. In casual 2v2
 // the seat is freed: a waiting room keeps waiting, a started one goes on with
@@ -20,7 +20,7 @@ import (
 // leaving on purpose is still a forfeit.
 // dropped: p's connection was lost too (no hold possible): with another seat
 // already held that is a shared outage, not a forfeit by p.
-func (r *room) leave(slot int, p peer, dropped bool) bool {
+func (r *Room) Leave(slot int, p Peer, dropped bool) bool {
 	r.mu.Lock()
 	if r.closed || (p != nil && r.peers[slot] != p) {
 		r.mu.Unlock()
@@ -34,11 +34,11 @@ func (r *room) leave(slot int, p peer, dropped bool) bool {
 	}
 	forfeit := r.ranked && r.started && !r.reported && r.onOver != nil && !(dropped && r.anyAwayLocked())
 	r.reported = r.reported || r.ranked // a no-contest is never reported later either
-	winner, users, onOver := 1-r.teamOf(slot), r.users, r.onOver
+	winner, users, onOver := 1-r.TeamOf(slot), r.users, r.onOver
 	r.closed = true
 	gone, release := r.stopHoldsLocked(), r.release
 	others := r.peers
-	r.peers = [sim.MaxPlayers]peer{}
+	r.peers = [sim.MaxPlayers]Peer{}
 	close(r.stop)
 	r.mu.Unlock()
 	for _, c := range gone {
@@ -57,7 +57,7 @@ func (r *room) leave(slot int, p peer, dropped bool) bool {
 	return true
 }
 
-func tellLeft(others [sim.MaxPlayers]peer) {
+func tellLeft(others [sim.MaxPlayers]Peer) {
 	for _, o := range others {
 		if o != nil {
 			_ = o.Send(wire.EncodeSignal(wire.MsgPeerLeft))
@@ -66,8 +66,8 @@ func tellLeft(others [sim.MaxPlayers]peer) {
 	}
 }
 
-// run plays the match until the room stops. tick is injectable for tests.
-func (r *room) run(tick <-chan time.Time) {
+// Run plays the match until the room stops. tick is injectable for tests.
+func (r *Room) Run(tick <-chan time.Time) {
 	r.mu.Lock()
 	mode, mask, onOver := r.mode, r.humanMaskLocked(), r.onOver
 	r.mu.Unlock()
@@ -115,12 +115,12 @@ func (r *room) run(tick <-chan time.Time) {
 			}
 			game.ViewOut(view, out, scratch, i, mode == sim.Mode2v2)
 			wire.EncodeFrame(msgs[i], view)
-			sendTo(p, msgs[i])
+			SendTo(p, msgs[i])
 		}
 	}
 }
 
-func sendTo(p peer, b []byte) {
+func SendTo(p Peer, b []byte) {
 	if p != nil {
 		_ = p.Send(b) // a dead peer is detected by its read loop, which calls leave
 	}

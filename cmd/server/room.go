@@ -11,39 +11,39 @@ import (
 )
 
 const (
-	frameInterval   = time.Second / 60
+	FrameInterval   = time.Second / 60
 	ticksPerFrame   = sim.TickRate / 60
 	roomPointsToWin = 5
 	closeNormal     = 1000
-	// minHumans2v2: a 2v2 room may start early (bots fill the rest) once this
+	// MinHumans2v2: a 2v2 room may start early (bots fill the rest) once this
 	// many people are in; see hub.fillWait.
-	minHumans2v2 = 2
+	MinHumans2v2 = 2
 )
 
 // Seat fill order. 2v2 teams are {0,1} vs {2,3} (sim/rules.go): the first two
 // people become rivals, each with a bot partner until more arrive.
 var (
 	seats1v1 = []int{0, 1}
-	seats2v2 = []int{0, 2, 1, 3}
+	Seats2v2 = []int{0, 2, 1, 3}
 )
 
-// peer is one connected browser; send must be safe for concurrent use.
-type peer interface {
+// Peer is one connected browser; send must be safe for concurrent use.
+type Peer interface {
 	Send(b []byte) error
 	Close(code int, reason string)
 }
 
-// room is one online match: 1v1 (2 seats) or 2v2 (4 seats). Seat = sim slot;
+// Room is one online match: 1v1 (2 seats) or 2v2 (4 seats). Seat = sim slot;
 // team = slot in 1v1, slot/2 in 2v2. Every client gets its own view
 // (game.ViewOut). In 2v2 an empty seat is played by the bot, also when
 // someone leaves mid-match.
-type room struct {
+type Room struct {
 	mu      sync.Mutex
 	mode    sim.Mode
 	code    string // hub key (set by hub.roomFor)
 	seats   int
 	order   []int
-	peers   [sim.MaxPlayers]peer
+	peers   [sim.MaxPlayers]Peer
 	inputs  [sim.MaxPlayers]sim.PlayerInput
 	stop    chan struct{}
 	started bool
@@ -65,7 +65,7 @@ type room struct {
 }
 
 // claimReport returns true exactly once: the caller reports the ranked result.
-func (r *room) claimReport() bool {
+func (r *Room) claimReport() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.reported {
@@ -75,19 +75,19 @@ func (r *room) claimReport() bool {
 	return true
 }
 
-// teamOf maps a seat to its team (1v1: the seat; 2v2: seat/2, sim/rules.go).
-func (r *room) teamOf(slot int) int {
+// TeamOf maps a seat to its team (1v1: the seat; 2v2: seat/2, sim/rules.go).
+func (r *Room) TeamOf(slot int) int {
 	if r.mode == sim.Mode2v2 {
 		return slot / 2
 	}
 	return slot
 }
 
-// markRanked records slot's verified account and network (limit key); the
+// MarkRanked records slot's verified account and network (limit key); the
 // room becomes ranked. It refuses an account or a network already seated:
 // nobody plays against themselves, and two accounts from one network can't
 // trade wins.
-func (r *room) markRanked(slot int, c ranked.Claim, network string) bool {
+func (r *Room) MarkRanked(slot int, c ranked.Claim, network string) bool {
 	user := c.UID
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -100,28 +100,28 @@ func (r *room) markRanked(slot int, c ranked.Claim, network string) bool {
 	return true
 }
 
-func newRoom(mode sim.Mode, code string) *room {
+func NewRoom(mode sim.Mode, code string) *Room {
 	order := seats1v1
 	if mode == sim.Mode2v2 {
-		order = seats2v2
+		order = Seats2v2
 	}
-	return &room{mode: mode, code: code, seats: len(order), order: order, stop: make(chan struct{})}
+	return &Room{mode: mode, code: code, seats: len(order), order: order, stop: make(chan struct{})}
 }
 
 // Code is the hub key of the room; Mode and Seats never change either.
-func (r *room) Code() string   { return r.code }
-func (r *room) Mode() sim.Mode { return r.mode }
-func (r *room) SeatCount() int { return r.seats }
+func (r *Room) Code() string   { return r.code }
+func (r *Room) Mode() sim.Mode { return r.mode }
+func (r *Room) SeatCount() int { return r.seats }
 
 // Peers is a snapshot of who is seated (nil = empty or held seat).
-func (r *room) Peers() [sim.MaxPlayers]peer {
+func (r *Room) Peers() [sim.MaxPlayers]Peer {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.peers
 }
 
 // Claims is a snapshot of the seats' ranked reservations.
-func (r *room) Claims() [sim.MaxPlayers]ranked.Claim {
+func (r *Room) Claims() [sim.MaxPlayers]ranked.Claim {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.claims
@@ -129,7 +129,7 @@ func (r *room) Claims() [sim.MaxPlayers]ranked.Claim {
 
 // SetRankedHooks wires the ELO report at game over and the release of held
 // accounts when the room closes; a casual room ignores them. Call before run.
-func (r *room) SetRankedHooks(onOver func(winner int, users [sim.MaxPlayers]string), release func(ranked.Claim)) {
+func (r *Room) SetRankedHooks(onOver func(winner int, users [sim.MaxPlayers]string), release func(ranked.Claim)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.ranked {
@@ -137,11 +137,11 @@ func (r *room) SetRankedHooks(onOver func(winner int, users [sim.MaxPlayers]stri
 	}
 }
 
-// join adds p and returns its slot (-1 if full, closed or already started).
-// start is true for exactly one caller: the one whose join fills the room.
+// Join adds p and returns its slot (-1 if full, closed or already started).
+// start is true for exactly one caller: the one whose Join fills the room.
 // humans is the head count after joining. A waiting joiner gets WAITING while
 // the lock is held, so a concurrent WELCOME can never precede it.
-func (r *room) join(p peer) (slot int, start bool, humans int) {
+func (r *Room) Join(p Peer) (slot int, start bool, humans int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed || r.started {
@@ -166,18 +166,18 @@ func (r *room) join(p peer) (slot int, start bool, humans int) {
 	return slot, r.startLocked(), humans
 }
 
-// startEarly starts a 2v2 room that is not full yet (bots take the empty
+// StartEarly starts a 2v2 room that is not full yet (bots take the empty
 // seats). It reports true for exactly one caller.
-func (r *room) startEarly() bool {
+func (r *Room) StartEarly() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.closed || r.ranked || r.humansLocked() < minHumans2v2 {
+	if r.closed || r.ranked || r.humansLocked() < MinHumans2v2 {
 		return false
 	}
 	return r.startLocked()
 }
 
-func (r *room) startLocked() bool {
+func (r *Room) startLocked() bool {
 	if r.started {
 		return false
 	}
@@ -186,7 +186,7 @@ func (r *room) startLocked() bool {
 	return true
 }
 
-func (r *room) humansLocked() int {
+func (r *Room) humansLocked() int {
 	n := 0
 	for _, p := range r.peers {
 		if p != nil {
@@ -197,7 +197,7 @@ func (r *room) humansLocked() int {
 }
 
 // humanMaskLocked has bit i set for every seated person.
-func (r *room) humanMaskLocked() int {
+func (r *Room) humanMaskLocked() int {
 	m := 0
 	for i, p := range r.peers {
 		if p != nil {
@@ -207,19 +207,19 @@ func (r *room) humanMaskLocked() int {
 	return m
 }
 
-// startedAt reports when the match began (ok false while waiting).
-func (r *room) startedAt() (t time.Time, ok bool) {
+// StartedAt reports when the match began (ok false while waiting).
+func (r *Room) StartedAt() (t time.Time, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.startAt, r.started
 }
 
-// expireIfWaiting closes the room iff the match never started, atomically
+// ExpireIfWaiting closes the room iff the match never started, atomically
 // with join (a rival arriving now is rejected instead of meeting a dead host).
-func (r *room) expireIfWaiting() bool {
+func (r *Room) ExpireIfWaiting() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.started || r.closed || (r.mode == sim.Mode2v2 && r.humansLocked() >= minHumans2v2) {
+	if r.started || r.closed || (r.mode == sim.Mode2v2 && r.humansLocked() >= MinHumans2v2) {
 		return false // 2v2 with enough people: the fill timer starts it with bots
 	}
 	r.closed = true
@@ -227,15 +227,15 @@ func (r *room) expireIfWaiting() bool {
 	return true
 }
 
-func (r *room) isClosed() bool {
+func (r *Room) IsClosed() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.closed
 }
 
-// setInput stores slot's latest input from p (ignored once p was replaced),
+// SetInput stores slot's latest input from p (ignored once p was replaced),
 // turned from the client's view into server space.
-func (r *room) setInput(slot int, p peer, in sim.PlayerInput) {
+func (r *Room) SetInput(slot int, p Peer, in sim.PlayerInput) {
 	in = game.ViewInput(in, slot, r.mode == sim.Mode2v2)
 	r.mu.Lock()
 	if r.peers[slot] == p {

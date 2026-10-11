@@ -34,7 +34,7 @@ var (
 // hub maps room codes to rooms.
 type hub struct {
 	mu       sync.Mutex
-	rooms    map[string]*room
+	rooms    map[string]*Room
 	origins  []string
 	proxied  bool                              // trust X-Forwarded-For (behind the hosting proxy)
 	ticker   func() (<-chan time.Time, func()) // injectable for tests
@@ -66,38 +66,38 @@ type hub struct {
 }
 
 func newHub(origins []string, logger *log.Logger) *hub {
-	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
+	return &hub{rooms: map[string]*Room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: netlimit.NewConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(lobby.Max*lobby.MaxShards, lobby.MaxPerClient), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobby.Idle, done: make(chan struct{})}
+		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: RejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(lobby.Max*lobby.MaxShards, lobby.MaxPerClient), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobby.Idle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
-	t := time.NewTicker(frameInterval)
+	t := time.NewTicker(FrameInterval)
 	return t.C, t.Stop
 }
 
 // roomFor returns the open room for code, creating it if missing or closed.
 // It returns nil when a new room is needed but the hub is at capacity.
-func (h *hub) roomFor(code string, mode sim.Mode) *room {
+func (h *hub) roomFor(code string, mode sim.Mode) *Room {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	r := h.rooms[code]
-	if r == nil || r.isClosed() {
+	if r == nil || r.IsClosed() {
 		if r == nil && len(h.rooms) >= h.maxRooms {
 			return nil
 		}
-		r = newRoom(mode, code)
+		r = NewRoom(mode, code)
 		h.rooms[code] = r
 	}
 	return r
 }
 
-func (h *hub) forget(code string, r *room) {
+func (h *hub) forget(code string, r *Room) {
 	h.mu.Lock()
 	if h.rooms[code] == r {
 		delete(h.rooms, code)
 	}
-	for _, t := range r.tokenList() {
+	for _, t := range r.TokenList() {
 		if h.seats[t].r == r {
 			delete(h.seats, t)
 		}
@@ -151,12 +151,12 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // join finds or creates the room for code and joins p, retrying once if the
 // room closed concurrently. r is nil when the hub is full.
-func (h *hub) join(code string, mode sim.Mode, p peer) (r *room, slot int, start bool, humans int) {
+func (h *hub) join(code string, mode sim.Mode, p Peer) (r *Room, slot int, start bool, humans int) {
 	for range 2 {
 		if r = h.roomFor(code, mode); r == nil {
 			return nil, -1, false, 0
 		}
-		if slot, start, humans = r.join(p); slot >= 0 || !r.isClosed() {
+		if slot, start, humans = r.Join(p); slot >= 0 || !r.IsClosed() {
 			return r, slot, start, humans
 		}
 	}
@@ -166,7 +166,7 @@ func (h *hub) join(code string, mode sim.Mode, p peer) (r *room, slot int, start
 // serve joins the room and runs the read loop until the peer disconnects.
 func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.Conn) {
 	p := wsPeer{c}
-	var r *room
+	var r *Room
 	var slot, humans int
 	var start, kept bool
 	var cl ranked.Claim // ranked reservation (zero outside ranked)
@@ -197,9 +197,9 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 			elo = h.ratingFor(ctx, rankedMode, cl.UID)
 		}
 		code, r, slot, start, humans = h.joinQueue(queued, p, key, elo)
-		if isRanked && r != nil && slot >= 0 && !r.markRanked(slot, cl, network) {
-			r.leave(slot, p, false)
-			if r.isClosed() {
+		if isRanked && r != nil && slot >= 0 && !r.MarkRanked(slot, cl, network) {
+			r.Leave(slot, p, false)
+			if r.IsClosed() {
 				h.forget(code, r)
 			}
 			h.leaveQueue(queued, code, key)
@@ -233,15 +233,15 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 // expireAlone closes p's room if nobody else shows up within h.wait. While a
 // 2v2 room has enough people for the bot fill it re-checks later instead of
 // giving up, so a waiter whose company left is never stranded. stop cancels it.
-func (h *hub) expireAlone(r *room, p peer) (stop func()) {
+func (h *hub) expireAlone(r *Room, p Peer) (stop func()) {
 	var mu sync.Mutex
 	var t *time.Timer
 	check := func() {
-		if r.expireIfWaiting() {
+		if r.ExpireIfWaiting() {
 			p.Close(closeNoRival, "no rival")
 			return
 		}
-		if _, started := r.startedAt(); !started && !r.isClosed() {
+		if _, started := r.StartedAt(); !started && !r.IsClosed() {
 			mu.Lock()
 			t.Reset(h.wait)
 			mu.Unlock()
@@ -257,7 +257,7 @@ func (h *hub) expireAlone(r *room, p peer) (stop func()) {
 // floods or sends garbage.
 // It reports lost when the connection dropped (not a normal close, nor one the
 // server made): the seat may then be held for a rejoin.
-func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *websocket.Conn) (lost bool) {
+func (h *hub) readLoop(ctx context.Context, code string, slot int, r *Room, c *websocket.Conn) (lost bool) {
 	p := wsPeer{c}
 	// Idle only counts once the match runs: a waiting host often hides the tab
 	// to share the link (no rAF, no PING); the no-rival timeout covers that.
@@ -291,18 +291,18 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 			_ = c.Close(websocket.StatusUnsupportedData, "bad message")
 			return false
 		}
-		r.setInput(slot, p, in)
+		r.SetInput(slot, p, in)
 	}
 }
 
 // armFill: the second person in a 2v2 room starts the countdown after which
 // bots fill the empty seats.
-func (h *hub) armFill(r *room, humans int, queued, code string) {
-	if r.Mode() != sim.Mode2v2 || humans != minHumans2v2 {
+func (h *hub) armFill(r *Room, humans int, queued, code string) {
+	if r.Mode() != sim.Mode2v2 || humans != MinHumans2v2 {
 		return
 	}
 	time.AfterFunc(h.fill, func() {
-		if !r.startEarly() {
+		if !r.StartEarly() {
 			return
 		}
 		if queued != "" {
@@ -314,12 +314,12 @@ func (h *hub) armFill(r *room, humans int, queued, code string) {
 
 // announce sends WELCOME to every seated peer and starts the match loop.
 // rankedMode ("1v1"/"2v2", "" = casual) wires the ELO report at game over.
-func (h *hub) announce(r *room, rankedMode string) {
+func (h *hub) announce(r *Room, rankedMode string) {
 	if rankedMode != "" {
 		r.SetRankedHooks(func(w int, users [sim.MaxPlayers]string) { h.reportRanked(rankedMode, r, users, w) }, h.releaseRanked)
 	}
 	peers := r.Peers()
-	tokens := r.issueTokens()
+	tokens := r.IssueTokens()
 	h.mu.Lock()
 	for i, p := range peers {
 		if p != nil {
@@ -328,17 +328,17 @@ func (h *hub) announce(r *room, rankedMode string) {
 	}
 	h.mu.Unlock()
 	for i, p := range peers {
-		sendTo(p, wire.EncodeWelcome(i)) // nil if that seat is empty
+		SendTo(p, wire.EncodeWelcome(i)) // nil if that seat is empty
 		if p != nil {
-			sendTo(p, wire.EncodeSeat(tokens[i]))
+			SendTo(p, wire.EncodeSeat(tokens[i]))
 		}
 	}
 	tick, stop := h.ticker()
-	go func() { defer stop(); r.run(tick) }()
+	go func() { defer stop(); r.Run(tick) }()
 }
 
 // watchIdle closes p once the match runs and nothing arrived for h.idle.
-func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, kicked *atomic.Bool, done <-chan struct{}) {
+func (h *hub) watchIdle(r *Room, p Peer, lastSeen *atomic.Int64, kicked *atomic.Bool, done <-chan struct{}) {
 	t := time.NewTimer(h.idle)
 	defer t.Stop()
 	for {
@@ -347,8 +347,8 @@ func (h *hub) watchIdle(r *room, p peer, lastSeen *atomic.Int64, kicked *atomic.
 			return
 		case <-t.C:
 		}
-		startAt, started := r.startedAt()
-		if r.isPaused() {
+		startAt, started := r.StartedAt()
+		if r.IsPaused() {
 			lastSeen.Store(time.Now().UnixNano()) // waiting for a dropped rival never counts as idle
 		}
 		if !started {

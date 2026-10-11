@@ -45,7 +45,7 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 // joinLobby seats p in the first lobby with room, opening another (with its
 // own broadcast loop) when all are full, up to maxLobbyShard. The join itself
 // (which sends) runs outside the hub lock; a lobby that filled meanwhile is retried.
-func (h *hub) joinLobby(p peer) (l *lobby.Lobby, id int, ok bool) {
+func (h *hub) joinLobby(p Peer) (l *lobby.Lobby, id int, ok bool) {
 	for range 3 {
 		if l = h.pickLobby(); l == nil {
 			return nil, 0, false

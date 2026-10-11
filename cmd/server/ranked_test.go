@@ -12,6 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
+	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
@@ -96,16 +97,17 @@ func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
 	_ = store.Save(context.Background(), "1v1", []ranked.Row{{ID: userA, Elo: 1000}, {ID: userB, Elo: 1000}})
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	h.ratings = store
-	r := newRoom(sim.Mode1v1, "test")
-	pa, pb := &fakePeer{}, &fakePeer{}
-	r.join(pa)
-	r.join(pb)
+	r := NewRoom(sim.Mode1v1, "test")
+	pa, pb := &peertest.Peer{}, &peertest.Peer{}
+	r.Join(pa)
+	r.Join(pb)
 	h.reportRanked("1v1", r, [sim.MaxPlayers]string{userA, userB}, 1)
 	got, _ := store.Load(context.Background(), "1v1", []string{userA, userB})
 	if got[userA] != 984 || got[userB] != 1016 {
 		t.Fatalf("stored %v", got)
 	}
-	last := pb.msgs[len(pb.msgs)-1]
+	msgs, _ := pb.Snapshot()
+	last := msgs[len(msgs)-1]
 	if last[0] != wire.MsgResult || wire.F64(last, 0) != 1000 || wire.F64(last, 1) != 1016 {
 		t.Fatalf("winner result %v", last)
 	}
@@ -125,14 +127,14 @@ func TestGameOverWinner(t *testing.T) {
 
 // Leaving a started ranked match is a forfeit: the leaver's team loses, once.
 func TestRankedLeaverForfeits(t *testing.T) {
-	r := newRoom(sim.Mode1v1, "test")
-	r.join(&fakePeer{})
-	r.join(&fakePeer{})
-	r.markRanked(0, ranked.Claim{UID: userA}, "net-a")
-	r.markRanked(1, ranked.Claim{UID: userB}, "net-b")
+	r := NewRoom(sim.Mode1v1, "test")
+	r.Join(&peertest.Peer{})
+	r.Join(&peertest.Peer{})
+	r.MarkRanked(0, ranked.Claim{UID: userA}, "net-a")
+	r.MarkRanked(1, ranked.Claim{UID: userB}, "net-b")
 	got := make(chan int, 2)
 	r.onOver = func(w int, _ [sim.MaxPlayers]string) { got <- w }
-	r.leave(0, nil, false) // userA quits
+	r.Leave(0, nil, false) // userA quits
 	select {
 	case w := <-got:
 		if w != 1 {
@@ -148,16 +150,16 @@ func TestRankedLeaverForfeits(t *testing.T) {
 
 // A ranked 2v2 never hands a seat to a bot: a leaver ends the match.
 func TestRanked2v2LeaverEndsMatch(t *testing.T) {
-	r := newRoom(sim.Mode2v2, "test")
+	r := NewRoom(sim.Mode2v2, "test")
 	for i := 0; i < 4; i++ {
-		r.join(&fakePeer{})
+		r.Join(&peertest.Peer{})
 	}
 	for i, u := range []string{userA, userB, userA + "c", userA + "d"} {
-		r.markRanked(i, ranked.Claim{UID: u}, u)
+		r.MarkRanked(i, ranked.Claim{UID: u}, u)
 	}
 	r.onOver = func(int, [sim.MaxPlayers]string) {}
-	r.leave(2, nil, false)
-	if !r.isClosed() {
+	r.Leave(2, nil, false)
+	if !r.IsClosed() {
 		t.Fatal("ranked 2v2 kept going with a bot")
 	}
 }
@@ -186,16 +188,16 @@ func TestRankedOneActiveConnectionPerAccount(t *testing.T) {
 }
 
 func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
-	r := newRoom(sim.Mode1v1, "test")
-	r.join(&fakePeer{})
-	r.join(&fakePeer{})
-	if !r.markRanked(0, ranked.Claim{UID: userA}, "10.0.0.1") {
+	r := NewRoom(sim.Mode1v1, "test")
+	r.Join(&peertest.Peer{})
+	r.Join(&peertest.Peer{})
+	if !r.MarkRanked(0, ranked.Claim{UID: userA}, "10.0.0.1") {
 		t.Fatal("first seat refused")
 	}
-	if r.markRanked(1, ranked.Claim{UID: userA}, "10.0.0.2") {
+	if r.MarkRanked(1, ranked.Claim{UID: userA}, "10.0.0.2") {
 		t.Fatal("same account on both seats accepted")
 	}
-	if r.markRanked(1, ranked.Claim{UID: userB}, "10.0.0.1") {
+	if r.MarkRanked(1, ranked.Claim{UID: userB}, "10.0.0.1") {
 		t.Fatal("two accounts from one network accepted")
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/game"
 	"github.com/txny34/futenis/sim"
@@ -14,37 +15,12 @@ import (
 
 const waitTimeout = time.Second
 
-type fakePeer struct {
-	mu     sync.Mutex
-	msgs   [][]byte
-	closed bool
-}
-
-func (f *fakePeer) Send(b []byte) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.msgs = append(f.msgs, append([]byte{}, b...))
-	return nil
-}
-
-func (f *fakePeer) Close(int, string) {
-	f.mu.Lock()
-	f.closed = true
-	f.mu.Unlock()
-}
-
-func (f *fakePeer) snapshot() ([][]byte, bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([][]byte{}, f.msgs...), f.closed
-}
-
-// waitFor polls until the peer has at least n messages.
-func (f *fakePeer) waitFor(t *testing.T, n int) [][]byte {
+// waitFor polls until p has at least n messages.
+func waitFor(t *testing.T, p *peertest.Peer, n int) [][]byte {
 	t.Helper()
 	deadline := time.Now().Add(waitTimeout)
 	for time.Now().Before(deadline) {
-		if m, _ := f.snapshot(); len(m) >= n {
+		if m, _ := p.Snapshot(); len(m) >= n {
 			return m
 		}
 		time.Sleep(time.Millisecond)
@@ -62,14 +38,14 @@ func decodeBody(b []byte) []float64 {
 }
 
 func TestRoomJoinFull(t *testing.T) {
-	r := newRoom(sim.Mode1v1, "test")
-	if slot, start, _ := r.join(&fakePeer{}); slot != 0 || start {
+	r := NewRoom(sim.Mode1v1, "test")
+	if slot, start, _ := r.Join(&peertest.Peer{}); slot != 0 || start {
 		t.Fatal("first join")
 	}
-	if slot, start, _ := r.join(&fakePeer{}); slot != 1 || !start {
+	if slot, start, _ := r.Join(&peertest.Peer{}); slot != 1 || !start {
 		t.Fatal("second join should start")
 	}
-	if slot, start, _ := r.join(&fakePeer{}); slot != -1 || start {
+	if slot, start, _ := r.Join(&peertest.Peer{}); slot != -1 || start {
 		t.Fatal("third peer accepted")
 	}
 }
@@ -78,18 +54,18 @@ func TestRoomJoinFull(t *testing.T) {
 // before anything else, so WELCOME is never followed by WAITING.
 func TestRoomWaitingOrder(t *testing.T) {
 	for range 50 {
-		r := newRoom(sim.Mode1v1, "test")
-		host, guest := &fakePeer{}, &fakePeer{}
+		r := NewRoom(sim.Mode1v1, "test")
+		host, guest := &peertest.Peer{}, &peertest.Peer{}
 		var wg sync.WaitGroup
 		starts := make(chan bool, 2)
-		for _, p := range []*fakePeer{host, guest} {
+		for _, p := range []*peertest.Peer{host, guest} {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, start, _ := r.join(p)
+				_, start, _ := r.Join(p)
 				if start {
-					sendTo(r.peers[0], wire.EncodeWelcome(0))
-					sendTo(r.peers[1], wire.EncodeWelcome(1))
+					SendTo(r.peers[0], wire.EncodeWelcome(0))
+					SendTo(r.peers[1], wire.EncodeWelcome(1))
 				}
 				starts <- start
 			}()
@@ -99,8 +75,8 @@ func TestRoomWaitingOrder(t *testing.T) {
 			t.Fatalf("%d starters", n)
 		}
 		waits := 0
-		for _, p := range []*fakePeer{host, guest} {
-			m, _ := p.snapshot()
+		for _, p := range []*peertest.Peer{host, guest} {
+			m, _ := p.Snapshot()
 			for i, b := range m {
 				if b[0] == wire.MsgWaiting {
 					waits++
@@ -124,18 +100,18 @@ func btoi(b bool) int {
 }
 
 func TestRoomFramesRotated(t *testing.T) {
-	r := newRoom(sim.Mode1v1, "test")
-	host, guest := &fakePeer{}, &fakePeer{}
-	r.join(host)
-	r.join(guest)
+	r := NewRoom(sim.Mode1v1, "test")
+	host, guest := &peertest.Peer{}, &peertest.Peer{}
+	r.Join(host)
+	r.Join(guest)
 	tick := make(chan time.Time)
 	done := make(chan struct{})
-	go func() { r.run(tick); close(done) }()
+	go func() { r.Run(tick); close(done) }()
 	for range 3 {
 		tick <- time.Time{}
 	}
-	hm := host.waitFor(t, 4)[1:] // host got WAITING first
-	gm := guest.waitFor(t, 3)
+	hm := waitFor(t, host, 4)[1:] // host got WAITING first
+	gm := waitFor(t, guest, 3)
 	rot := make([]float64, game.OutLen)
 	for i := range 3 {
 		if len(hm[i]) != wire.FrameLen || hm[i][0] != wire.MsgFrame || gm[i][0] != wire.MsgFrame {
@@ -149,35 +125,35 @@ func TestRoomFramesRotated(t *testing.T) {
 			}
 		}
 	}
-	r.leave(0, nil, false)
+	r.Leave(0, nil, false)
 	<-done
 }
 
 func TestRoomGuestInputRotated(t *testing.T) {
-	r := newRoom(sim.Mode1v1, "test")
+	r := NewRoom(sim.Mode1v1, "test")
 	in := sim.PlayerInput{MoveX: 1, MoveZ: -0.5, TargetX: 4, TargetZ: 2, Buttons: 3, Spin: 1}
-	r.setInput(0, nil, in)
-	r.setInput(1, nil, in)
+	r.SetInput(0, nil, in)
+	r.SetInput(1, nil, in)
 	if r.inputs[0] != in || r.inputs[1] != game.RotateInput(in) {
 		t.Fatalf("inputs %+v", r.inputs)
 	}
 }
 
 func TestRoomLeave(t *testing.T) {
-	r := newRoom(sim.Mode1v1, "test")
-	host, guest := &fakePeer{}, &fakePeer{}
-	r.join(host)
-	r.join(guest)
-	r.leave(1, nil, false)
-	r.leave(0, nil, false) // second leave is a no-op
-	msgs, closed := host.snapshot()
+	r := NewRoom(sim.Mode1v1, "test")
+	host, guest := &peertest.Peer{}, &peertest.Peer{}
+	r.Join(host)
+	r.Join(guest)
+	r.Leave(1, nil, false)
+	r.Leave(0, nil, false) // second leave is a no-op
+	msgs, closed := host.Snapshot()
 	if len(msgs) != 2 || msgs[0][0] != wire.MsgWaiting || msgs[1][0] != wire.MsgPeerLeft || !closed {
 		t.Fatalf("host msgs %v closed %v", msgs, closed)
 	}
-	if slot, _, _ := r.join(&fakePeer{}); !r.isClosed() || slot != -1 {
+	if slot, _, _ := r.Join(&peertest.Peer{}); !r.IsClosed() || slot != -1 {
 		t.Fatal("closed room accepted a peer")
 	}
-	if m, _ := guest.snapshot(); len(m) != 0 {
+	if m, _ := guest.Snapshot(); len(m) != 0 {
 		t.Fatalf("leaver got %v", m)
 	}
 }

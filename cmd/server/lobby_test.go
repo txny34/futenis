@@ -11,6 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/lobby"
+	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
@@ -148,7 +149,7 @@ func TestLobbyShards(t *testing.T) {
 	defer close(h.done)
 	seen := map[*lobby.Lobby]int{}
 	for i := 0; i < lobby.Max+1; i++ {
-		l, _, ok := h.joinLobby(&fakePeer{})
+		l, _, ok := h.joinLobby(&peertest.Peer{})
 		if !ok {
 			t.Fatalf("join %d rejected", i)
 		}
