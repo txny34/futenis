@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/auth"
+	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -19,14 +21,14 @@ const (
 	userB   = "8d1c7a3e-0000-4000-8000-00000000000b"
 )
 
-func newRankedHub(t *testing.T) (*httptest.Server, *fakeIssuer, *memRatings) {
+func newRankedHub(t *testing.T) (*httptest.Server, *authtest.Issuer, *memRatings) {
 	t.Helper()
-	iss := newFakeIssuer(t)
+	iss := authtest.NewIssuer(t)
 	store := newMemRatings()
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	h.proxied = true
 	h.ticker = func() (<-chan time.Time, func()) { return make(chan time.Time), func() {} }
-	h.auth = newVerifier(iss.srv.URL, testIss)
+	h.auth = auth.NewVerifier(iss.Srv.URL, testIss)
 	h.ratings = store
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
@@ -51,10 +53,10 @@ func dialRanked(ctx context.Context, t *testing.T, srv *httptest.Server, ip, tok
 	return c
 }
 
-func tokenFor(t *testing.T, iss *fakeIssuer, user string) string {
-	c := goodClaims(testIss)
+func tokenFor(t *testing.T, iss *authtest.Issuer, user string) string {
+	c := authtest.GoodClaims(testIss)
 	c["sub"] = user
-	return iss.token(t, c)
+	return iss.Token(t, c)
 }
 
 func TestRankedNeedsAValidToken(t *testing.T) {

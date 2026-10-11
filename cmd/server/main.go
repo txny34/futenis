@@ -18,6 +18,8 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/txny34/futenis/cmd/server/internal/auth"
 )
 
 const (
@@ -86,7 +88,7 @@ func configureRanked(h *hub, logger *log.Logger) {
 		return
 	}
 	base := strings.TrimRight(project, "/")
-	h.auth = newVerifier(base+"/auth/v1/.well-known/jwks.json", base+"/auth/v1")
+	h.auth = auth.NewVerifier(base+"/auth/v1/.well-known/jwks.json", base+"/auth/v1")
 	h.ratings = newSupabaseRatings(base, key)
 	logger.Printf("ranked enabled (%s)", base)
 }

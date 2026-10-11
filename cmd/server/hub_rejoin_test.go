@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -164,7 +165,7 @@ func TestClosingTheTabLeaves(t *testing.T) {
 }
 
 // startRanked starts a ranked 1v1 between userA and userB; it returns A's rejoin token.
-func startRanked(ctx context.Context, t *testing.T, srv *httptest.Server, iss *fakeIssuer, net string) (a, b *websocket.Conn, token string) {
+func startRanked(ctx context.Context, t *testing.T, srv *httptest.Server, iss *authtest.Issuer, net string) (a, b *websocket.Conn, token string) {
 	t.Helper()
 	a = dialRanked(ctx, t, srv, net+".1", tokenFor(t, iss, userA))
 	readMsg(ctx, t, a, msgWaiting, headerLen)

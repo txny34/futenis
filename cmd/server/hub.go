@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 	"github.com/txny34/futenis/sim"
 )
@@ -46,7 +47,7 @@ type hub struct {
 	matching    bool                              // ranked rebalancing loop started (queue_match.go)
 	matchTicker func() (<-chan time.Time, func()) // injectable for tests
 
-	auth     *verifier         // Supabase token check; nil = ranked disabled
+	auth     *auth.Verifier    // Supabase token check; nil = ranked disabled
 	active   map[string]uint64 // accounts with a live ranked connection (one each) -> claim generation
 	claimSeq uint64
 	ratings  ratingStore // ranked ELO store; nil = ranked disabled
@@ -171,7 +172,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	network := "" // ranked: the client's limit key, seated next to its account
 	if ranked {
 		acc, ok := h.authenticate(ctx, c)
-		uid := acc.id
+		uid := acc.ID
 		if !ok {
 			p.close(closeNoAuth, "sign in required")
 			return
