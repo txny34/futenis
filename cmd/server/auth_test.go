@@ -61,9 +61,15 @@ func goodClaims(iss string) map[string]any {
 func TestVerifyAcceptsSupabaseToken(t *testing.T) {
 	f := newFakeIssuer(t)
 	v := newVerifier(f.srv.URL, "https://proj.supabase.co/auth/v1")
-	id, err := v.verify(f.token(t, goodClaims("https://proj.supabase.co/auth/v1")))
-	if err != nil || id != "8d1c7a3e-0000-4000-8000-000000000001" {
-		t.Fatalf("id=%q err=%v", id, err)
+	c := goodClaims("https://proj.supabase.co/auth/v1")
+	c["user_metadata"] = map[string]any{"full_name": "Ana Pérez", "custom_claims": map[string]any{"global_name": "anita"}}
+	acc, err := v.verify(f.token(t, c))
+	if err != nil || acc.id != "8d1c7a3e-0000-4000-8000-000000000001" || acc.name != "anita" {
+		t.Fatalf("account=%+v err=%v", acc, err)
+	}
+	c["user_metadata"] = map[string]any{"full_name": "Pendejo Total"}
+	if acc, _ := v.verify(f.token(t, c)); acc.name != fallbackName {
+		t.Fatalf("offensive name kept: %q", acc.name)
 	}
 }
 

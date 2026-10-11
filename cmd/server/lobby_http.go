@@ -95,7 +95,7 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby, id int, c *websocket.Conn
 		case isPing(b):
 			_ = p.send(encodePong(pong, b))
 		case isNameMsg(b):
-			l.setName(id, sanitizeName(string(b[headerLen:])), time.Now())
+			l.setName(id, cleanName(string(b[headerLen:])), time.Now())
 		default:
 			pos, err := decodePresence(b)
 			if err != nil {

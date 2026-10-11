@@ -48,39 +48,56 @@ type jwtHeader struct {
 }
 
 type jwtClaims struct {
-	Sub string          `json:"sub"`
+	Sub  string `json:"sub"`
+	Meta struct {
+		FullName string `json:"full_name"`
+		Name     string `json:"name"`
+		Custom   struct {
+			GlobalName string `json:"global_name"`
+		} `json:"custom_claims"`
+	} `json:"user_metadata"`
 	Iss string          `json:"iss"`
 	Aud json.RawMessage `json:"aud"`
 	Exp int64           `json:"exp"`
 }
 
-// verify returns the user id (sub) of a valid token.
-func (v *verifier) verify(token string) (string, error) {
+// account is a verified login: user id (sub) and its display name.
+type account struct{ id, name string }
+
+// verify returns the account of a valid token. The name follows the client
+// (auth/session.ts): Discord global name, then full name, then name.
+func (v *verifier) verify(token string) (account, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return "", errBadToken
+		return account{}, errBadToken
 	}
 	var h jwtHeader
 	if decodePart(parts[0], &h) != nil || h.Alg != "ES256" {
-		return "", errBadToken
+		return account{}, errBadToken
 	}
 	key, err := v.key(h.Kid)
 	if err != nil {
-		return "", err
+		return account{}, err
 	}
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil || len(sig) != 64 {
-		return "", errBadToken
+		return account{}, errBadToken
 	}
 	sum := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
 	if !ecdsa.Verify(key, sum[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])) {
-		return "", errBadToken
+		return account{}, errBadToken
 	}
 	var c jwtClaims
 	if decodePart(parts[1], &c) != nil || !v.claimsOK(c) {
-		return "", errBadToken
+		return account{}, errBadToken
 	}
-	return c.Sub, nil
+	name := c.Meta.Custom.GlobalName
+	for _, n := range []string{c.Meta.FullName, c.Meta.Name} {
+		if name == "" {
+			name = n
+		}
+	}
+	return account{id: c.Sub, name: cleanName(name)}, nil
 }
 
 func (v *verifier) claimsOK(c jwtClaims) bool {

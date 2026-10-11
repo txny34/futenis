@@ -89,7 +89,7 @@ func TestRankedDisabledWithoutConfig(t *testing.T) {
 
 func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
 	store := newMemRatings()
-	_ = store.save(context.Background(), "1v1", map[string]int{userA: 1000, userB: 1000})
+	_ = store.save(context.Background(), "1v1", []rankedRow{{ID: userA, Elo: 1000}, {ID: userB, Elo: 1000}})
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	h.ratings = store
 	r := newRoom(sim.Mode1v1)

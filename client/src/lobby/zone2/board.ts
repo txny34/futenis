@@ -2,14 +2,15 @@ import * as THREE from "three";
 import { THEME } from "../../env/theme";
 import { FONT_STACK } from "../decor/util";
 import { t } from "../../i18n/t";
+import { TOP_SIZE, type TopRow } from "./top";
 
-// One framed leaderboard screen of the hall (lobby/zone2). Local data only:
-// the guest's own highlighted row plus clearly-marked "coming soon" slots
-// where the online top list will go (no invented names). Redrawn only when
-// the profile changes (setValue), never per frame.
+// One framed leaderboard screen of the hall (lobby/zone2): the global top
+// list (lobby/zone2/top.ts) plus the player's own highlighted row. Until the
+// list loads (or offline) the slots stay as clearly-marked "coming soon"
+// lines (no invented names). Redrawn only on changes, never per frame.
 const W = 768;
 const H = 1024;
-const SLOTS = 7;
+const SLOTS = TOP_SIZE;
 const SLOT_Y0 = 250;
 const SLOT_H = 74;
 const OWN_Y = 840;
@@ -24,6 +25,8 @@ export class Board {
   private readonly tex: THREE.CanvasTexture;
   private name = "";
   private value = "";
+  private top: readonly TopRow[] | null = null;
+  private ownId = "";
 
   constructor(private readonly title: string, worldW: number) {
     const canvas = document.createElement("canvas");
@@ -52,6 +55,13 @@ export class Board {
     this.draw();
   }
 
+  /** Global list (null = unavailable) and the signed-in account to highlight in it. */
+  setTop(rows: readonly TopRow[] | null, ownId: string): void {
+    this.top = rows;
+    this.ownId = ownId;
+    this.draw();
+  }
+
   private draw(): void {
     const c = this.ctx;
     if (!c) return;
@@ -64,24 +74,29 @@ export class Board {
     c.fillText(this.title, W / 2, 90, W - 60);
     c.fillStyle = H_.boardMuted;
     c.font = `30px ${FONT_STACK}`;
-    c.fillText(t("RANKING ONLINE — PRÓXIMAMENTE", "ONLINE RANKING — COMING SOON"), W / 2, 180, W - 60);
+    const sub = this.top ? t("RANKING ONLINE", "ONLINE RANKING") : t("RANKING ONLINE — PRÓXIMAMENTE", "ONLINE RANKING — COMING SOON");
+    c.fillText(sub, W / 2, 180, W - 60);
     this.drawSlots(c);
     this.drawOwn(c);
     this.tex.needsUpdate = true;
   }
 
-  /** Empty placeholder lines: where the online top list will go. */
+  /** Top rows (own account highlighted); the rest stay dashed placeholder lines. */
   private drawSlots(c: CanvasRenderingContext2D): void {
-    c.strokeStyle = H_.boardMuted;
     c.lineWidth = 2;
-    c.setLineDash([14, 12]);
-    c.textAlign = "left";
     c.font = `34px ${FONT_STACK}`;
     for (let i = 0; i < SLOTS; i++) {
       const y = SLOT_Y0 + i * SLOT_H;
+      const mid = y + (SLOT_H - 16) / 2;
+      const r = this.top?.[i];
+      const own = r !== undefined && r.id === this.ownId;
+      c.setLineDash(r ? [] : [14, 12]);
+      c.strokeStyle = own ? H_.ownText : H_.boardMuted;
       c.strokeRect(40, y, W - 80, SLOT_H - 16);
-      c.fillStyle = H_.boardMuted;
-      c.fillText(`#${i + 1}`, 60, y + (SLOT_H - 16) / 2);
+      c.fillStyle = r ? (own ? H_.ownText : H_.boardTitle) : H_.boardMuted;
+      c.textAlign = "left";
+      c.fillText(r ? `#${i + 1}  ${r.name}` : `#${i + 1}`, 60, mid, W - 260);
+      if (r) { c.textAlign = "right"; c.fillText(String(r.value), W - 60, mid); }
     }
     c.setLineDash([]);
   }
