@@ -17,9 +17,10 @@ var queueModes = map[string]sim.Mode{
 const (
 	fillWait = 20 * time.Second
 
-	// Ranked pairing by ELO: a waiting room takes a newcomer whose rating is
-	// within eloGapStart, widening by eloGapPerSec while it waits; after
-	// eloGapOpen anyone fits. Casual queues ignore ratings (one open room).
+	// Ranked 1v1 pairing by ELO: a waiting room takes a newcomer whose rating
+	// is within eloGapStart, widening by eloGapPerSec while it waits; after
+	// eloGapOpen anyone fits. Other queues ignore ratings (one open room):
+	// split 2v2 groups could otherwise wait for each other forever.
 	eloGapStart  = 150
 	eloGapPerSec = 25
 	eloGapOpen   = 30 * time.Second
@@ -64,9 +65,12 @@ func (q *queue) remove(code string) {
 	}
 }
 
+// eloQueue is the only queue paired by rating.
+const eloQueue = "ranked1v1"
+
 // fits reports whether a player rated elo may join o now.
-func (o *openRoom) fits(elo int, ranked bool, now time.Time) bool {
-	if !ranked {
+func (o *openRoom) fits(elo int, byElo bool, now time.Time) bool {
+	if !byElo {
 		return true
 	}
 	waited := now.Sub(o.since)
@@ -84,26 +88,28 @@ func (h *hub) queueRoom(mode, key string, elo int) (code string, ok bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	q := h.queueFor(mode)
-	_, ranked := rankedModes[mode]
-	if ranked {
+	byElo := mode == eloQueue
+	if byElo {
 		h.startMatcherLocked()
 	}
 	now := time.Now()
-	var best *openRoom
 	live := q.open[:0]
 	for _, o := range q.open {
 		if r := h.rooms[o.code]; (r == nil && now.Sub(o.since) > staleOpen) || (r != nil && r.isClosed()) {
 			continue // everyone waiting there left
 		}
 		live = append(live, o)
+	}
+	q.open = live
+	var best *openRoom
+	for _, o := range q.open {
 		if o.owners[key] {
 			return o.code, false
 		}
-		if (o.fits(elo, ranked, now) || len(q.open) >= maxOpenRooms) && (best == nil || abs(elo-o.elo) < abs(elo-best.elo)) {
+		if (o.fits(elo, byElo, now) || len(q.open) >= maxOpenRooms) && (best == nil || abs(elo-o.elo) < abs(elo-best.elo)) {
 			best = o
 		}
 	}
-	q.open = live
 	if best == nil {
 		h.queueSeq++
 		best = &openRoom{code: fmt.Sprintf("mm-%s-%x", mode, h.queueSeq), elo: elo, since: now, owners: map[string]bool{}}

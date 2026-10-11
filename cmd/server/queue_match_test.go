@@ -98,3 +98,46 @@ func closedSoon(p *fakePeer) bool {
 	}
 	return false
 }
+
+func TestRequeueSkipsARoomThatStarted(t *testing.T) {
+	r := newRoom(sim.Mode1v1)
+	r.join(&fakePeer{})
+	r.join(&fakePeer{}) // full: the match starts
+	if p, _ := r.requeueAlone(); p != nil || r.isClosed() {
+		t.Fatal("a started match must never be broken up")
+	}
+	lone := newRoom(sim.Mode1v1)
+	lone.join(&fakePeer{})
+	if p, _ := lone.requeueAlone(); p == nil || !lone.isClosed() {
+		t.Fatal("a lone waiter is moved and its room closed")
+	}
+	if slot, _, _ := lone.join(&fakePeer{}); slot >= 0 {
+		t.Fatal("a joiner racing the move must be refused (it retries)")
+	}
+}
+
+func TestQueueRefusalKeepsOpenRoomsUnique(t *testing.T) {
+	h := newMatchHub()
+	a, _ := openAt(t, h, "a", 1000, 0)
+	h.mu.Lock()
+	h.rooms[a].closed = true // everyone left room a
+	h.mu.Unlock()
+	b, _ := openAt(t, h, "b", 1000, 0)
+	h.claimWait("ranked1v1", b, "b")
+	if _, ok := h.queueRoom("ranked1v1", "b", 1000); ok {
+		t.Fatal("b already waits")
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if n := len(h.queueFor("ranked1v1").open); n != 1 {
+		t.Fatalf("%d open rooms, want 1 (no duplicates)", n)
+	}
+}
+
+func TestRanked2v2IgnoresRatings(t *testing.T) {
+	h := newMatchHub()
+	a, _ := h.queueRoom("ranked2v2", "a", 800)
+	if code, _ := h.queueRoom("ranked2v2", "b", 2000); code != a {
+		t.Fatal("ranked 2v2 keeps one open room: split groups would wait forever")
+	}
+}

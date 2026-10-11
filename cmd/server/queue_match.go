@@ -11,8 +11,9 @@ import (
 // widened) has its waiter closed with closeRequeue; the client queues again at
 // once and lands in the older room.
 const (
-	matchEvery   = time.Second
-	closeRequeue = 4009
+	matchEvery          = time.Second
+	closeRequeue        = 4009
+	ratingLookupTimeout = 2 * time.Second // a slow database must not hold the queue join
 )
 
 // startMatcher runs the rebalancing loop once per hub (lazily, on the first ranked queue).
@@ -30,9 +31,7 @@ func (h *hub) startMatcherLocked() {
 				return
 			case <-tick:
 			}
-			for mode := range rankedModes {
-				h.rebalance(mode, time.Now())
-			}
+			h.rebalance(eloQueue, time.Now())
 		}
 	}()
 }
@@ -52,7 +51,7 @@ func (h *hub) rebalance(mode string, now time.Time) {
 			lonely = append(lonely, o)
 		}
 	}
-	var move []*room
+	var move []*room // candidates; requeueAlone re-checks each under its own lock
 	taken := map[*openRoom]bool{}
 	for i, old := range lonely {
 		for _, newer := range lonely[i+1:] {
@@ -66,7 +65,10 @@ func (h *hub) rebalance(mode string, now time.Time) {
 	}
 	h.mu.Unlock()
 	for _, r := range move {
-		r.requeueAlone()
+		if p, c := r.requeueAlone(); p != nil {
+			h.releaseRanked(c) // before the close: the client's immediate reconnect must find the account free
+			go p.close(closeRequeue, "requeue") // the close handshake may wait on the client
+		}
 	}
 }
 
@@ -77,27 +79,33 @@ func (r *room) waitingAlone() bool {
 	return !r.started && !r.closed && r.humansLocked() == 1
 }
 
-// requeueAlone asks the lone waiter to queue again (closeRequeue).
-func (r *room) requeueAlone() {
+// requeueAlone closes the room iff it still waits with exactly one person
+// (atomically with join: a rival arriving now is refused and retries) and
+// returns that person and their ranked claim; nil when the room moved on.
+func (r *room) requeueAlone() (peer, claim) {
 	r.mu.Lock()
-	var p peer
-	for _, o := range r.peers {
-		if o != nil {
-			p = o
+	defer r.mu.Unlock()
+	if r.started || r.closed || r.humansLocked() != 1 {
+		return nil, claim{}
+	}
+	for i, p := range r.peers {
+		if p != nil {
+			r.closed = true
+			close(r.stop)
+			r.peers[i] = nil
+			return p, r.claims[i]
 		}
 	}
-	r.mu.Unlock()
-	if p != nil {
-		go p.close(closeRequeue, "requeue") // the close handshake may wait on the client
-	}
+	return nil, claim{}
 }
 
 // ratingFor is the account's current ELO in mode (eloDefault when unknown or unreachable).
 func (h *hub) ratingFor(ctx context.Context, mode, uid string) int {
-	ctx, cancel := context.WithTimeout(ctx, ratingsTimeout)
+	ctx, cancel := context.WithTimeout(ctx, ratingLookupTimeout)
 	defer cancel()
 	got, err := h.ratings.load(ctx, mode, []string{uid})
 	if err != nil {
+		h.logger.Printf("ranked %s: rating lookup: %v (queued as %d)", mode, err, eloDefault)
 		return eloDefault
 	}
 	return ratingOf(got, uid)
