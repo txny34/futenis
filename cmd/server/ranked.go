@@ -110,20 +110,32 @@ func gameOverWinner(out []float64) (int, bool) {
 // claimRanked reserves the account's single ranked connection (queue through
 // match end). It fails while another one is live: no self-matching, no
 // parallel matches whose rating writes could overwrite each other.
-func (h *hub) claimRanked(uid string) bool {
+// Each claim has its own generation: a late release from an old connection
+// (replaced, or of a finished match) never frees the account's newer claim.
+func (h *hub) claimRanked(uid string) (claim, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.active[uid] {
-		return false
+	if _, busy := h.active[uid]; busy {
+		return claim{}, false
 	}
-	h.active[uid] = true
-	return true
+	h.claimSeq++
+	h.active[uid] = h.claimSeq
+	return claim{uid: uid, gen: h.claimSeq}, true
 }
 
-func (h *hub) releaseRanked(uid string) {
+// releaseRanked frees c if it is still the account's live claim ("" = none).
+func (h *hub) releaseRanked(c claim) {
 	h.mu.Lock()
-	delete(h.active, uid)
+	if c.uid != "" && h.active[c.uid] == c.gen {
+		delete(h.active, c.uid)
+	}
 	h.mu.Unlock()
+}
+
+// claim is one ranked reservation of an account.
+type claim struct {
+	uid string
+	gen uint64
 }
 
 // distinct reports whether every id appears once (defense in depth for reports).

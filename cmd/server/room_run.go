@@ -14,9 +14,12 @@ import (
 // the seat is freed: a waiting room keeps waiting, a started one goes on with
 // the bot in that seat; the room ends when no person is left. Leaving a
 // started ranked match is a forfeit: the leaver's team loses and the match
-// ends (no bot ever plays ranked). With a seat held for a dropped player the
-// ranked match ends without a result: nobody loses to a shared network blip.
-func (r *room) leave(slot int, p peer) bool {
+// ends (no bot ever plays ranked). A ranked match whose last connected player
+// drops while another seat is held ends without a result (shared outage);
+// leaving on purpose is still a forfeit.
+// dropped: p's connection was lost too (no hold possible): with another seat
+// already held that is a shared outage, not a forfeit by p.
+func (r *room) leave(slot int, p peer, dropped bool) bool {
 	r.mu.Lock()
 	if r.closed || (p != nil && r.peers[slot] != p) {
 		r.mu.Unlock()
@@ -28,7 +31,7 @@ func (r *room) leave(slot int, p peer) bool {
 		r.mu.Unlock()
 		return true // the bot takes the seat (started) or it is free again (waiting)
 	}
-	forfeit := r.ranked && r.started && !r.reported && r.onOver != nil && !r.anyAwayLocked()
+	forfeit := r.ranked && r.started && !r.reported && r.onOver != nil && !(dropped && r.anyAwayLocked())
 	r.reported = r.reported || r.ranked // a no-contest is never reported later either
 	winner, users, onOver := 1-r.teamOf(slot), r.users, r.onOver
 	r.closed = true
@@ -37,9 +40,9 @@ func (r *room) leave(slot int, p peer) bool {
 	r.peers = [sim.MaxPlayers]peer{}
 	close(r.stop)
 	r.mu.Unlock()
-	for _, uid := range gone {
+	for _, c := range gone {
 		if release != nil {
-			release(uid)
+			release(c)
 		}
 	}
 	if !forfeit {

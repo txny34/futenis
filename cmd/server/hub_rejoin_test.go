@@ -203,3 +203,22 @@ func TestRankedBothDroppedIsNoContest(t *testing.T) {
 	again := dialRanked(ctx, t, srv, "10.4.2.3", tokenFor(t, iss, userA)) // the account is free again
 	readMsg(ctx, t, again, msgWaiting, headerLen)
 }
+
+func TestRankedLeavingWhileRivalHeldIsAForfeit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, iss, store := newRankedHub(t)
+	a, b, _ := startRanked(ctx, t, srv, iss, "10.4.3")
+	a.CloseNow() // A's connection blips
+	readMsg(ctx, t, b, msgPeerAway, headerLen+8)
+	_ = b.Close(websocket.StatusNormalClosure, "") // B quits on purpose to dodge the loss
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if got, _ := store.load(ctx, "1v1", []string{userA, userB}); got[userB] != 0 && got[userB] < got[userA] {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	got, _ := store.load(ctx, "1v1", []string{userA, userB})
+	t.Fatalf("ratings %v: want B's forfeit recorded", got)
+}

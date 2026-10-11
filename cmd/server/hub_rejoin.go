@@ -25,7 +25,7 @@ func (h *hub) play(ctx context.Context, code string, slot int, r *room, c *webso
 		h.logger.Printf("room %s slot %d: connection lost, seat held", code, slot)
 		return true
 	}
-	left := r.leave(slot, p)
+	left := r.leave(slot, p, lost)
 	closed := r.isClosed()
 	if closed { // a 2v2 goes on (or keeps waiting) while people remain
 		h.forget(code, r)
@@ -34,13 +34,11 @@ func (h *hub) play(ctx context.Context, code string, slot int, r *room, c *webso
 }
 
 func (h *hub) expireSeat(code string, r *room, slot int) {
-	uid := r.seatedAccount(slot)
+	c := r.seatClaim(slot)
 	if !r.expireAway(slot) {
 		return // back in time
 	}
-	if uid != "" {
-		h.releaseRanked(uid)
-	}
+	h.releaseRanked(c)
 	if r.isClosed() {
 		h.forget(code, r)
 	}
@@ -58,8 +56,8 @@ func (h *hub) serveRejoin(ctx context.Context, token string, c *websocket.Conn) 
 		return
 	}
 	h.logger.Printf("room %s slot %d: rejoined", ref.r.code, ref.slot)
-	uid := ref.r.seatedAccount(ref.slot)
-	if !h.play(ctx, ref.r.code, ref.slot, ref.r, c) && uid != "" {
-		h.releaseRanked(uid)
+	cl := ref.r.seatClaim(ref.slot)
+	if !h.play(ctx, ref.r.code, ref.slot, ref.r, c) {
+		h.releaseRanked(cl)
 	}
 }

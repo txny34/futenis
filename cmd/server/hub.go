@@ -44,7 +44,8 @@ type hub struct {
 	queues   map[string]*queue
 
 	auth    *verifier       // Supabase token check; nil = ranked disabled
-	active  map[string]bool // accounts with a live ranked connection (one each)
+	active   map[string]uint64 // accounts with a live ranked connection (one each) -> claim generation
+	claimSeq uint64
 	ratings ratingStore     // ranked ELO store; nil = ranked disabled
 
 	seats map[string]seatRef // rejoin token -> held seat (room_rejoin.go)
@@ -60,7 +61,7 @@ type hub struct {
 func newHub(origins []string, logger *log.Logger) *hub {
 	return &hub{rooms: map[string]*room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: newConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]bool{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
+		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: rejoinGrace, active: map[string]uint64{}, lobbyConns: newConnLimiter(maxLobby*maxLobbyShard, maxLobbyPerIP), lobbyTicker: realLobbyTicker, lobbyIdle: lobbyIdle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
@@ -162,6 +163,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	var r *room
 	var slot, humans int
 	var start, kept bool
+	var cl claim // ranked reservation (zero outside ranked)
 	rankedMode, ranked := rankedModes[queued]
 	network := "" // ranked: the client's limit key, seated next to its account
 	if ranked {
@@ -170,13 +172,13 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 			p.close(closeNoAuth, "sign in required")
 			return
 		}
-		if !h.claimRanked(uid) {
+		if cl, ok = h.claimRanked(uid); !ok {
 			p.close(closeFull, "already in a ranked match")
 			return
 		}
 		defer func() {
 			if !kept { // a held or replaced seat keeps the account claimed; hub.expireSeat frees it
-				h.releaseRanked(uid)
+				h.releaseRanked(cl)
 			}
 		}()
 		network = key
@@ -184,8 +186,8 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	}
 	if queued != "" {
 		code, r, slot, start, humans = h.joinQueue(queued, p, key)
-		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, key[len("user:"):], network) {
-			r.leave(slot, p)
+		if ranked && r != nil && slot >= 0 && !r.markRanked(slot, cl, network) {
+			r.leave(slot, p, false)
 			if r.isClosed() {
 				h.forget(code, r)
 			}
@@ -278,7 +280,7 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *room, c *w
 			_ = c.Close(websocket.StatusUnsupportedData, "bad message")
 			return false
 		}
-		r.setInput(slot, in)
+		r.setInput(slot, p, in)
 	}
 }
 

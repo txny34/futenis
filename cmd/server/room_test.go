@@ -148,15 +148,15 @@ func TestRoomFramesRotated(t *testing.T) {
 			}
 		}
 	}
-	r.leave(0, nil)
+	r.leave(0, nil, false)
 	<-done
 }
 
 func TestRoomGuestInputRotated(t *testing.T) {
 	r := newRoom(sim.Mode1v1)
 	in := sim.PlayerInput{MoveX: 1, MoveZ: -0.5, TargetX: 4, TargetZ: 2, Buttons: 3, Spin: 1}
-	r.setInput(0, in)
-	r.setInput(1, in)
+	r.setInput(0, nil, in)
+	r.setInput(1, nil, in)
 	if r.inputs[0] != in || r.inputs[1] != game.RotateInput(in) {
 		t.Fatalf("inputs %+v", r.inputs)
 	}
@@ -167,8 +167,8 @@ func TestRoomLeave(t *testing.T) {
 	host, guest := &fakePeer{}, &fakePeer{}
 	r.join(host)
 	r.join(guest)
-	r.leave(1, nil)
-	r.leave(0, nil) // second leave is a no-op
+	r.leave(1, nil, false)
+	r.leave(0, nil, false) // second leave is a no-op
 	msgs, closed := host.snapshot()
 	if len(msgs) != 2 || msgs[0][0] != msgWaiting || msgs[1][0] != msgPeerLeft || !closed {
 		t.Fatalf("host msgs %v closed %v", msgs, closed)

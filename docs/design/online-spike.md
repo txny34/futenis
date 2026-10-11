@@ -21,6 +21,9 @@ privada por código contra un servidor autoritativo (`cmd/server`) que corre el 
   asiento): el rival recibe `PEER_AWAY`, 1v1 y clasificatoria se pausan (en 2v2 casual juega el bot) y el cliente
   reintenta `/ws?rejoin=TOKEN` con el token de `SEAT`. Al volver recibe `WELCOME` + `SEAT` y el rival `PEER_BACK`.
   Si no vuelve a tiempo es un abandono normal (en clasificatoria pierde). Token desconocido o vencido: cierre 4007.
+  Si el server todavía no notó el corte, la conexión nueva reemplaza a la vieja (cierre 4008, sin pausa ni aviso al rival).
+  Tope de 4 reservas/reemplazos por sala. En clasificatoria, si el último conectado también se cae con otro asiento
+  reservado, el partido termina sin resultado; irse a propósito (1000/1001) siempre es derrota.
 
 ## 3. Vista del invitado
 

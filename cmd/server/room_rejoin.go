@@ -45,11 +45,11 @@ func (r *room) tokenList() [sim.MaxPlayers]string {
 	return r.tokens
 }
 
-// seatedAccount is slot's verified account ("" outside ranked).
-func (r *room) seatedAccount(slot int) string {
+// seatClaim is slot's ranked reservation (zero outside ranked).
+func (r *room) seatClaim(slot int) claim {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.users[slot]
+	return r.claims[slot]
 }
 
 // hold keeps slot's seat after p's connection dropped. It refuses (the caller
@@ -85,7 +85,7 @@ func (r *room) expireAway(slot int) bool {
 	}
 	r.away[slot] = nil
 	r.mu.Unlock()
-	r.leave(slot, nil)
+	r.leave(slot, nil, false)
 	return true
 }
 
@@ -156,15 +156,13 @@ func (r *room) markOver() {
 
 // stopHoldsLocked cancels pending holds of a closing room and returns their
 // ranked accounts (the caller frees them through r.release).
-func (r *room) stopHoldsLocked() []string {
-	var gone []string
+func (r *room) stopHoldsLocked() []claim {
+	var gone []claim
 	for i, t := range r.away {
 		if t != nil {
 			t.Stop()
 			r.away[i] = nil
-			if r.users[i] != "" {
-				gone = append(gone, r.users[i])
-			}
+			gone = append(gone, r.claims[i])
 		}
 	}
 	return gone
