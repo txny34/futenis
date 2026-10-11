@@ -16,7 +16,11 @@ privada por código contra un servidor autoritativo (`cmd/server`) que corre el 
 - URL `online.html?room=CODE` (si falta, el cliente genera un código de 5 letras y lo pone en la URL para compartir).
 - Primer conectado = host (slot 0), segundo = invitado (slot 1). Un tercero se rechaza (cierre 4001 "room full").
 - Arranca cuando están los dos: 1v1, scoring de pádel (`game.Session.Configure(Mode1v1, Normal, 5, 0b11)`).
-- Si uno se va: el otro recibe `PEER_LEFT` y la sala se cierra.
+- Si uno se va (cierre 1000): el otro recibe `PEER_LEFT` y la sala se cierra.
+- Si se le corta la conexión con el partido en juego, el asiento queda reservado 20 s (`rejoinGrace`, hasta 3 veces por
+  asiento): el rival recibe `PEER_AWAY`, 1v1 y clasificatoria se pausan (en 2v2 casual juega el bot) y el cliente
+  reintenta `/ws?rejoin=TOKEN` con el token de `SEAT`. Al volver recibe `WELCOME` + `SEAT` y el rival `PEER_BACK`.
+  Si no vuelve a tiempo es un abandono normal (en clasificatoria pierde). Token desconocido o vencido: cierre 4007.
 
 ## 3. Vista del invitado
 
@@ -35,6 +39,10 @@ El cliente siempre se dibuja como slot 0 / equipo 0 (X negativo). El servidor ro
 | S→C | 0x83 | FRAME | `game.OutLen` × f64: el mismo buffer de salida que el wasm (prev, curr, count, eventos), en la vista del receptor |
 | S→C | 0x84 | PONG | f64 clientMs (eco) |
 | S→C | 0x85 | PEER_LEFT | — |
+| S→C | 0x86 | RESULT | f64 ELO antes, f64 después (clasificatoria) |
+| S→C | 0x87 | SEAT | token de reconexión (32 caracteres hex ASCII), después de WELCOME |
+| S→C | 0x88 | PEER_AWAY | f64 segundos que tiene el rival para volver |
+| S→C | 0x89 | PEER_BACK | — |
 
 El servidor corre `Session.Run(inputs, 2, out)` cada 1/60 s (2 ticks por frame) con el último input de cada jugador.
 

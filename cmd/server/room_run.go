@@ -29,6 +29,7 @@ func (r *room) leave(slot int) {
 	r.reported = r.reported || forfeit
 	winner, users, onOver := 1-r.teamOf(slot), r.users, r.onOver
 	r.closed = true
+	r.stopHoldsLocked()
 	others := r.peers
 	r.peers = [sim.MaxPlayers]peer{}
 	close(r.stop)
@@ -75,8 +76,11 @@ func (r *room) run(tick <-chan time.Time) {
 		case <-tick:
 		}
 		r.mu.Lock()
-		in, peers, now := r.inputs, r.peers, r.humanMaskLocked()
+		in, peers, now, paused := r.inputs, r.peers, r.humanMaskLocked(), r.pausedLocked()
 		r.mu.Unlock()
+		if paused {
+			continue // a dropped player may come back (room_rejoin.go); no frames: events would repeat
+		}
 		if now != mask {
 			mask = now
 			_ = s.SetHumanMask(mask) // someone left: the bot takes the seat

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"time"
 
 	"github.com/txny34/futenis/game"
 	"github.com/txny34/futenis/sim"
@@ -23,6 +24,9 @@ const (
 	msgFrame    = 0x83
 	msgPong     = 0x84
 	msgPeerLeft = 0x85
+	msgSeat     = 0x87 // rejoin token (ASCII hex) after the header
+	msgPeerAway = 0x88 // f64: seconds the dropped player has to come back
+	msgPeerBack = 0x89
 
 	inputFloats = 6
 	inputMsgLen = headerLen + inputFloats*8
@@ -85,6 +89,20 @@ func encodeWelcome(slot int) []byte {
 	b[2] = byte(slot)
 	putF64(b, 0, sim.SnapLen)
 	putF64(b, 1, game.OutLen)
+	return b
+}
+
+func encodeSeat(token string) []byte {
+	b := make([]byte, headerLen+len(token))
+	putHeader(b, msgSeat)
+	copy(b[headerLen:], token)
+	return b
+}
+
+func encodeAway(grace time.Duration) []byte {
+	b := make([]byte, headerLen+8)
+	putHeader(b, msgPeerAway)
+	putF64(b, 0, grace.Seconds())
 	return b
 }
 

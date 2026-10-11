@@ -31,6 +31,8 @@ function statusText(s: NetStatus): string {
     case "desconectado por inactividad": return t("desconectado por inactividad", "disconnected due to inactivity");
     case "nadie se unió a la sala": return t("nadie se unió a la sala", "nobody joined the room");
     case "demasiados mensajes": return t("demasiados mensajes", "too many messages");
+    case "reconectando": return t("reconectando", "reconnecting");
+    case "rival reconectando": return t("rival reconectando", "opponent reconnecting");
     default: return s;
   }
 }

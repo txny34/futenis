@@ -38,6 +38,7 @@ type peer interface {
 type room struct {
 	mu      sync.Mutex
 	mode    sim.Mode
+	code    string // hub key (set by hub.roomFor)
 	seats   int
 	order   []int
 	peers   [sim.MaxPlayers]peer
@@ -52,6 +53,10 @@ type room struct {
 	nets     [sim.MaxPlayers]string                         // client limit key per seat (ranked only)
 	onOver   func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
 	reported bool                                           // ranked result already sent (game over or forfeit)
+
+	tokens  [sim.MaxPlayers]string      // rejoin secret per seat (room_rejoin.go)
+	away    [sim.MaxPlayers]*time.Timer // seat held for a dropped connection; fires the leave
+	rejoins [sim.MaxPlayers]int         // holds used per seat (capped: nobody stalls a match forever)
 }
 
 // claimReport returns true exactly once: the caller reports the ranked result.

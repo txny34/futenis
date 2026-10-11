@@ -50,6 +50,14 @@ func readMsg(ctx context.Context, t *testing.T, c *websocket.Conn, typ byte, n i
 	return b
 }
 
+// readWelcome reads WELCOME and the SEAT (rejoin token) that follows it.
+func readWelcome(ctx context.Context, t *testing.T, c *websocket.Conn) []byte {
+	t.Helper()
+	w := readMsg(ctx, t, c, msgWelcome, welcomeLen)
+	readMsg(ctx, t, c, msgSeat, headerLen+tokenLen)
+	return w
+}
+
 func TestHubMatch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -60,10 +68,10 @@ func TestHubMatch(t *testing.T) {
 	c1 := dial(ctx, t, srv)
 	readMsg(ctx, t, c1, msgWaiting, headerLen)
 	c2 := dial(ctx, t, srv)
-	if w := readMsg(ctx, t, c1, msgWelcome, welcomeLen); w[2] != 0 {
+	if w := readWelcome(ctx, t, c1); w[2] != 0 {
 		t.Fatalf("host slot %d", w[2])
 	}
-	if w := readMsg(ctx, t, c2, msgWelcome, welcomeLen); w[2] != 1 {
+	if w := readWelcome(ctx, t, c2); w[2] != 1 {
 		t.Fatalf("guest slot %d", w[2])
 	}
 	tick <- time.Time{}
@@ -84,7 +92,7 @@ func TestHubMatch(t *testing.T) {
 	if err := c2.Write(ctx, websocket.MessageBinary, in); err != nil {
 		t.Fatal(err)
 	}
-	c2.CloseNow()
+	_ = c2.Close(websocket.StatusNormalClosure, "") // leaving on purpose: no seat held
 	readMsg(ctx, t, c1, msgPeerLeft, headerLen)
 }
 
@@ -98,7 +106,7 @@ func TestHubThirdPeerRejected(t *testing.T) {
 	c2 := dial(ctx, t, srv)
 	// WELCOME proves c2 joined: only then is the room full for c3 (dial returns
 	// at the handshake, before the server-side join runs).
-	readMsg(ctx, t, c2, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, c2)
 	c3 := dial(ctx, t, srv)
 	if _, _, err := c3.Read(ctx); websocket.CloseStatus(err) != closeFull {
 		t.Fatalf("third peer err %v", err)

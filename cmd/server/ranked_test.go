@@ -74,8 +74,8 @@ func TestRankedPairsTwoAccountsNotOneTwice(t *testing.T) {
 	again := dialRanked(ctx, t, srv, "10.3.1.2", tokenFor(t, iss, userA)) // same account, other IP
 	expectClose(ctx, t, again, closeFull)
 	b := dialRanked(ctx, t, srv, "10.3.1.3", tokenFor(t, iss, userB))
-	readMsg(ctx, t, a, msgWelcome, welcomeLen)
-	readMsg(ctx, t, b, msgWelcome, welcomeLen)
+	readWelcome(ctx, t, a)
+	readWelcome(ctx, t, b)
 }
 
 func TestRankedDisabledWithoutConfig(t *testing.T) {
