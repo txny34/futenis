@@ -28,7 +28,7 @@
 
 /* Serve hint sits above the action bar */
 #hint {
-  position: absolute; bottom: calc(196px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(220px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
   font-size: calc(15px * var(--hud-scale)); padding: 6px 14px; border-radius: 10px; white-space: nowrap;
   background: var(--hud-card); border: 1px solid var(--hud-border); color: var(--hud-text);
 }
@@ -37,23 +37,23 @@
    little athlete doing each move (label above, key below), no panel. */
 #actions {
   position: absolute; bottom: calc(52px * var(--hud-scale)); left: 50%; transform: translateX(-50%);
-  display: flex; align-items: flex-start; gap: calc(22px * var(--hud-scale));
+  display: flex; align-items: flex-start; gap: calc(26px * var(--hud-scale));
   font-family: var(--fx-body, system-ui); color: var(--hud-text);
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .55));
 }
 .act {
   --act-fill: var(--hud-accent);
   display: flex; flex-direction: column; align-items: center; gap: calc(4px * var(--hud-scale));
-  width: calc(92px * var(--hud-scale));
+  width: calc(112px * var(--hud-scale));
 }
 .act--strike { --act-fill: var(--hud-gold); }
 .act--lob { --act-fill: var(--train-machine); }
 .act__label {
-  order: -1; font: 800 calc(13px * var(--hud-scale)) / 1 var(--fx-display, system-ui); letter-spacing: .1em;
+  order: -1; font: 800 calc(15px * var(--hud-scale)) / 1 var(--fx-display, system-ui); letter-spacing: .1em;
   text-transform: uppercase; white-space: nowrap; color: var(--act-fill); text-shadow: 0 0 8px var(--act-fill), 0 1px 2px #000;
 }
 .act__svg {
-  width: calc(84px * var(--hud-scale)); height: calc(84px * var(--hud-scale)); overflow: visible;
+  width: calc(104px * var(--hud-scale)); height: calc(104px * var(--hud-scale)); overflow: visible;
   transition: transform .12s cubic-bezier(.3, 1.8, .5, 1);
 }
 .act__track { fill: var(--act-fill); stroke: rgba(4, 8, 24, .85); stroke-width: 2.5; transition: filter .2s; }
@@ -71,7 +71,7 @@
 .act__fx { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 3 4; }
 .act--dash .act__fx { stroke-dasharray: none; }
 .act__key {
-  font: 700 calc(12px * var(--hud-scale)) / 1.6 var(--fx-body, system-ui); color: var(--hud-text);
+  font: 700 calc(14px * var(--hud-scale)) / 1.6 var(--fx-body, system-ui); color: var(--hud-text);
   padding: 0 7px; background: rgba(4, 8, 24, .75); border: 1px solid rgba(255, 255, 255, .15); border-radius: 5px; white-space: nowrap;
 }
 .act.is-active .act__svg { transform: scale(1.14) rotate(-4deg); }
