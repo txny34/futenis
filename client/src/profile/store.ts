@@ -17,6 +17,8 @@ export interface ProfileStore {
 /** Superficie de escritura (solo profile/record.ts y misiones). */
 export interface ProfileWriter extends ProfileStore {
   update(fn: (s: ProfileStats) => ProfileStats): void;
+  /** Re-reads localStorage (cloud sync wrote a merged copy). */
+  reload(): void;
 }
 
 const KEY = "futenis.profile.v1";
@@ -79,6 +81,10 @@ function create(): ProfileWriter {
     update(fn) {
       state = validate(fn({ ...state, elo: { ...state.elo } }));
       save(state);
+      subs.forEach((cb) => cb(state));
+    },
+    reload() {
+      state = load();
       subs.forEach((cb) => cb(state));
     },
   };

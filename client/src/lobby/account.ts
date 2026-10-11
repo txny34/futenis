@@ -2,6 +2,7 @@ import { authUser, initAuth, logout, onAuthChange } from "../auth/auth";
 import { syncRatings } from "../auth/ratings";
 import { guestChosen } from "../auth/session";
 import { t } from "../i18n/t";
+import { startCloudSync } from "../profile/cloud";
 import { profileWriter } from "../profile/store";
 import { LoginModal } from "../ui/login-modal";
 import { extraOverlayOpen, registerOverlay } from "../ui/overlays";
@@ -38,6 +39,7 @@ export function setupAccount(app: App): Account {
     profileWriter().update((p) => ({ ...p })); // re-render the shown name
     if (u) void syncRatings(u.id); // ranked ELO comes from the server
   });
+  startCloudSync(); // level, XP, missions and history follow the account
   void initAuth().then((err) => {
     if (err) login.open(SIGN_IN_FAILED); // in the modal: survives the lobby clearing the HUD
     else if (!authUser() && !guestChosen()) login.open("", true);

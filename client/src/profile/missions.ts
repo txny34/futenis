@@ -95,6 +95,9 @@ export class Missions {
     profileWriter().update((s) => addXp(s, m.def.xp));
   }
 
+  /** Re-reads localStorage (cloud sync wrote a merged copy). */
+  reload(): void { this.commit(load(new Date())); }
+
   private bump(b: Bucket, defs: readonly MissionDef[], metric: Metric, value: number): Bucket {
     const progress = { ...b.progress };
     for (const d of defs) {
