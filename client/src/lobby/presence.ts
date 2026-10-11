@@ -11,7 +11,7 @@ import type { RemotePlayers } from "./remote-players";
 // Shared online lobby: while the player is in the lobby, report the local
 // position 10 times a second and draw everyone else (lobby/remote-players.ts).
 // The lobby has no rules, so its positions are client-reported; the server
-// bounds them (cmd/server/lobby_proto.go). Self-contained: a 100 ms timer
+// bounds them (cmd/server/internal/wire/lobby.go). Self-contained: a 100 ms timer
 // opens the socket in the lobby and closes it everywhere else.
 const SEND_MS = 100;
 const RETRY_MIN_MS = 2000;

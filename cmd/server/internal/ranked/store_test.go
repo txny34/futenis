@@ -1,8 +1,9 @@
-package main
+package ranked
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -46,13 +47,13 @@ func TestSupabaseRatingsLoadAndRecord(t *testing.T) {
 	var upsert []map[string]any
 	srv := fakeRest(t, false, &rpc, &upsert)
 	defer srv.Close()
-	s := newSupabaseRatings(srv.URL, "secret")
+	s := NewSupabase(srv.URL, "secret")
 	s.base = srv.URL
-	got, err := s.load(context.Background(), "1v1", []string{"a", "b"})
+	got, err := s.Load(context.Background(), "1v1", []string{"a", "b"})
 	if err != nil || got["a"] != 1100 || len(got) != 1 {
 		t.Fatalf("load %v %v", got, err)
 	}
-	if err := s.save(context.Background(), "1v1", []rankedRow{{ID: "a", Elo: 1116, Won: true, Name: "Ana"}}); err != nil {
+	if err := s.Save(context.Background(), "1v1", []Row{{ID: "a", Elo: 1116, Won: true, Name: "Ana"}}); err != nil {
 		t.Fatal(err)
 	}
 	rows, _ := rpc["p_rows"].([]any)
@@ -63,7 +64,7 @@ func TestSupabaseRatingsLoadAndRecord(t *testing.T) {
 	if upsert != nil {
 		t.Fatal("upsert used although ranked_result exists")
 	}
-	if _, err := s.load(context.Background(), "3v3", nil); err == nil {
+	if _, err := s.Load(context.Background(), "3v3", nil); err == nil {
 		t.Fatal("unknown mode accepted")
 	}
 }
@@ -73,10 +74,11 @@ func TestSupabaseRatingsFallsBackBeforeTheMigration(t *testing.T) {
 	var upsert []map[string]any
 	srv := fakeRest(t, true, &rpc, &upsert)
 	defer srv.Close()
-	s := newSupabaseRatings(srv.URL, "secret")
+	s := NewSupabase(srv.URL, "secret")
 	s.base = srv.URL
-	err := s.save(context.Background(), "1v1", []rankedRow{{ID: "a", Elo: 1116}})
-	if legacy, ok := err.(errLegacySave); !ok || legacy.err != nil {
+	err := s.Save(context.Background(), "1v1", []Row{{ID: "a", Elo: 1116}})
+	var legacy ErrLegacy
+	if !errors.As(err, &legacy) || legacy.Err != nil {
 		t.Fatalf("want a logged legacy save with the ELO stored, got %v", err)
 	}
 	if len(upsert) != 1 || upsert[0]["user_id"] != "a" || upsert[0]["elo_1v1"] != float64(1116) {

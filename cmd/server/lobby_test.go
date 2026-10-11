@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/lobby"
+	"github.com/txny34/futenis/cmd/server/internal/peertest"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
 func newLobbyServer(t *testing.T, tick chan time.Time) (*httptest.Server, *hub) {
@@ -53,9 +56,9 @@ func readType(ctx context.Context, t *testing.T, c *websocket.Conn, typ byte) []
 }
 
 func nameMsg(s string) []byte {
-	b := make([]byte, headerLen+len(s))
-	putHeader(b, msgName)
-	copy(b[headerLen:], s)
+	b := make([]byte, wire.HeaderLen+len(s))
+	wire.PutHeader(b, wire.MsgName)
+	copy(b[wire.HeaderLen:], s)
 	return b
 }
 
@@ -67,22 +70,22 @@ func TestLobbyRelaysOthersPositionsAndNames(t *testing.T) {
 	a := dialLobby(ctx, t, srv, "10.5.0.1")
 	b := dialLobby(ctx, t, srv, "10.5.0.2")
 	write(ctx, t, a, nameMsg(" txny\x0044 "))
-	if got := readType(ctx, t, b, msgLobbyName); string(got[headerLen+8:]) != "txny44" {
-		t.Fatalf("name %q", got[headerLen+8:])
+	if got := readType(ctx, t, b, wire.MsgLobbyName); string(got[wire.HeaderLen+8:]) != "txny44" {
+		t.Fatalf("name %q", got[wire.HeaderLen+8:])
 	}
-	write(ctx, t, a, presenceMsg(3, 0, 999, 0))
+	write(ctx, t, a, wire.EncodePresence(3, 0, 999, 0))
 	time.Sleep(30 * time.Millisecond) // the server stores a's position
 	tick <- time.Time{}
-	r := readType(ctx, t, b, msgRoster)
-	if f64(r, 0) != 1 || f64(r, 2) != 3 || f64(r, 4) != lobbyHalfZ {
-		t.Fatalf("roster count=%v x=%v z=%v", f64(r, 0), f64(r, 2), f64(r, 4))
+	r := readType(ctx, t, b, wire.MsgRoster)
+	if wire.F64(r, 0) != 1 || wire.F64(r, 2) != 3 || wire.F64(r, 4) != wire.LobbyHalfZ {
+		t.Fatalf("roster count=%v x=%v z=%v", wire.F64(r, 0), wire.F64(r, 2), wire.F64(r, 4))
 	}
-	if self := readType(ctx, t, a, msgRoster); f64(self, 0) != 0 {
-		t.Fatalf("a sees itself or b without a position: count %v", f64(self, 0))
+	if self := readType(ctx, t, a, wire.MsgRoster); wire.F64(self, 0) != 0 {
+		t.Fatalf("a sees itself or b without a position: count %v", wire.F64(self, 0))
 	}
 	a.Close(websocket.StatusNormalClosure, "")
-	if g := readType(ctx, t, b, msgGone); f64(g, 0) != f64(r, 1) {
-		t.Fatalf("gone id %v want %v", f64(g, 0), f64(r, 1))
+	if g := readType(ctx, t, b, wire.MsgGone); wire.F64(g, 0) != wire.F64(r, 1) {
+		t.Fatalf("gone id %v want %v", wire.F64(g, 0), wire.F64(r, 1))
 	}
 }
 
@@ -94,18 +97,6 @@ func TestLobbyRejectsGarbage(t *testing.T) {
 	write(ctx, t, a, []byte{0x10, 1, 0, 0})
 	if _, _, err := a.Read(ctx); websocket.CloseStatus(err) != websocket.StatusUnsupportedData {
 		t.Fatalf("garbage not rejected: %v", err)
-	}
-}
-
-func TestLobbyFull(t *testing.T) {
-	l := newLobby()
-	for i := 0; i < maxLobby; i++ {
-		if _, ok := l.join(&fakePeer{}); !ok {
-			t.Fatalf("join %d rejected", i)
-		}
-	}
-	if _, ok := l.join(&fakePeer{}); ok {
-		t.Fatal("lobby over capacity")
 	}
 }
 
@@ -130,7 +121,7 @@ func TestLobbyNameChangesAreThrottled(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		write(ctx, t, a, nameMsg(string(rune('a'+i%2))))
 	}
-	readType(ctx, t, b, msgLobbyName)
+	readType(ctx, t, b, wire.MsgLobbyName)
 	short, cancelShort := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancelShort()
 	if _, _, err := b.Read(short); err == nil {
@@ -144,10 +135,10 @@ func TestLobbyRateLimit(t *testing.T) {
 	defer cancel()
 	srv, _ := newLobbyServer(t, make(chan time.Time))
 	a := dialLobby(ctx, t, srv, "10.6.1.1")
-	for i := 0; i < maxLobbyMsgs+5; i++ {
-		_ = a.Write(ctx, websocket.MessageBinary, presenceMsg(0, 0, 0, 0))
+	for i := 0; i < lobby.MaxMsgs+5; i++ {
+		_ = a.Write(ctx, websocket.MessageBinary, wire.EncodePresence(0, 0, 0, 0))
 	}
-	if _, _, err := a.Read(ctx); websocket.CloseStatus(err) != closeRate {
+	if _, _, err := a.Read(ctx); websocket.CloseStatus(err) != wire.CloseRate {
 		t.Fatalf("flood not closed: %v", err)
 	}
 }
@@ -156,16 +147,16 @@ func TestLobbyRateLimit(t *testing.T) {
 func TestLobbyShards(t *testing.T) {
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	defer close(h.done)
-	seen := map[*lobby]int{}
-	for i := 0; i < maxLobby+1; i++ {
-		l, _, ok := h.joinLobby(&fakePeer{})
+	seen := map[*lobby.Lobby]int{}
+	for i := 0; i < lobby.Max+1; i++ {
+		l, _, ok := h.joinLobby(&peertest.Peer{})
 		if !ok {
 			t.Fatalf("join %d rejected", i)
 		}
 		seen[l]++
 	}
 	if len(seen) != 2 {
-		t.Fatalf("%d lobbies for %d people", len(seen), maxLobby+1)
+		t.Fatalf("%d lobbies for %d people", len(seen), lobby.Max+1)
 	}
 }
 
@@ -180,14 +171,14 @@ func TestLobbyCompactRosterOnRequest(t *testing.T) {
 	}
 	t.Cleanup(func() { c.CloseNow() })
 	old := dialLobby(ctx, t, srv, "10.5.9.2")
-	write(ctx, t, old, presenceMsg(1, 0, 2, 0))
-	write(ctx, t, c, presenceMsg(-1, 0, -2, 0))
+	write(ctx, t, old, wire.EncodePresence(1, 0, 2, 0))
+	write(ctx, t, c, wire.EncodePresence(-1, 0, -2, 0))
 	time.Sleep(30 * time.Millisecond)
 	tick <- time.Time{}
-	if q := readType(ctx, t, c, msgRosterQ); len(q) != rosterQLen(1) {
+	if q := readType(ctx, t, c, wire.MsgRosterQ); len(q) != wire.RosterQLen(1) {
 		t.Fatalf("compact roster len %d", len(q))
 	}
-	if r := readType(ctx, t, old, msgRoster); len(r) != rosterMsgLen(1) {
+	if r := readType(ctx, t, old, wire.MsgRoster); len(r) != wire.RosterLen(1) {
 		t.Fatalf("old clients keep the float roster, len %d", len(r))
 	}
 }

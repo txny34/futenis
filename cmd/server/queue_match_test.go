@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -16,13 +17,13 @@ func newMatchHub() *hub {
 }
 
 // openAt queues key at elo and seats a fake peer there; since is backdated by waited.
-func openAt(t *testing.T, h *hub, key string, elo int, waited time.Duration) (string, *fakePeer) {
+func openAt(t *testing.T, h *hub, key string, elo int, waited time.Duration) (string, *peertest.Peer) {
 	t.Helper()
 	code, ok := h.queueRoom("ranked1v1", key, elo)
 	if !ok {
 		t.Fatalf("%s already queued", key)
 	}
-	p := &fakePeer{}
+	p := &peertest.Peer{}
 	if _, slot, _, _ := h.join(code, sim.Mode1v1, p); slot < 0 {
 		t.Fatalf("%s not seated", key)
 	}
@@ -86,11 +87,9 @@ func TestRebalanceMovesTheNewerLonelyWaiter(t *testing.T) {
 	}
 }
 
-func closedSoon(p *fakePeer) bool {
+func closedSoon(p *peertest.Peer) bool {
 	for range 20 {
-		p.mu.Lock()
-		c := p.closed
-		p.mu.Unlock()
+		_, c := p.Snapshot()
 		if c {
 			return true
 		}
@@ -99,28 +98,11 @@ func closedSoon(p *fakePeer) bool {
 	return false
 }
 
-func TestRequeueSkipsARoomThatStarted(t *testing.T) {
-	r := newRoom(sim.Mode1v1)
-	r.join(&fakePeer{})
-	r.join(&fakePeer{}) // full: the match starts
-	if p, _ := r.requeueAlone(); p != nil || r.isClosed() {
-		t.Fatal("a started match must never be broken up")
-	}
-	lone := newRoom(sim.Mode1v1)
-	lone.join(&fakePeer{})
-	if p, _ := lone.requeueAlone(); p == nil || !lone.isClosed() {
-		t.Fatal("a lone waiter is moved and its room closed")
-	}
-	if slot, _, _ := lone.join(&fakePeer{}); slot >= 0 {
-		t.Fatal("a joiner racing the move must be refused (it retries)")
-	}
-}
-
 func TestQueueRefusalKeepsOpenRoomsUnique(t *testing.T) {
 	h := newMatchHub()
 	a, _ := openAt(t, h, "a", 1000, 0)
 	h.mu.Lock()
-	h.rooms[a].closed = true // everyone left room a
+	h.rooms[a].ExpireIfWaiting() // everyone left room a
 	h.mu.Unlock()
 	b, _ := openAt(t, h, "b", 1000, 0)
 	h.claimWait("ranked1v1", b, "b")

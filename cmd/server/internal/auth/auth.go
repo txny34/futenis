@@ -1,4 +1,6 @@
-package main
+// Package auth verifies Supabase access tokens (ES256 JWTs against the
+// project's JWKS) and extracts the account behind them.
+package auth
 
 import (
 	"crypto/ecdsa"
@@ -14,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/txny34/futenis/cmd/server/internal/names"
 )
 
 // Supabase session tokens are ES256 JWTs; the public keys are published as a
@@ -28,7 +32,7 @@ const (
 
 var errBadToken = errors.New("auth: invalid token")
 
-type verifier struct {
+type Verifier struct {
 	jwksURL string
 	issuer  string
 	client  *http.Client
@@ -38,8 +42,8 @@ type verifier struct {
 	fetched time.Time
 }
 
-func newVerifier(jwksURL, issuer string) *verifier {
-	return &verifier{jwksURL: jwksURL, issuer: issuer, client: &http.Client{Timeout: 5 * time.Second}, keys: map[string]*ecdsa.PublicKey{}}
+func NewVerifier(jwksURL, issuer string) *Verifier {
+	return &Verifier{jwksURL: jwksURL, issuer: issuer, client: &http.Client{Timeout: 5 * time.Second}, keys: map[string]*ecdsa.PublicKey{}}
 }
 
 type jwtHeader struct {
@@ -61,35 +65,35 @@ type jwtClaims struct {
 	Exp int64           `json:"exp"`
 }
 
-// account is a verified login: user id (sub) and its display name.
-type account struct{ id, name string }
+// Account is a verified login: user id (sub) and its display name.
+type Account struct{ ID, Name string }
 
-// verify returns the account of a valid token. The name follows the client
+// Verify returns the account of a valid token. The name follows the client
 // (auth/session.ts): Discord global name, then full name, then name.
-func (v *verifier) verify(token string) (account, error) {
+func (v *Verifier) Verify(token string) (Account, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return account{}, errBadToken
+		return Account{}, errBadToken
 	}
 	var h jwtHeader
 	if decodePart(parts[0], &h) != nil || h.Alg != "ES256" {
-		return account{}, errBadToken
+		return Account{}, errBadToken
 	}
 	key, err := v.key(h.Kid)
 	if err != nil {
-		return account{}, err
+		return Account{}, err
 	}
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil || len(sig) != 64 {
-		return account{}, errBadToken
+		return Account{}, errBadToken
 	}
 	sum := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
 	if !ecdsa.Verify(key, sum[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])) {
-		return account{}, errBadToken
+		return Account{}, errBadToken
 	}
 	var c jwtClaims
 	if decodePart(parts[1], &c) != nil || !v.claimsOK(c) {
-		return account{}, errBadToken
+		return Account{}, errBadToken
 	}
 	name := c.Meta.Custom.GlobalName
 	for _, n := range []string{c.Meta.FullName, c.Meta.Name} {
@@ -97,10 +101,10 @@ func (v *verifier) verify(token string) (account, error) {
 			name = n
 		}
 	}
-	return account{id: c.Sub, name: cleanName(name)}, nil
+	return Account{ID: c.Sub, Name: names.Clean(name)}, nil
 }
 
-func (v *verifier) claimsOK(c jwtClaims) bool {
+func (v *Verifier) claimsOK(c jwtClaims) bool {
 	return c.Sub != "" && c.Iss == v.issuer && time.Now().Unix() < c.Exp && hasAudience(c.Aud)
 }
 
@@ -132,7 +136,7 @@ func decodePart(s string, dst any) error {
 
 // key returns the public key for kid, refreshing the JWKS when stale or when
 // the kid is unknown (key rotation), at most once per jwksMinFetch.
-func (v *verifier) key(kid string) (*ecdsa.PublicKey, error) {
+func (v *Verifier) key(kid string) (*ecdsa.PublicKey, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	k, ok := v.keys[kid]
@@ -156,7 +160,7 @@ type jwk struct {
 	Kty, Crv, Kid, X, Y string
 }
 
-func (v *verifier) fetchLocked() error {
+func (v *Verifier) fetchLocked() error {
 	v.fetched = time.Now()
 	res, err := v.client.Get(v.jwksURL)
 	if err != nil {

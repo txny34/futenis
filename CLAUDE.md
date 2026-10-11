@@ -17,6 +17,9 @@ cmd/dev/  Servidor de desarrollo en Go (estáticos + build con esbuild Go API). 
 game/     Go puro. Sesión (modo, config, bots) + formato de frame. Compartido por wasm/ y cmd/server/.
 cmd/server/ Servidor online autoritativo (docs/design/online-spike.md): MISMO sim + ai nativos. Salas por código +
             cola de matchmaking (`/ws?queue=1v1`, queue.go). UNA sola máquina (estado en memoria).
+            `main` solo cablea conexiones (hub*, queue*, ranked.go, lobby_http.go); la lógica vive en `internal/`:
+            match (sala + loop del sim + reconexión), lobby, wire (protocolo), ranked (ELO + store), auth (JWT),
+            names (filtro de nombres), netlimit (límites), peertest (peer falso para tests).
 client/   TypeScript + three.js. SOLO dibuja, lee input, cámara, HUD, menú, feedback. NUNCA decide reglas.
 docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), character.md (pipeline de personaje).
 ```
