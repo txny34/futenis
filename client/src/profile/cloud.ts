@@ -14,10 +14,11 @@ const PULL_EVERY_MS = 30_000;
 const UUID = /^[0-9a-f-]{36}$/;
 
 let synced: string | null = null; // account whose cloud copy is merged in (pushes allowed)
-let dirty = false;
 let timer = 0;
 let lastPull = 0;
+let chain: Promise<void> = Promise.resolve(); // one sync at a time: no out-of-order pushes
 
+const PENDING_PREFIX = "futenis.cloud.pending.";
 function readLocal(): Snapshot {
   const out: Snapshot = {};
   for (const p of Object.keys(PARTS) as Part[]) {
@@ -53,66 +54,89 @@ function headers(token: string): Record<string, string> {
 async function fetchCloud(id: string, token: string): Promise<Snapshot | null> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=data&user_id=eq.${id}`, { headers: headers(token) });
   if (!res.ok) throw new Error(`cloud profile ${res.status}`);
-  const rows = (await res.json()) as Array<{ data?: unknown }>;
-  return rows[0] ? asSnapshot(rows[0].data) : null;
+  const rows: unknown = await res.json();
+  const row = Array.isArray(rows) ? (rows[0] as { data?: unknown } | undefined) : undefined;
+  return row ? asSnapshot(row.data) : null;
 }
 
-/** Pulls the account's copy, merges, reloads the live stores and pushes the result. */
-async function pull(id: string): Promise<void> {
+function stash(id: string, local: Snapshot): void {
+  try { localStorage.setItem(PENDING_PREFIX + id, JSON.stringify(local)); } catch { /* blocked: nothing to keep */ }
+}
+
+function takeStash(id: string): Snapshot {
+  try {
+    const raw = localStorage.getItem(PENDING_PREFIX + id);
+    localStorage.removeItem(PENDING_PREFIX + id);
+    return raw === null ? {} : asSnapshot(JSON.parse(raw));
+  } catch { return {}; }
+}
+
+/** This browser's copy for account id. Another account's progress is set aside
+ * (merged back when that account signs in here again), never adopted or lost. */
+function localFor(id: string): Snapshot {
+  const prev = owner();
+  if (prev !== null && prev !== id && UUID.test(prev)) { stash(prev, readLocal()); return takeStash(id); }
+  return mergeSnapshots(readLocal(), takeStash(id));
+}
+
+async function upload(id: string, token: string, data: Snapshot): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?on_conflict=user_id`, {
+    method: "POST",
+    headers: { ...headers(token), Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ user_id: id, data }),
+  });
+  if (!res.ok) throw new Error(`cloud push ${res.status}`);
+}
+
+/** Pull, merge with this browser, reload the live stores, push the merge. Pushing
+ * only merged data means a device that is behind never overwrites the cloud. */
+async function sync(id: string): Promise<void> {
   const token = accessToken();
   if (!token || !UUID.test(id)) return;
   lastPull = Date.now();
   const cloud = await fetchCloud(id, token);
   if (authUser()?.id !== id) return; // signed out (or switched) meanwhile
-  const prev = owner();
-  const local = prev !== null && prev !== id ? {} : readLocal(); // another account's progress is not adopted
-  writeLocal(cloud ? mergeSnapshots(local, cloud) : local);
+  const local = localFor(id);
+  const merged = cloud ? mergeSnapshots(local, cloud) : local;
+  writeLocal(merged);
   setOwner(id);
   synced = id;
-  profileWriter().reload();
+  profileWriter().reload(); // fires schedule(); the timer is cleared below
   missions().reload();
-  dirty = true;
-  void push();
+  window.clearTimeout(timer);
+  await upload(id, token, merged);
 }
 
-async function push(keepalive = false): Promise<void> {
-  window.clearTimeout(timer);
-  const id = synced;
-  const token = accessToken();
-  if (!dirty || !id || !token || authUser()?.id !== id) return;
-  dirty = false;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?on_conflict=user_id`, {
-      method: "POST", keepalive,
-      headers: { ...headers(token), Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify({ user_id: id, data: readLocal() }),
-    });
-    if (!res.ok) throw new Error(`cloud push ${res.status}`);
-  } catch {
-    dirty = true; // offline or refused: retried on the next change or tab hide
-  }
+function queueSync(id: string): void {
+  chain = chain.then(() => sync(id)).catch(() => {
+    window.clearTimeout(timer); // offline or refused: local stays the truth, retried on the next change
+  });
 }
 
 function schedule(): void {
   if (!synced) return;
-  dirty = true;
+  const id = synced;
   window.clearTimeout(timer);
-  timer = window.setTimeout(() => { void push(); }, PUSH_DELAY_MS);
+  timer = window.setTimeout(() => queueSync(id), PUSH_DELAY_MS);
 }
 
 function onVisibility(): void {
-  if (document.visibilityState === "hidden") { void push(true); return; }
   const u = authUser();
-  if (u && Date.now() - lastPull > PULL_EVERY_MS) void pull(u.id).catch(() => undefined);
+  if (!u) return;
+  if (document.visibilityState === "hidden") { window.clearTimeout(timer); if (synced === u.id) queueSync(u.id); return; }
+  if (Date.now() - lastPull > PULL_EVERY_MS) queueSync(u.id);
 }
 
-/** Wires the sync once at boot (before initAuth resolves). */
+/** Wires the sync once at boot (before initAuth resolves). Unpushed changes
+ * survive sign-out: the browser keeps them under the owner and the next sign-in
+ * of that account merges them. */
 export function startCloudSync(): void {
   profileWriter().onChange(schedule);
   missions().onChange(schedule);
   document.addEventListener("visibilitychange", onVisibility);
   onAuthChange((u) => {
     synced = null;
-    if (u) void pull(u.id).catch(() => undefined); // offline: stays local until the next sign-in or tab return
+    window.clearTimeout(timer);
+    if (u) queueSync(u.id);
   });
 }

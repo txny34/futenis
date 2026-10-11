@@ -26,7 +26,7 @@ function mergeProfile(a: Obj, b: Obj): Obj {
   const out: Obj = { ...b, ...a, level: lead.level, xp: lead.xp };
   for (const k of COUNTERS) out[k] = Math.max(n(a[k]), n(b[k]));
   const named = (v: unknown): boolean => typeof v === "string" && v.trim() !== "" && v !== DEFAULT_NAME;
-  out.name = named(a.name) ? a.name : b.name ?? a.name;
+  out.name = named(b.name) ? b.name : a.name; // the account's saved name wins
   return out;
 }
 
@@ -39,7 +39,8 @@ function mergeBucket(a: unknown, b: unknown): unknown {
   const py = obj(y.progress) ?? {};
   const progress: Record<string, number> = {};
   for (const id of new Set([...Object.keys(px), ...Object.keys(py)])) progress[id] = Math.max(n(px[id]), n(py[id]));
-  const claimed = [...new Set([...(Array.isArray(x.claimed) ? x.claimed : []), ...(Array.isArray(y.claimed) ? y.claimed : [])])];
+  const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const claimed = [...new Set([...list(x.claimed), ...list(y.claimed)])];
   return { key: x.key, progress, claimed };
 }
 
