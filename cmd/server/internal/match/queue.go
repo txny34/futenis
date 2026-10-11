@@ -1,4 +1,4 @@
-package main
+package match
 
 import "github.com/txny34/futenis/cmd/server/internal/ranked"
 

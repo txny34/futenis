@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 )
 
@@ -53,7 +54,7 @@ func (h *hub) rebalance(mode string, now time.Time) {
 			lonely = append(lonely, o)
 		}
 	}
-	var move []*Room // candidates; requeueAlone re-checks each under its own lock
+	var move []*match.Room // candidates; requeueAlone re-checks each under its own lock
 	taken := map[*openRoom]bool{}
 	for i, old := range lonely {
 		for _, newer := range lonely[i+1:] {

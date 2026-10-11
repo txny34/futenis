@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -150,11 +151,11 @@ func (h *hub) leaveQueue(mode, code, key string) {
 // joinQueue seats p in mode's open room, or rejects it (slot -1 with a non-nil
 // room: already queued / no room found). Rooms that filled, started or went
 // stale concurrently are skipped (bounded retries).
-func (h *hub) joinQueue(mode string, p Peer, key string, elo int) (code string, r *Room, slot int, start bool, humans int) {
+func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int) (code string, r *match.Room, slot int, start bool, humans int) {
 	for range 3 {
 		code, ok := h.queueRoom(mode, key, elo)
 		if !ok {
-			return code, &Room{}, -1, false, 0
+			return code, &match.Room{}, -1, false, 0
 		}
 		if r, slot, start, humans = h.join(code, queueModes[mode], p); r == nil {
 			return code, nil, -1, false, 0
@@ -174,5 +175,5 @@ func (h *hub) joinQueue(mode string, p Peer, key string, elo int) (code string, 
 			h.closeQueueRoom(mode, code)
 		}
 	}
-	return code, &Room{}, -1, false, 0
+	return code, &match.Room{}, -1, false, 0
 }

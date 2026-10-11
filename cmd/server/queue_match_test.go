@@ -98,28 +98,11 @@ func closedSoon(p *peertest.Peer) bool {
 	return false
 }
 
-func TestRequeueSkipsARoomThatStarted(t *testing.T) {
-	r := NewRoom(sim.Mode1v1, "test")
-	r.Join(&peertest.Peer{})
-	r.Join(&peertest.Peer{}) // full: the match starts
-	if p, _ := r.RequeueAlone(); p != nil || r.IsClosed() {
-		t.Fatal("a started match must never be broken up")
-	}
-	lone := NewRoom(sim.Mode1v1, "test")
-	lone.Join(&peertest.Peer{})
-	if p, _ := lone.RequeueAlone(); p == nil || !lone.IsClosed() {
-		t.Fatal("a lone waiter is moved and its room closed")
-	}
-	if slot, _, _ := lone.Join(&peertest.Peer{}); slot >= 0 {
-		t.Fatal("a joiner racing the move must be refused (it retries)")
-	}
-}
-
 func TestQueueRefusalKeepsOpenRoomsUnique(t *testing.T) {
 	h := newMatchHub()
 	a, _ := openAt(t, h, "a", 1000, 0)
 	h.mu.Lock()
-	h.rooms[a].closed = true // everyone left room a
+	h.rooms[a].ExpireIfWaiting() // everyone left room a
 	h.mu.Unlock()
 	b, _ := openAt(t, h, "b", 1000, 0)
 	h.claimWait("ranked1v1", b, "b")

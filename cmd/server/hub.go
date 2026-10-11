@@ -12,6 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/lobby"
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
@@ -34,7 +35,7 @@ var (
 // hub maps room codes to rooms.
 type hub struct {
 	mu       sync.Mutex
-	rooms    map[string]*Room
+	rooms    map[string]*match.Room
 	origins  []string
 	proxied  bool                              // trust X-Forwarded-For (behind the hosting proxy)
 	ticker   func() (<-chan time.Time, func()) // injectable for tests
@@ -55,7 +56,7 @@ type hub struct {
 	claimSeq uint64
 	ratings  ranked.Store // ranked ELO store; nil = ranked disabled
 
-	seats map[string]seatRef // rejoin token -> held seat (room_rejoin.go)
+	seats map[string]seatRef // rejoin token -> held seat (internal/match/rejoin.go)
 	grace time.Duration      // how long a dropped seat is held (injectable)
 
 	lobbies     []*lobby.Lobby                    // shared online lobbies (lobby.go), opened on demand
@@ -66,19 +67,19 @@ type hub struct {
 }
 
 func newHub(origins []string, logger *log.Logger) *hub {
-	return &hub{rooms: map[string]*Room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
+	return &hub{rooms: map[string]*match.Room{}, origins: origins, logger: logger, ticker: realTicker, maxRooms: maxRooms,
 		conns: netlimit.NewConnLimiter(maxConns, maxConnsPerIP), idle: idleTimeout, wait: rivalTimeout, fill: fillWait,
-		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: RejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(lobby.Max*lobby.MaxShards, lobby.MaxPerClient), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobby.Idle, done: make(chan struct{})}
+		queues: map[string]*queue{}, seats: map[string]seatRef{}, grace: match.RejoinGrace, active: map[string]uint64{}, lobbyConns: netlimit.NewConnLimiter(lobby.Max*lobby.MaxShards, lobby.MaxPerClient), lobbyTicker: realLobbyTicker, matchTicker: realMatchTicker, lobbyIdle: lobby.Idle, done: make(chan struct{})}
 }
 
 func realTicker() (<-chan time.Time, func()) {
-	t := time.NewTicker(FrameInterval)
+	t := time.NewTicker(match.FrameInterval)
 	return t.C, t.Stop
 }
 
 // roomFor returns the open room for code, creating it if missing or closed.
 // It returns nil when a new room is needed but the hub is at capacity.
-func (h *hub) roomFor(code string, mode sim.Mode) *Room {
+func (h *hub) roomFor(code string, mode sim.Mode) *match.Room {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	r := h.rooms[code]
@@ -86,13 +87,13 @@ func (h *hub) roomFor(code string, mode sim.Mode) *Room {
 		if r == nil && len(h.rooms) >= h.maxRooms {
 			return nil
 		}
-		r = NewRoom(mode, code)
+		r = match.NewRoom(mode, code)
 		h.rooms[code] = r
 	}
 	return r
 }
 
-func (h *hub) forget(code string, r *Room) {
+func (h *hub) forget(code string, r *match.Room) {
 	h.mu.Lock()
 	if h.rooms[code] == r {
 		delete(h.rooms, code)
@@ -151,7 +152,7 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // join finds or creates the room for code and joins p, retrying once if the
 // room closed concurrently. r is nil when the hub is full.
-func (h *hub) join(code string, mode sim.Mode, p Peer) (r *Room, slot int, start bool, humans int) {
+func (h *hub) join(code string, mode sim.Mode, p match.Peer) (r *match.Room, slot int, start bool, humans int) {
 	for range 2 {
 		if r = h.roomFor(code, mode); r == nil {
 			return nil, -1, false, 0
@@ -166,7 +167,7 @@ func (h *hub) join(code string, mode sim.Mode, p Peer) (r *Room, slot int, start
 // serve joins the room and runs the read loop until the peer disconnects.
 func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.Conn) {
 	p := wsPeer{c}
-	var r *Room
+	var r *match.Room
 	var slot, humans int
 	var start, kept bool
 	var cl ranked.Claim // ranked reservation (zero outside ranked)
@@ -233,7 +234,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 // expireAlone closes p's room if nobody else shows up within h.wait. While a
 // 2v2 room has enough people for the bot fill it re-checks later instead of
 // giving up, so a waiter whose company left is never stranded. stop cancels it.
-func (h *hub) expireAlone(r *Room, p Peer) (stop func()) {
+func (h *hub) expireAlone(r *match.Room, p match.Peer) (stop func()) {
 	var mu sync.Mutex
 	var t *time.Timer
 	check := func() {
@@ -257,7 +258,7 @@ func (h *hub) expireAlone(r *Room, p Peer) (stop func()) {
 // floods or sends garbage.
 // It reports lost when the connection dropped (not a normal close, nor one the
 // server made): the seat may then be held for a rejoin.
-func (h *hub) readLoop(ctx context.Context, code string, slot int, r *Room, c *websocket.Conn) (lost bool) {
+func (h *hub) readLoop(ctx context.Context, code string, slot int, r *match.Room, c *websocket.Conn) (lost bool) {
 	p := wsPeer{c}
 	// Idle only counts once the match runs: a waiting host often hides the tab
 	// to share the link (no rAF, no PING); the no-rival timeout covers that.
@@ -297,8 +298,8 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *Room, c *w
 
 // armFill: the second person in a 2v2 room starts the countdown after which
 // bots fill the empty seats.
-func (h *hub) armFill(r *Room, humans int, queued, code string) {
-	if r.Mode() != sim.Mode2v2 || humans != MinHumans2v2 {
+func (h *hub) armFill(r *match.Room, humans int, queued, code string) {
+	if r.Mode() != sim.Mode2v2 || humans != match.MinHumans2v2 {
 		return
 	}
 	time.AfterFunc(h.fill, func() {
@@ -314,7 +315,7 @@ func (h *hub) armFill(r *Room, humans int, queued, code string) {
 
 // announce sends WELCOME to every seated peer and starts the match loop.
 // rankedMode ("1v1"/"2v2", "" = casual) wires the ELO report at game over.
-func (h *hub) announce(r *Room, rankedMode string) {
+func (h *hub) announce(r *match.Room, rankedMode string) {
 	if rankedMode != "" {
 		r.SetRankedHooks(func(w int, users [sim.MaxPlayers]string) { h.reportRanked(rankedMode, r, users, w) }, h.releaseRanked)
 	}
@@ -328,9 +329,9 @@ func (h *hub) announce(r *Room, rankedMode string) {
 	}
 	h.mu.Unlock()
 	for i, p := range peers {
-		SendTo(p, wire.EncodeWelcome(i)) // nil if that seat is empty
+		match.SendTo(p, wire.EncodeWelcome(i)) // nil if that seat is empty
 		if p != nil {
-			SendTo(p, wire.EncodeSeat(tokens[i]))
+			match.SendTo(p, wire.EncodeSeat(tokens[i]))
 		}
 	}
 	tick, stop := h.ticker()
@@ -338,7 +339,7 @@ func (h *hub) announce(r *Room, rankedMode string) {
 }
 
 // watchIdle closes p once the match runs and nothing arrived for h.idle.
-func (h *hub) watchIdle(r *Room, p Peer, lastSeen *atomic.Int64, kicked *atomic.Bool, done <-chan struct{}) {
+func (h *hub) watchIdle(r *match.Room, p match.Peer, lastSeen *atomic.Int64, kicked *atomic.Bool, done <-chan struct{}) {
 	t := time.NewTimer(h.idle)
 	defer t.Stop()
 	for {

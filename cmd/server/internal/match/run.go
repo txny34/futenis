@@ -1,4 +1,4 @@
-package main
+package match
 
 import (
 	"time"
@@ -92,7 +92,7 @@ func (r *Room) Run(tick <-chan time.Time) {
 		in, peers, now, paused := r.inputs, r.peers, r.humanMaskLocked(), r.pausedLocked()
 		r.mu.Unlock()
 		if paused {
-			continue // a dropped player may come back (room_rejoin.go); no frames: events would repeat
+			continue // a dropped player may come back (rejoin.go); no frames: events would repeat
 		}
 		if now != mask {
 			mask = now
@@ -124,4 +124,17 @@ func SendTo(p Peer, b []byte) {
 	if p != nil {
 		_ = p.Send(b) // a dead peer is detected by its read loop, which calls leave
 	}
+}
+
+// gameOverWinner reports the winning team (server space) once the frame's
+// current snapshot is in GameOver.
+func gameOverWinner(out []float64) (int, bool) {
+	cur := out[sim.SnapLen:]
+	if int(cur[sim.SnapPhase]) != int(sim.PhaseGameOver) {
+		return 0, false
+	}
+	if cur[sim.SnapSets1] > cur[sim.SnapSets0] {
+		return 1, true
+	}
+	return 0, true
 }

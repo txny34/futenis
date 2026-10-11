@@ -1,4 +1,7 @@
-package main
+// Package match is one online match room: seats, the authoritative sim loop,
+// ranked bookkeeping, held seats for reconnection (rejoin.go) and the
+// matchmaking moves of a waiting room (queue.go).
+package match
 
 import (
 	"sync"
@@ -56,7 +59,7 @@ type Room struct {
 	onOver   func(winner int, users [sim.MaxPlayers]string) // set before run (ranked)
 	reported bool                                           // ranked result already sent (game over or forfeit)
 
-	tokens  [sim.MaxPlayers]string       // rejoin secret per seat (room_rejoin.go)
+	tokens  [sim.MaxPlayers]string       // rejoin secret per seat (rejoin.go)
 	away    [sim.MaxPlayers]*time.Timer  // seat held for a dropped connection; fires the leave
 	holds   int                          // holds used in this room (capped: nobody stalls a match forever)
 	over    bool                         // game over reached: no more holds

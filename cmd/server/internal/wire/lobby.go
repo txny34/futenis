@@ -6,7 +6,7 @@ import (
 	"github.com/txny34/futenis/sim"
 )
 
-// Shared-lobby presence protocol (same header as proto.go; mirrors
+// Shared-lobby presence protocol (same header as match.go; mirrors
 // client/src/net/lobby-proto.ts). The lobby has no rules: clients report their
 // own position and the server only bounds and relays it.
 const (

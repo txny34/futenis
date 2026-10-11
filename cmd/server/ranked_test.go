@@ -12,6 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
 	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
@@ -97,7 +98,7 @@ func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
 	_ = store.Save(context.Background(), "1v1", []ranked.Row{{ID: userA, Elo: 1000}, {ID: userB, Elo: 1000}})
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
 	h.ratings = store
-	r := NewRoom(sim.Mode1v1, "test")
+	r := match.NewRoom(sim.Mode1v1, "test")
 	pa, pb := &peertest.Peer{}, &peertest.Peer{}
 	r.Join(pa)
 	r.Join(pb)
@@ -110,57 +111,6 @@ func TestReportRankedStoresAndTellsEachPlayer(t *testing.T) {
 	last := msgs[len(msgs)-1]
 	if last[0] != wire.MsgResult || wire.F64(last, 0) != 1000 || wire.F64(last, 1) != 1016 {
 		t.Fatalf("winner result %v", last)
-	}
-}
-
-func TestGameOverWinner(t *testing.T) {
-	out := make([]float64, 2*sim.SnapLen)
-	if _, over := gameOverWinner(out); over {
-		t.Fatal("serve phase reported as over")
-	}
-	out[sim.SnapLen+sim.SnapPhase] = float64(sim.PhaseGameOver)
-	out[sim.SnapLen+sim.SnapSets1] = 1
-	if w, over := gameOverWinner(out); !over || w != 1 {
-		t.Fatalf("w=%d over=%v", w, over)
-	}
-}
-
-// Leaving a started ranked match is a forfeit: the leaver's team loses, once.
-func TestRankedLeaverForfeits(t *testing.T) {
-	r := NewRoom(sim.Mode1v1, "test")
-	r.Join(&peertest.Peer{})
-	r.Join(&peertest.Peer{})
-	r.MarkRanked(0, ranked.Claim{UID: userA}, "net-a")
-	r.MarkRanked(1, ranked.Claim{UID: userB}, "net-b")
-	got := make(chan int, 2)
-	r.onOver = func(w int, _ [sim.MaxPlayers]string) { got <- w }
-	r.Leave(0, nil, false) // userA quits
-	select {
-	case w := <-got:
-		if w != 1 {
-			t.Fatalf("winner %d, want the team that stayed (1)", w)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("no result reported for a ranked quit")
-	}
-	if r.claimReport() { // a later game over must report nothing
-		t.Fatal("result could be reported twice")
-	}
-}
-
-// A ranked 2v2 never hands a seat to a bot: a leaver ends the match.
-func TestRanked2v2LeaverEndsMatch(t *testing.T) {
-	r := NewRoom(sim.Mode2v2, "test")
-	for i := 0; i < 4; i++ {
-		r.Join(&peertest.Peer{})
-	}
-	for i, u := range []string{userA, userB, userA + "c", userA + "d"} {
-		r.MarkRanked(i, ranked.Claim{UID: u}, u)
-	}
-	r.onOver = func(int, [sim.MaxPlayers]string) {}
-	r.Leave(2, nil, false)
-	if !r.IsClosed() {
-		t.Fatal("ranked 2v2 kept going with a bot")
 	}
 }
 
@@ -188,7 +138,7 @@ func TestRankedOneActiveConnectionPerAccount(t *testing.T) {
 }
 
 func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
-	r := NewRoom(sim.Mode1v1, "test")
+	r := match.NewRoom(sim.Mode1v1, "test")
 	r.Join(&peertest.Peer{})
 	r.Join(&peertest.Peer{})
 	if !r.MarkRanked(0, ranked.Claim{UID: userA}, "10.0.0.1") {

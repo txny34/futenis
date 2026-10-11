@@ -7,6 +7,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth"
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
@@ -50,7 +51,7 @@ func (h *hub) authenticate(ctx context.Context, c *websocket.Conn) (auth.Account
 
 // reportRanked stores the new ratings and sends each seated player a RESULT.
 // Runs off the match loop (network I/O).
-func (h *hub) reportRanked(mode string, r *Room, users [sim.MaxPlayers]string, winner int) {
+func (h *hub) reportRanked(mode string, r *match.Room, users [sim.MaxPlayers]string, winner int) {
 	teams := [2][]string{}
 	for i := 0; i < r.SeatCount(); i++ {
 		team := r.TeamOf(i)
@@ -78,32 +79,19 @@ func (h *hub) reportRanked(mode string, r *Room, users [sim.MaxPlayers]string, w
 	peers := r.Peers()
 	for i, p := range peers {
 		if p != nil && users[i] != "" {
-			SendTo(p, wire.EncodeResult(ranked.RatingOf(before, users[i]), after[users[i]]))
+			match.SendTo(p, wire.EncodeResult(ranked.RatingOf(before, users[i]), after[users[i]]))
 		}
 	}
 }
 
 // resultRows pairs every seated account with its new ELO, win flag and public name.
-func resultRows(r *Room, users [sim.MaxPlayers]string, after map[string]int, winner int) []ranked.Row {
+func resultRows(r *match.Room, users [sim.MaxPlayers]string, after map[string]int, winner int) []ranked.Row {
 	claims := r.Claims()
 	rows := make([]ranked.Row, 0, r.SeatCount())
 	for i := 0; i < r.SeatCount(); i++ {
 		rows = append(rows, ranked.Row{ID: users[i], Elo: after[users[i]], Won: r.TeamOf(i) == winner, Name: claims[i].Name})
 	}
 	return rows
-}
-
-// gameOverWinner reports the winning team (server space) once the frame's
-// current snapshot is in GameOver.
-func gameOverWinner(out []float64) (int, bool) {
-	cur := out[sim.SnapLen:]
-	if int(cur[sim.SnapPhase]) != int(sim.PhaseGameOver) {
-		return 0, false
-	}
-	if cur[sim.SnapSets1] > cur[sim.SnapSets0] {
-		return 1, true
-	}
-	return 0, true
 }
 
 // claimRanked reserves the account's single ranked connection (queue through

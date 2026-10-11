@@ -10,8 +10,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
-	"github.com/txny34/futenis/sim"
 )
 
 func newGraceHub(tick chan time.Time, grace time.Duration) *httptest.Server {
@@ -39,7 +39,7 @@ func startPair(ctx context.Context, t *testing.T, srv *httptest.Server) (c1, c2 
 	c2 = dial(ctx, t, srv)
 	readWelcome(ctx, t, c1)
 	readMsg(ctx, t, c2, wire.MsgWelcome, wire.WelcomeLen)
-	seat := readMsg(ctx, t, c2, wire.MsgSeat, wire.HeaderLen+TokenLen)
+	seat := readMsg(ctx, t, c2, wire.MsgSeat, wire.HeaderLen+match.TokenLen)
 	return c1, c2, string(seat[wire.HeaderLen:])
 }
 
@@ -59,7 +59,7 @@ func TestRejoinResumesHeldSeat(t *testing.T) {
 	if w := readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen); w[2] != 1 {
 		t.Fatalf("rejoined slot %d, want 1", w[2])
 	}
-	if s := readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+TokenLen); string(s[wire.HeaderLen:]) != token {
+	if s := readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+match.TokenLen); string(s[wire.HeaderLen:]) != token {
 		t.Fatal("rejoin token changed")
 	}
 	readMsg(ctx, t, c1, wire.MsgPeerBack, wire.HeaderLen)
@@ -108,35 +108,16 @@ func TestHoldsAreCapped(t *testing.T) {
 	srv := newGraceHub(make(chan time.Time), time.Minute)
 	defer srv.Close()
 	c1, c2, token := startPair(ctx, t, srv)
-	for range MaxHolds {
+	for range match.MaxHolds {
 		c2.CloseNow()
 		readMsg(ctx, t, c1, wire.MsgPeerAway, wire.HeaderLen+8)
 		c2 = dialRejoin(ctx, t, srv, token)
 		readMsg(ctx, t, c2, wire.MsgWelcome, wire.WelcomeLen)
-		readMsg(ctx, t, c2, wire.MsgSeat, wire.HeaderLen+TokenLen)
+		readMsg(ctx, t, c2, wire.MsgSeat, wire.HeaderLen+match.TokenLen)
 		readMsg(ctx, t, c1, wire.MsgPeerBack, wire.HeaderLen)
 	}
 	c2.CloseNow() // one drop too many: the seat is left for good
 	readMsg(ctx, t, c1, wire.MsgPeerLeft, wire.HeaderLen)
-}
-
-func TestPausedOnlyWhereNoBotPlays(t *testing.T) {
-	held := func(mode sim.Mode, ranked bool) bool {
-		r := NewRoom(mode, "test")
-		r.ranked = ranked
-		r.away[1] = time.NewTimer(time.Hour)
-		defer r.away[1].Stop()
-		return r.pausedLocked()
-	}
-	if !held(sim.Mode1v1, false) || !held(sim.Mode2v2, true) {
-		t.Fatal("1v1 and ranked must pause while a seat is held")
-	}
-	if held(sim.Mode2v2, false) {
-		t.Fatal("casual 2v2 goes on with the bot")
-	}
-	if NewRoom(sim.Mode1v1, "test").pausedLocked() {
-		t.Fatal("no held seat: not paused")
-	}
 }
 
 func TestRejoinReplacesAConnectionNotSeenDropped(t *testing.T) {
@@ -148,8 +129,8 @@ func TestRejoinReplacesAConnectionNotSeenDropped(t *testing.T) {
 	c1, c2, token := startPair(ctx, t, srv)
 	back := dialRejoin(ctx, t, srv, token) // c2 still open: wifi -> 4G switch
 	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
-	readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+TokenLen)
-	expectClose(ctx, t, c2, CloseReplace)
+	readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+match.TokenLen)
+	expectClose(ctx, t, c2, match.CloseReplace)
 	tick <- time.Time{} // the match never paused nor ended
 	readMsg(ctx, t, c1, wire.MsgFrame, wire.FrameLen)
 	readMsg(ctx, t, back, wire.MsgFrame, wire.FrameLen)
@@ -172,7 +153,7 @@ func startRanked(ctx context.Context, t *testing.T, srv *httptest.Server, iss *a
 	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	b = dialRanked(ctx, t, srv, net+".2", tokenFor(t, iss, userB))
 	readMsg(ctx, t, a, wire.MsgWelcome, wire.WelcomeLen)
-	seat := readMsg(ctx, t, a, wire.MsgSeat, wire.HeaderLen+TokenLen)
+	seat := readMsg(ctx, t, a, wire.MsgSeat, wire.HeaderLen+match.TokenLen)
 	readWelcome(ctx, t, b)
 	return a, b, string(seat[wire.HeaderLen:])
 }

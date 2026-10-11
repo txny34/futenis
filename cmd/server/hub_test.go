@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
@@ -55,7 +56,7 @@ func readMsg(ctx context.Context, t *testing.T, c *websocket.Conn, typ byte, n i
 func readWelcome(ctx context.Context, t *testing.T, c *websocket.Conn) []byte {
 	t.Helper()
 	w := readMsg(ctx, t, c, wire.MsgWelcome, wire.WelcomeLen)
-	readMsg(ctx, t, c, wire.MsgSeat, wire.HeaderLen+TokenLen)
+	readMsg(ctx, t, c, wire.MsgSeat, wire.HeaderLen+match.TokenLen)
 	return w
 }
 

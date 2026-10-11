@@ -4,20 +4,21 @@ import (
 	"context"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/match"
 )
 
 // seatRef locates a rejoin token's seat.
 type seatRef struct {
-	r    *Room
+	r    *match.Room
 	slot int
 }
 
 // play runs a seated peer until it disconnects. A dropped connection in a
-// running match keeps the seat for h.grace (room_rejoin.go); anything else
+// running match keeps the seat for h.grace (internal/match/rejoin.go); anything else
 // leaves it for good. kept reports that the seat is still taken (held, or
 // replaced by a newer connection of the same player): its ranked account
 // stays claimed until hub.expireSeat or the last play frees it.
-func (h *hub) play(ctx context.Context, code string, slot int, r *Room, c *websocket.Conn) (kept bool) {
+func (h *hub) play(ctx context.Context, code string, slot int, r *match.Room, c *websocket.Conn) (kept bool) {
 	p := wsPeer{c}
 	defer c.CloseNow()
 	lost := h.readLoop(ctx, code, slot, r, c)
@@ -33,7 +34,7 @@ func (h *hub) play(ctx context.Context, code string, slot int, r *Room, c *webso
 	return !left && !closed
 }
 
-func (h *hub) expireSeat(code string, r *Room, slot int) {
+func (h *hub) expireSeat(code string, r *match.Room, slot int) {
 	c := r.SeatClaim(slot)
 	if !r.ExpireAway(slot) {
 		return // back in time

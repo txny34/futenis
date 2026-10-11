@@ -36,8 +36,8 @@ type lobbyPeer struct {
 	nameAt time.Time
 	buf    []byte
 
-	compact    bool            // wants ROSTER_Q (lobby_compact.go)
-	key        string          // client limit key (lobby_report.go)
+	compact    bool            // wants ROSTER_Q (wire.EncodeRosterQ)
+	key        string          // client limit key (report.go)
 	reportedBy map[string]bool // networks that reported this name
 	flagged    bool            // name hidden after reports: fixed to names.Fallback
 }
