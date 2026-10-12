@@ -1,5 +1,5 @@
 import { CharacterStyle, styleFromSeed } from "../../character/character";
-import { BUILD_RANGE, HAIR_STYLES, HEADWEAR, HEAD_SIZE_RANGE, HairStyle, Headwear } from "../../character/style";
+import { BUILD_RANGE, HAIR_STYLES, HEADWEAR, HEAD_SIZE_RANGE, HairStyle, Headwear, MAX_SHIRT_NUMBER } from "../../character/style";
 import { THEME } from "../../env/theme";
 import { t } from "../../i18n/t";
 import { loadStyle, saveStyle } from "../../profile/style-store";
@@ -8,7 +8,7 @@ import { registerOverlay } from "../overlays";
 import { StylePreview } from "./style-preview";
 
 // "Estilos" (lobby dock): customize your own character — hair, headwear,
-// skin/hair/hat colors, head size and build — with a live 3D preview. Every
+// skin/hair/hat colors, head size, build and shirt number — with a live 3D preview. Every
 // change is saved at once (style-store) and reaches your player in matches.
 
 const HAIR_LABELS: Readonly<Record<HairStyle, string>> = {
@@ -127,6 +127,8 @@ export class StylesModal {
         value: s.headSize, format: pct, onInput: (v) => this.patch({ headSize: v }) }),
       slider({ label: t("Contextura", "Build"), min: BUILD_RANGE[0], max: BUILD_RANGE[1], step: STEP,
         value: s.build, format: pct, onInput: (v) => this.patch({ build: v }) }),
+      slider({ label: t("Número de camiseta", "Shirt number"), min: 0, max: MAX_SHIRT_NUMBER, step: 1,
+        value: s.number, format: (v) => String(Math.round(v)), onInput: (v) => this.patch({ number: Math.round(v) }) }),
     );
   }
 }

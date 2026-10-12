@@ -4,6 +4,7 @@
 // and cyan (team 1 / neon B), neon-yellow ball.
 import { LOBBY_DECOR, type LobbyDecorTheme, type HallTheme } from "./theme-lobby";
 import { FX, type FxTheme } from "./theme-fx";
+import { makeKits, type Kit } from "./theme-kits";
 import { CB, COLORBLIND } from "./theme-cb";
 
 // Team hues (shirts, neon, pads, HUD): orange/sky in colorblind mode.
@@ -46,6 +47,8 @@ export interface Theme {
   readonly ledText: string;
   readonly ledAccent: string;
   readonly team: readonly [number, number];
+  /** Team kits (theme-kits.ts). */
+  readonly kits: readonly [Kit, Kit];
   /** Entrenamiento ball machine (view/machine.ts). */
   readonly machine: { readonly body: number; readonly barrel: number; readonly trim: number; readonly flash: number };
   /** Lobby (docs/design/lobby.md §7): floor, neon border, pad colors (training/1v1/2v2), hold ring. */
@@ -116,6 +119,7 @@ export const THEME: Theme = {
   ledText: "#19e3ff",
   ledAccent: TEAM_A_CSS,
   team: [TEAM_A, TEAM_B],
+  kits: makeKits(TEAM_A, TEAM_B),
   machine: { body: 0x1b2340, barrel: 0x0b0f1c, trim: 0xff4fa3, flash: 0xff4fa3 },
   lobbyFloor: 0x141a33,
   lobbyEdge: 0x19e3ff,

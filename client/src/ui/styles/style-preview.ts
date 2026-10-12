@@ -11,6 +11,8 @@ const W = 300;
 const H = 380;
 const TURN_RATE = 0.5; // rad/s
 const SMILE_EVERY_S = 4;
+const SHOW_BACK_S = 2; // after a shirt number change: turn around to show it
+const TURN_EASE_HZ = 6;
 
 export class StylePreview {
   readonly canvas: HTMLCanvasElement;
@@ -22,6 +24,8 @@ export class StylePreview {
   private raf = 0;
   private last = 0;
   private clock = 0;
+  private backUntil = 0;
+  private number = -1;
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -41,6 +45,9 @@ export class StylePreview {
 
   setStyle(style: Readonly<CharacterStyle>): void {
     this.character.setStyle(style);
+    this.character.setJersey(style.number, "");
+    if (this.number >= 0 && style.number !== this.number) this.backUntil = this.clock + SHOW_BACK_S;
+    this.number = style.number;
     this.character.express("happy", 1.2);
   }
 
@@ -51,7 +58,8 @@ export class StylePreview {
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
       this.clock += dt;
-      this.pose.facing = Math.sin(this.clock * TURN_RATE) * 0.9;
+      const target = this.clock < this.backUntil ? Math.PI : Math.sin(this.clock * TURN_RATE) * 0.9;
+      this.pose.facing += (target - this.pose.facing) * Math.min(1, dt * TURN_EASE_HZ);
       if (Math.floor(this.clock / SMILE_EVERY_S) !== Math.floor((this.clock - dt) / SMILE_EVERY_S)) this.character.express("cheer", 1);
       this.character.update(this.pose, dt);
       this.renderer.render(this.scene, this.camera);

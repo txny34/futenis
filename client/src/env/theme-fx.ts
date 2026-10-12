@@ -14,8 +14,6 @@ export interface FxTheme {
   readonly serveBox: number;
   readonly reticle: number;
   readonly perfectFlash: number;
-  /** Shorts of slot 0 / slot 1 inside a team (2v2). */
-  readonly partnerShorts: readonly [number, number];
   readonly eyeWhite: number;
   readonly eyePupil: number;
   /** Mouth atlas (character/mouth-atlas.ts): lips/inside, teeth, tongue. */
@@ -42,7 +40,6 @@ export const FX: FxTheme = {
   serveBox: 0xffd23f,
   reticle: 0xffffff,
   perfectFlash: 0xffc23f,
-  partnerShorts: [0xf2f2f2, 0x2b2f36],
   eyeWhite: 0xffffff,
   eyePupil: 0x111111,
   mouth: 0x3a1418,
