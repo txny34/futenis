@@ -37,10 +37,14 @@ export function createLook(rig: Rig): Look {
       const st = pose.strike;
       const free = 1 - (st !== null && st.t > 0 ? strikeWeight(st.t) : 0);
       if (pose.lookAt && free > 0) {
-        rig.root.updateMatrixWorld();
+        rig.root.updateWorldMatrix(true, false); // the root's own transform is all worldToLocal needs
         rig.root.worldToLocal(local.copy(pose.lookAt));
-        ty = clamp(Math.atan2(local.x, local.z), MAX_YAW) * free; // the character faces +Z
-        tp = clamp(Math.atan2(local.y - EYE_HEIGHT, Math.hypot(local.x, local.z)), MAX_PITCH) * free;
+        const a = Math.atan2(local.x, local.z); // the character faces +Z
+        // Behind the shoulder: ease back to looking ahead instead of snapping across at ±π.
+        const reach = Math.max(0, Math.min(1, (Math.PI - Math.abs(a)) / (Math.PI - MAX_YAW)));
+        const w = free * (Math.abs(a) > MAX_YAW ? reach : 1);
+        ty = clamp(a, MAX_YAW) * w;
+        tp = clamp(Math.atan2(local.y - EYE_HEIGHT, Math.hypot(local.x, local.z)), MAX_PITCH) * w;
       }
       const k = 1 - Math.exp(-dt * RATE);
       yaw += (ty - yaw) * k;
