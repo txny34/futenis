@@ -188,7 +188,7 @@ func strike(s *State, i int8, part BodyPart, u float64, ev []Event) []Event {
 	h := strikeHash(s.Tick, p.Team, s.Ball.Pos)
 
 	shot := p.ShotType
-	if shot == ShotLob && PassReady(s, i) {
+	if shot == ShotLob && passOnRelease(s, i, p.BufCharge) {
 		s.Ball.Vel = passVelocity(s, i)
 	} else {
 		// Padel: the serve is struck at/below the waist, there is no lob serve

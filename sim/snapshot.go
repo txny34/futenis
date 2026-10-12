@@ -277,8 +277,9 @@ func chargeFraction(p *Player, cfg *Config) float64 {
 	return float64(p.ChargeTicks) / float64(cfg.chargeMaxTicks)
 }
 
-// FlagPassReady is the per-player Flags bit set while that player's next
-// touch can be a 2v2 pass (PassReady): the HUD turns Globo into Pase.
+// FlagPassReady is the per-player Flags bit set while releasing Lob now
+// would be a 2v2 pass (PassReady and the charge under PassMaxCharge): the
+// HUD shows Pase, and Globo again once the charge passes the tap.
 const FlagPassReady = 1 << 2
 
 // playerFlags packs ShotType (bit 0), "stamina locked" (bit 1) and
@@ -290,7 +291,7 @@ func playerFlags(s *State, i int8) float64 {
 	if p.StaminaLock > 0 {
 		flags |= 1 << 1
 	}
-	if PassReady(s, i) {
+	if passOnRelease(s, i, chargeFraction(p, &s.Cfg)) {
 		flags |= FlagPassReady
 	}
 	return float64(flags)

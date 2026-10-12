@@ -1,5 +1,7 @@
 package sim
 
+import "math"
+
 // 2v2 passes (futvóley): a team may touch the ball up to maxDoublesTouches
 // times per crossing, never the same player twice in a row, and the
 // 1-bounce limit on its side holds for the whole possession (a pass does
@@ -85,9 +87,23 @@ func PassReady(s *State, i int8) bool {
 	return r.LastPlayer != i && touchesOf(r)+1 < limitOf(r)
 }
 
+// PassMaxCharge splits Globo in 2v2: released below it (a quick tap) the
+// touch is a pass to the partner; charged to it or beyond, a normal lob.
+const PassMaxCharge = 0.3
+
+// passOnRelease reports whether player i releasing Lob now would pass:
+// PassReady and the charge still under PassMaxCharge.
+func passOnRelease(s *State, i int8, charge float64) bool {
+	return charge < PassMaxCharge && PassReady(s, i)
+}
+
 // passHeight is where the set comes down to: the partner's chest, the
 // easiest height to strike it again.
 const passHeight = 1.0
+
+// passLead is how far in front of the partner (toward the net) the set
+// comes down, in metres.
+const passLead = 1.0
 
 // passCharge picks the set's apex between LobApexMin/Max: the lowest, a soft
 // "levantada" the partner can read, not a defensive lob.
@@ -98,6 +114,13 @@ const passCharge = 0
 // cooperative touch; the quality of the finishing shot is what matters.
 func passVelocity(s *State, i int8) Vec3 {
 	mate := &s.Players[i^1] // teamPlayers: team 0 = {0,1}, team 1 = {2,3}
-	tgt := Vec3{X: mate.Pos.X, Y: passHeight, Z: mate.Pos.Z}
+	// In front of the partner (toward the net): the set comes down where a
+	// step forward meets it with the foot, not on the head or body.
+	toNet := -math.Copysign(1, mate.Pos.X)
+	x := float64(mate.Pos.X + toNet*passLead)
+	if x*mate.Pos.X <= 0 {
+		x = mate.Pos.X // never over the net
+	}
+	tgt := Vec3{X: x, Y: passHeight, Z: mate.Pos.Z}
 	return solveLaunch(&s.Cfg, s.Ball.Pos, tgt, ShotLob, 0, passCharge)
 }

@@ -19,7 +19,7 @@ func passState() State {
 	p := &s.Players[0]
 	p.ShotType = ShotLob
 	p.BufTarget = Vec3{X: 8, Y: BallRadius, Z: 3} // aiming at the rival court
-	p.BufCharge = 1
+	p.BufCharge = 0.1                             // a quick tap: pass
 	return s
 }
 
@@ -31,7 +31,8 @@ func TestStrike_LobWithPassReadySetsUpThePartner(t *testing.T) {
 		t.Fatal("first touch of team 0 in a 2v2 rally must be pass-ready")
 	}
 	strike(&s, 0, PartFoot, 0, nil)
-	want := horizontalDir(Vec3{X: s.Players[1].Pos.X - s.Ball.Pos.X, Z: s.Players[1].Pos.Z - s.Ball.Pos.Z})
+	spot := Vec3{X: s.Players[1].Pos.X + passLead, Z: s.Players[1].Pos.Z} // in front of the partner, toward the net
+	want := horizontalDir(Vec3{X: spot.X - s.Ball.Pos.X, Z: spot.Z - s.Ball.Pos.Z})
 	if got := horizontalDir(s.Ball.Vel); got.Dot(want) < 0.99 {
 		t.Fatalf("pass heads %+v, want toward the partner %+v", got, want)
 	}
@@ -39,8 +40,8 @@ func TestStrike_LobWithPassReadySetsUpThePartner(t *testing.T) {
 		t.Fatalf("a pass is a soft set upward, got Vel.Y=%.2f", s.Ball.Vel.Y)
 	}
 	land := landingOf(&s)
-	if d := math.Hypot(land.X-s.Players[1].Pos.X, land.Z-s.Players[1].Pos.Z); d > 0.6 {
-		t.Fatalf("the set comes down %.2f m from the partner (at %+v), want within 0.6 m", d, land)
+	if d := math.Hypot(land.X-spot.X, land.Z-spot.Z); d > 0.6 {
+		t.Fatalf("the set comes down %.2f m from the spot in front of the partner (at %+v), want within 0.6 m", d, land)
 	}
 }
 
@@ -122,5 +123,24 @@ func TestSnapshot_PassReadyFlag(t *testing.T) {
 	}
 	if flags := int(dst[SnapP2Flags]); flags&FlagPassReady != 0 {
 		t.Fatalf("P2 (team in possession, last toucher) flags=%b, want no pass-ready bit", flags)
+	}
+}
+
+func TestStrike_ChargedLobStaysALobEvenWhenPassReady(t *testing.T) {
+	s := passState()
+	s.Players[0].BufCharge = PassMaxCharge
+	strike(&s, 0, PartFoot, 0, nil)
+	if s.Ball.Vel.X <= 0 {
+		t.Fatalf("a charged lob crosses the net (+X), got Vel=%+v", s.Ball.Vel)
+	}
+}
+
+func TestSnapshot_PassFlagClearsWhileChargingPastTheTap(t *testing.T) {
+	s := passState()
+	s.Players[0].ChargeTicks = uint16(float64(s.Cfg.chargeMaxTicks)*PassMaxCharge) + 1
+	dst := make([]float64, SnapLen)
+	WriteSnapshot(&s, dst)
+	if flags := int(dst[SnapP0Flags]); flags&FlagPassReady != 0 {
+		t.Fatalf("P0 flags=%b: charging past PassMaxCharge must read as Globo", flags)
 	}
 }
