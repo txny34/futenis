@@ -173,6 +173,9 @@ func (b *Bot) withAim(in sim.PlayerInput) sim.PlayerInput {
 // a short backspin drop against a deep opponent. Low-decision bots pick a
 // random spot. Aim noise is added on top.
 func (b *Bot) chooseShot(s *sim.State, slot int) {
+	if b.choosePass(s, slot) {
+		return
+	}
 	me := &s.Players[slot]
 	fwd := forward(me.Team)
 	ox, oz := opponentsCentroid(s, me.Team)
@@ -180,10 +183,12 @@ func (b *Bot) chooseShot(s *sim.State, slot int) {
 	shot := sim.BtnStrike
 	b.spin = 0
 	b.mistimed = unit(b.hash(s, slot, 9)) < b.missChance()
-	if unit(b.hash(s, slot, 4)) < b.Level.Decision {
+	smash := finishing(s, slot) // the partner's set: always the best, hardest shot
+	if smash || unit(b.hash(s, slot, 4)) < b.Level.Decision {
 		b.aimZ = -math.Copysign(wide, oz)
 		b.aimX = fwd * (sim.CourtHalfLength - b.Level.LineMargin - 0.5)
 		switch {
+		case smash:
 		case math.Abs(ox) < 3.5:
 			shot = sim.BtnLob
 		case math.Abs(ox) > 7.5 && unit(b.hash(s, slot, 5)) < b.Level.DropChance:
@@ -192,9 +197,6 @@ func (b *Bot) chooseShot(s *sim.State, slot int) {
 	} else {
 		b.aimZ = signed(b.hash(s, slot, 6)) * wide
 		b.aimX = fwd * (3 + unit(b.hash(s, slot, 7))*5)
-	}
-	if shot == sim.BtnLob && sim.PassReady(s, int8(slot)) {
-		shot = sim.BtnStrike // bots never pass (a Lob here would set up the partner)
 	}
 	b.aimX += signed(b.hash(s, slot, 8)) * b.Level.AimNoise
 	b.aimZ += signed(b.hash(s, slot, 9)) * b.Level.AimNoise
@@ -223,7 +225,7 @@ func (b *Bot) chargeFor(s *sim.State, slot int, shot uint8) int {
 	cfg := &s.Cfg
 	maxT := ticksOfSec(cfg.ChargeMaxTime)
 	if shot == sim.BtnLob {
-		return maxT / 4
+		return lobCharge(s, slot, maxT)
 	}
 	from := b.plan.ball.Pos
 	part, _ := sim.BestPart(cfg, from.Y, b.plan.off, false)

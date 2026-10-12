@@ -55,3 +55,64 @@ func TestBotFinishesPartnersPass(t *testing.T) {
 		}
 	}
 }
+
+// Bots build the play in 2v2: over a match some possessions are a pass
+// (two touches) and some the full A-B-A (pass, pass back, finish).
+func TestBotsPlayPassesInDoubles(t *testing.T) {
+	maxRun, passes, aba := 0, 0, 0
+	for seed := uint64(1); seed <= 4; seed++ {
+		r, p, a := passRuns(seed)
+		maxRun, passes, aba = max(maxRun, r), passes+p, aba+a
+	}
+	if passes == 0 || aba == 0 {
+		t.Fatalf("passes=%d A-B-A=%d (longest team run %d), want both > 0", passes, aba, maxRun)
+	}
+	if maxRun > 3 {
+		t.Fatalf("a team touched the ball %d times in a row", maxRun)
+	}
+}
+
+// passRuns plays one Hard 2v2 bot match and counts possessions with two
+// (a pass) and three (A-B-A) touches, plus the longest team run.
+func passRuns(seed uint64) (maxRun, passes, aba int) {
+	cfg := sim.DefaultConfig()
+	cfg.Mode = sim.Mode2v2
+	cfg.PointsToWin = harnessPoints
+	m := sim.NewMatch(cfg)
+	var bots [sim.MaxPlayers]Bot
+	for i := range bots {
+		bots[i] = New(Hard, i)
+		bots[i].Seed = seed*31 + uint64(i) + 1
+	}
+	run, streak := int8(-1), 0
+	for tick := 0; tick < harnessMaxTicks; tick++ {
+		s := m.State()
+		if s.Phase == sim.PhaseGameOver {
+			break
+		}
+		var in [sim.MaxPlayers]sim.PlayerInput
+		for i := 0; i < int(s.NumPlayers); i++ {
+			in[i] = bots[i].Think(&s, i)
+		}
+		for _, e := range m.Step(in) {
+			switch e.Kind {
+			case sim.EvKick:
+				if e.Side == run {
+					streak++
+				} else {
+					run, streak = e.Side, 1
+				}
+				if streak == 2 {
+					passes++
+				}
+				if streak == 3 {
+					aba++
+				}
+				maxRun = max(maxRun, streak)
+			case sim.EvPoint:
+				run, streak = -1, 0
+			}
+		}
+	}
+	return maxRun, passes, aba
+}
