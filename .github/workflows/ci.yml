@@ -28,6 +28,8 @@ jobs:
         run: bash scripts/ci/coverage-check.sh
       - name: build wasm + TS bundle
         run: go run ./cmd/dev -check
+      - name: TS unit tests (esbuild Go API + node --test)
+        run: go run ./scripts/ci/tstest
       - name: staticcheck
         env:
           GOTOOLCHAIN: auto # staticcheck v0.8.1 needs go >= 1.26

@@ -14,7 +14,7 @@ const QUEUE_CAP = 256;
 // backlog of frames (hidden tab: no rAF, no drain) can never push them out.
 const CONTROL_CAP = 32;
 const CONTROL_BYTES = HEADER + 2 * 8;
-const CONTROL_SLOT = HEADER + 32; // largest control messages: SEAT (hex token), STYLES (4 x 8)
+const CONTROL_SLOT = HEADER + 36; // largest control message: STYLES (4 x 9); SEAT is 32
 const PING_EVERY_MS = 1000;
 // Inputs are held levels: one per sim tick (120 Hz) is enough, whatever the display rate.
 const INPUT_EVERY_MS = 1000 / 120;

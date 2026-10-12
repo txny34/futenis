@@ -68,7 +68,7 @@ docs/design/  contact-v2.md (diseño aprobado + contrato congelado §20), charac
 
 ## Calidad
 
-- TDD en `sim` y `ai`. `go test ./...` siempre verde. Coverage: `sim` ≥ 95%. Soak tests (`go test -run Soak ./sim/`).
+- TDD en `sim` y `ai`. `go test ./...` siempre verde. Tests de TS puros en `client/test/*.test.ts` (`go run ./scripts/ci/tstest`). Coverage: `sim` ≥ 95%. Soak tests (`go test -run Soak ./sim/`).
 - `gofmt` + `go vet ./...` + `GOOS=js GOARCH=wasm go vet ./wasm/` limpios. `-race` en CI local.
 - Funciones < 50 líneas, archivos Go < 400, archivos TS < 200. TS strict, sin `any`.
 - Review independiente (go-reviewer) por etapa: cero CRITICAL/HIGH antes de mergear.

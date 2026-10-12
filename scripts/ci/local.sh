@@ -29,5 +29,6 @@ step "build wasm + TS bundle" go run ./cmd/dev -check
 step "staticcheck" env GOTOOLCHAIN=auto go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
 step "govulncheck" go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 step "tsc (strict)" tsc_strict
+step "TS unit tests" go run ./scripts/ci/tstest
 step "file size limits" bash scripts/ci/size-check.sh
 echo "local CI: all green"

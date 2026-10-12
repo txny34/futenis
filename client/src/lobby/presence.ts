@@ -3,6 +3,8 @@ import { CM, FACING_Q, LobbyMsg, MAX_NAME_BYTES, PRESENCE_LEN, ROSTER_Q_HEAD, RO
 import { serverBase } from "../net/server-url";
 import { displayName } from "../profile/display-name";
 import { profileStore } from "../profile/store";
+import { loadStyle } from "../profile/style-store";
+import { STYLE_LEN, decodeLook, encodeStyle } from "../net/style-wire";
 import { Extra, Snap } from "../snapshot";
 import { isOnline } from "./online-state";
 import type { App } from "./flow";
@@ -22,14 +24,15 @@ const decoder = new TextDecoder();
 const MIN_FACING_SPEED = 0.2;
 const HEADER = 8;
 
-/** Lobby actions that need the socket (moderation). */
-export interface Presence { report(id: number): void }
+/** Lobby actions that need the socket (moderation, emotes). */
+export interface Presence { report(id: number): void; emote(kind: number): void }
 
 export function startPresence(app: App, remotes: RemotePlayers): Presence {
   let ws: WebSocket | null = null;
   let retryAt = 0;
   let backoff = RETRY_MIN_MS;
   let sentName = "";
+  let sentLook = "";
   let facing = 0;
   const buf = new Uint8Array(PRESENCE_LEN);
   const view = new DataView(buf.buffer);
@@ -58,6 +61,15 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
     };
     ws = s;
     sentName = "";
+    sentLook = "";
+  };
+
+  const sendLook = (s: WebSocket): void => { // my look, again whenever Estilos changed it
+    const st = loadStyle();
+    const key = JSON.stringify(st);
+    if (key === sentLook) return;
+    s.send(encodeStyle(st, LobbyMsg.Style));
+    sentLook = key;
   };
 
   const sendName = (s: WebSocket): void => {
@@ -87,6 +99,7 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
     view.setFloat64(HEADER + 16, c[Snap.P0Z], true);
     view.setFloat64(HEADER + 24, facing, true);
     sendName(ws);
+    sendLook(ws);
     ws.send(buf);
   }, SEND_MS);
   return {
@@ -97,6 +110,10 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
       msg[1] = 1;
       new DataView(msg.buffer).setFloat64(HEADER, id, true);
       ws.send(msg);
+    },
+    emote(kind) {
+      if (ws?.readyState !== WebSocket.OPEN) return;
+      ws.send(new Uint8Array([LobbyMsg.Emote, 1, 0, 0, 0, 0, 0, 0, kind]));
     },
   };
 }
@@ -129,6 +146,15 @@ function receive(remotes: RemotePlayers, v: DataView): void {
       break;
     case LobbyMsg.Gone:
       remotes.remove(f(0));
+      break;
+    case LobbyMsg.Look: {
+      if (v.byteLength !== HEADER + 8 + STYLE_LEN) break;
+      const look = decodeLook(new Uint8Array(v.buffer), HEADER + 8, 0);
+      if (look) remotes.look(f(0), look);
+      break;
+    }
+    case LobbyMsg.PlayerEmote:
+      if (v.byteLength === HEADER + 9) remotes.emote(f(0), v.getUint8(HEADER + 8));
       break;
     default:
       break;
