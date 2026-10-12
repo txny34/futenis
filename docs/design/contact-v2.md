@@ -874,6 +874,12 @@ recibe `[MaxPlayers]PlayerInput` (los slots no usados se ignoran). `State` sigue
   cargado** = globo normal, así el globo defensivo sigue existiendo en cualquier toque. `Flags` bit 2 =
   "soltar ahora es pase" → el HUD muestra "Pase" y vuelve a "Globo" al cargar. Los bots pasan
   (`Level.PassChance`), arman A-B-A y el que remata elige siempre el mejor tiro.
+  Detalles: el pase sale con **cualquier parte del cuerpo** (levantar de cabeza es futvóley; ignora
+  `AllowLob`) y sin desvío de calidad. Un pase sólo vale mientras la pelota **no llegó al lado rival**
+  (sin pique rival y sobre el propio medio); si el compañero toca un tiro propio que ya cruzó, el punto
+  es del equipo que tiró (como antes). El pique que la pelota ya dio del lado del equipo antes de su
+  primer toque cuenta para su posesión (p. ej. tras el pique del saque en el cuadro, el que recibe ya
+  no puede dejarla picar otra vez antes de pasar).
 - *(Antes: un toque por equipo por cruce — el compañero que tocaba en el mismo cruce era doble toque.)*
 - `RallyState.LastKicker` → **`RallyState.LastTeam`** (mismo rol, ahora nombrado por equipo) +
   **`RallyState.LastPlayer`** (qué jugador específico, dentro de ese equipo, tocó — informativo /
