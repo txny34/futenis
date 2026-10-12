@@ -29,12 +29,15 @@ const (
 )
 
 type lobbyPeer struct {
-	p      Peer
-	pos    wire.Presence
-	name   string
-	placed bool // sent at least one PRESENCE
-	nameAt time.Time
-	buf    []byte
+	p       Peer
+	pos     wire.Presence
+	name    string
+	placed  bool // sent at least one PRESENCE
+	nameAt  time.Time
+	look    wire.Style // look.go
+	lookAt  time.Time
+	emoteAt time.Time
+	buf     []byte
 
 	compact    bool            // wants ROSTER_Q (wire.EncodeRosterQ)
 	key        string          // client limit key (report.go)
@@ -60,7 +63,7 @@ func New() *Lobby {
 	return &Lobby{peers: map[int]*lobbyPeer{}, entries: make([]wire.Entry, 0, Max), out: make([]rosterOut, 0, Max)}
 }
 
-// Join adds p and then sends it the names already known (outside the lock:
+// Join adds p and then sends it the names and looks already known (outside the lock:
 // a slow joiner never blocks the lobby). ok is false when full.
 func (l *Lobby) Join(p Peer) (id int, ok bool) {
 	l.mu.Lock()
@@ -76,6 +79,7 @@ func (l *Lobby) Join(p Peer) (id int, ok bool) {
 			names = append(names, wire.EncodeLobbyName(oid, o.name))
 		}
 	}
+	names = append(names, l.looksLocked(id)...)
 	l.peers[id] = &lobbyPeer{p: p, buf: make([]byte, wire.RosterLen(Max))}
 	l.dirty = true
 	l.mu.Unlock()

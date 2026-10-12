@@ -56,11 +56,16 @@ func (r *Room) SeatClaim(slot int) ranked.Claim {
 
 // Hold keeps slot's seat after p's connection dropped. It refuses (the caller
 // then leaves for good) when p no longer owns the seat, the match is not
-// running or is over, nobody else is connected, or the room used up its holds.
+// running or is over, nobody else is connected (ranked: nor held), or the room
+// used up its holds.
 // expire runs after grace unless the player is back by then.
 func (r *Room) Hold(slot int, p Peer, grace time.Duration, expire func()) bool {
 	r.mu.Lock()
-	if r.closed || !r.started || r.over || r.peers[slot] != p || r.holds >= MaxHolds || r.humansLocked() < 2 {
+	// Ranked also holds the last connected seat when a rival is already held:
+	// whoever stays away past the grace loses (ExpireAway), so a player who
+	// drops on purpose while the rival blips can't settle it on the spot.
+	alone := r.humansLocked() < 2 && !(r.ranked && r.anyAwayLocked())
+	if r.closed || !r.started || r.over || r.peers[slot] != p || r.holds >= MaxHolds || alone {
 		r.mu.Unlock()
 		return false
 	}

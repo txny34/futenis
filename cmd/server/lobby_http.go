@@ -75,7 +75,7 @@ func (h *hub) pickLobby() *lobby.Lobby {
 	return l
 }
 
-// lobbyLoop reads PRESENCE / NAME / PING until the peer leaves, floods, sends
+// lobbyLoop reads PRESENCE / NAME / LOBBY_STYLE / EMOTE / PING until the peer leaves, floods, sends
 // garbage or stays silent for lobbyIdle (hidden tab).
 func (h *hub) lobbyLoop(ctx context.Context, l *lobby.Lobby, id int, c *websocket.Conn) {
 	p := wsPeer{c}
@@ -105,6 +105,14 @@ func (h *hub) lobbyLoop(ctx context.Context, l *lobby.Lobby, id int, c *websocke
 			}
 		case wire.IsNameMsg(b):
 			l.SetName(id, names.Clean(string(b[wire.HeaderLen:])), time.Now())
+		case len(b) > 0 && b[0] == wire.MsgLobbyStyle:
+			if st, ok := wire.DecodeLobbyStyle(b); ok {
+				l.SetLook(id, st, time.Now())
+			}
+		case len(b) > 0 && b[0] == wire.MsgEmote:
+			if kind, ok := wire.DecodeEmote(b); ok {
+				l.Emote(id, kind, time.Now())
+			}
 		default:
 			pos, err := wire.DecodePresence(b)
 			if err != nil {

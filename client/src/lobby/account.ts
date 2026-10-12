@@ -10,6 +10,7 @@ import { extraOverlayOpen, registerOverlay } from "../ui/overlays";
 import { errText, safeStart, tutorialOptions, type App } from "./flow";
 import { TutorialPrompt } from "./tutorial-prompt";
 import { startPresence } from "./presence";
+import { bindEmotes } from "./emotes";
 import { joinFromUrl, retryLinkJoin, startFriendRoom } from "./online-flow";
 
 // First visit = lobby + "Iniciá sesión" (Discord / Google / invitado) + an optional
@@ -30,6 +31,7 @@ export function setupAccount(app: App): Account {
   registerOverlay(() => login.isOpen);
   new TutorialPrompt(app.bar.root, () => safeStart(app, tutorialOptions()));
   const presence = startPresence(app, app.view.lobby.remote); // shared online lobby
+  bindEmotes(app, presence); // 1-4: saludo, festejo, baile, bajón
   const remotes = app.view.lobby.remote;
   app.play.onFriend(() => startFriendRoom(app));
   joinFromUrl(app); // opened from a friend's link (?room=CODE)

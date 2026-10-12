@@ -7,7 +7,7 @@ import { myShirtName, onShirtNameChange } from "./shirt-name";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import { moodFor } from "./player-moods";
-import { BodyReaction, reactionFor } from "./body-reaction";
+import { BodyReaction, EMOTE_S, Kind, reactionFor } from "./body-reaction";
 import { Steer, steer } from "./steer";
 import {
   EventKind, Extra, MAX_PLAYERS, Mode, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
@@ -127,9 +127,9 @@ export class PlayersView {
     }
   }
 
-  resetReactions(): void {
-    for (const s of this.slots) s.body.reset();
-  }
+  resetReactions(): void { for (const s of this.slots) s.body.reset(); }
+  /** My lobby emote (lobby/emotes.ts). */
+  emote(kind: Kind): void { this.slots[HUMAN_SLOT].body.trigger(kind, EMOTE_S); }
 
   /** Gold flash on player i (perfect hit). */
   flash(i: number): void {

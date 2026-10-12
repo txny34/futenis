@@ -65,6 +65,7 @@ type Room struct {
 	claims  [sim.MaxPlayers]ranked.Claim // ranked reservation per seat
 	styles  [sim.MaxPlayers]wire.Style   // each seat's look (style.go)
 	styleAt [sim.MaxPlayers]time.Time    // last accepted look change per seat
+	final   [sim.MaxPlayers]Peer         // who was seated when the room closed (Audience)
 	release func(c ranked.Claim)         // frees a held seat's ranked account when the room closes (set by announce)
 }
 
@@ -292,4 +293,15 @@ func (r *Room) SetInput(slot int, p Peer, in sim.PlayerInput) {
 		r.inputs[slot] = in
 	}
 	r.mu.Unlock()
+}
+
+// Audience is who gets the match result: the seated peers, or once the room
+// closed (a forfeit), those still seated at that moment.
+func (r *Room) Audience() [sim.MaxPlayers]Peer {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return r.final
+	}
+	return r.peers
 }

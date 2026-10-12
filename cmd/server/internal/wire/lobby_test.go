@@ -46,3 +46,17 @@ func TestEncodeRosterQ(t *testing.T) {
 		t.Fatalf("compact roster %d bytes is not ~3x smaller than %d", got, RosterLen(47))
 	}
 }
+
+// Every lobby message id is distinct (the compact roster already took 0x93).
+func TestLobbyMessageIDsUnique(t *testing.T) {
+	ids := map[byte]string{}
+	for name, id := range map[string]byte{
+		"presence": MsgPresence, "name": MsgName, "report": MsgReport, "style": MsgLobbyStyle, "emote": MsgEmote,
+		"roster": MsgRoster, "lobbyName": MsgLobbyName, "gone": MsgGone, "rosterQ": MsgRosterQ, "look": MsgLobbyLook, "lobbyEmote": MsgLobbyEmote,
+	} {
+		if other, dup := ids[id]; dup {
+			t.Fatalf("%s and %s share %#x", name, other, id)
+		}
+		ids[id] = name
+	}
+}

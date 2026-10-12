@@ -1,7 +1,7 @@
 import type { CharacterPose } from "../character/character";
 import { EventKind, SimEvent } from "../snapshot";
 
-// Full-body festejo / bajón after a set or the match (character/gestures.ts),
+// Full-body festejo / bajón after a set or the match, and lobby emotes (character/gestures.ts),
 // eased in and out. Running fades it: a player chasing the next serve just plays.
 
 const SET_S = 2.4;
@@ -9,7 +9,10 @@ const MATCH_S = 6;
 const EASE_S = 0.3;
 const RUN_FADE = 0.8;
 
-type Kind = "cheer" | "slump";
+export type Kind = "cheer" | "slump" | "wave" | "dance";
+/** Lobby emotes by wire kind (cmd/server/internal/wire/lobby_look.go): 1 saludo, 2 festejo, 3 baile, 4 bajón. */
+export const EMOTES: readonly Kind[] = ["wave", "cheer", "dance", "slump"];
+export const EMOTE_S = 2.6;
 interface Reaction { readonly kind: Kind; readonly seconds: number }
 const SET_WIN: Reaction = { kind: "cheer", seconds: SET_S };
 const SET_LOSS: Reaction = { kind: "slump", seconds: SET_S };
@@ -45,5 +48,7 @@ export class BodyReaction {
     const w = this.left > 0 ? Math.min(easeIn, easeOut) * (1 - RUN_FADE * speed) : 0;
     pose.cheer = this.kind === "cheer" ? w : 0;
     pose.slump = this.kind === "slump" ? w : 0;
+    pose.wave = this.kind === "wave" ? w : 0;
+    pose.dance = this.kind === "dance" ? w : 0;
   }
 }

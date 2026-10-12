@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { StrikeTier } from "./config";
 import { applyContactIk } from "./contact";
-import { applyCheer, applySlump, cheerHop } from "./gestures";
+import { applyCheer, applyDance, applySlump, applyWave, cheerHop } from "./gestures";
 import { applyFidget, applyShuffle, applySkid } from "./footwork";
 import { FootworkClock } from "./footwork-clock";
 import { applyAir, applyIdle, applyLocomotion, applyRest } from "./poses";
@@ -43,6 +43,9 @@ export interface CharacterPose {
   /** Reaction weights 0..1 (gestures.ts): festejo after winning a set/match, bajón after losing. */
   cheer?: number;
   slump?: number;
+  /** Lobby emotes (gestures.ts): saludo, baile. */
+  wave?: number;
+  dance?: number;
   /** Side shuffle -1..1 (footwork.ts): + steps to the body's left; 0 = run facing the move. */
   strafe?: number;
 }
@@ -108,7 +111,7 @@ export function createAnimator(rig: Rig): Animator {
     const air = pose.airborne ? 1 : 0;
     const speed = THREE.MathUtils.clamp(pose.speed, 0, 1);
     applyRest(rig.bones);
-    const gesture = Math.max(pose.cheer ?? 0, pose.slump ?? 0); // a reaction replaces the ready stance
+    const gesture = Math.max(pose.cheer ?? 0, pose.slump ?? 0, pose.wave ?? 0, pose.dance ?? 0); // a reaction replaces the ready stance
     const still = k * (1 - speed) * (1 - air) * (1 - gesture);
     applyIdle(rig.bones, time, still);
     // Looking around would fight the eyes on the ball (look.ts): with a ball only the stretch plays.
@@ -123,6 +126,8 @@ export function createAnimator(rig: Rig): Animator {
     applyAir(rig.bones, pose.verticalVel, k * air);
     applyCheer(rig.bones, time, k * (pose.cheer ?? 0)); // not gated by air: no snap when jumping mid-cheer
     applySlump(rig.bones, time, k * (pose.slump ?? 0));
+    applyWave(rig.bones, time, k * (pose.wave ?? 0));
+    applyDance(rig.bones, time, k * (pose.dance ?? 0));
   }
 
   function strikeLayer(pose: CharacterPose, side: Side): void {

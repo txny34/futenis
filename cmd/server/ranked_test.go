@@ -27,6 +27,12 @@ const (
 
 func newRankedHub(t *testing.T) (*httptest.Server, *authtest.Issuer, *ranked.Mem) {
 	t.Helper()
+	return newRankedHubGrace(t, 0)
+}
+
+// newRankedHubGrace: grace > 0 overrides how long a dropped seat is held.
+func newRankedHubGrace(t *testing.T, grace time.Duration) (*httptest.Server, *authtest.Issuer, *ranked.Mem) {
+	t.Helper()
 	iss := authtest.NewIssuer(t)
 	store := ranked.NewMem()
 	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
@@ -34,6 +40,9 @@ func newRankedHub(t *testing.T) (*httptest.Server, *authtest.Issuer, *ranked.Mem
 	h.ticker = func() (<-chan time.Time, func()) { return make(chan time.Time), func() {} }
 	h.auth = auth.NewVerifier(iss.Srv.URL, testIss)
 	h.ratings = store
+	if grace > 0 {
+		h.grace = grace
+	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return srv, iss, store

@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { Character, CharacterPose, createCharacter, styleFromSeed } from "../character/character";
+import { Character, CharacterPose, CharacterStyle, createCharacter, styleFromSeed } from "../character/character";
+import { BodyReaction, EMOTES, EMOTE_S } from "../view/body-reaction";
 import { THEME } from "../env/theme";
 import { canvasTexture, FONT_STACK } from "./decor/util";
 
@@ -20,6 +21,7 @@ interface Remote {
   readonly pose: CharacterPose;
   readonly tag: THREE.Sprite;
   readonly target: THREE.Vector3;
+  readonly body: BodyReaction;
   facing: number;
   id: number;
   name: string;
@@ -33,8 +35,9 @@ export class RemotePlayers {
   /** Same remotes as byId, iterated by index every frame (no iterator allocations). */
   private readonly active: Remote[] = [];
   private readonly free: Remote[] = [];
-  /** Names that arrived before the first position (join order on the server). */
+  /** Names and looks that arrived before the first position (join order on the server). */
   private readonly pendingNames = new Map<number, string>();
+  private readonly pendingLooks = new Map<number, CharacterStyle>();
   /** Players this viewer hid ("Jugadores en el lobby"); lobby ids live as long as their connection. */
   private readonly hidden = new Set<number>();
 
@@ -63,6 +66,9 @@ export class RemotePlayers {
       this.active.push(r);
       this.setTag(r, this.pendingNames.get(id) ?? "");
       this.pendingNames.delete(id);
+      const look = this.pendingLooks.get(id);
+      if (look) this.wear(r, look);
+      this.pendingLooks.delete(id);
     }
     r.target.set(x, y, z);
     r.facing = facing;
@@ -75,21 +81,46 @@ export class RemotePlayers {
     else this.pendingNames.set(id, text);
   }
 
+  /** Their own look (Estilos), with their shirt number. */
+  look(id: number, st: CharacterStyle): void {
+    const r = this.byId.get(id);
+    if (r) this.wear(r, st);
+    else this.pendingLooks.set(id, st);
+  }
+
+  /** A lobby emote (wire kind 0..3, view/body-reaction.ts EMOTES). */
+  emote(id: number, kind: number): void {
+    const r = this.byId.get(id);
+    const k = EMOTES[kind];
+    if (r && k) r.body.trigger(k, EMOTE_S);
+  }
+
+  private wear(r: Remote, st: CharacterStyle): void {
+    r.ch.setStyle(st);
+    r.ch.setJersey(st.number, "");
+  }
+
   remove(id: number): void {
     const r = this.byId.get(id);
     this.pendingNames.delete(id);
+    this.pendingLooks.delete(id);
     if (!r) return;
     this.byId.delete(id);
     const i = this.active.indexOf(r);
     this.active[i] = this.active[this.active.length - 1];
     this.active.pop();
     r.ch.root.visible = r.tag.visible = false;
+    r.body.reset();
+    const anon = styleFromSeed(301 + this.free.length * 7); // the next one starts anonymous
+    r.ch.setStyle(anon);
+    r.ch.setJersey(anon.number, "");
     this.free.push(r);
   }
 
   clear(): void {
     while (this.active.length > 0) this.remove(this.active[this.active.length - 1].id);
     this.pendingNames.clear();
+    this.pendingLooks.clear();
   }
 
   update(dt: number): void {
@@ -109,6 +140,7 @@ export class RemotePlayers {
       r.pose.speed = Math.min(1, Math.hypot(dx, dz) / dt / WALK_SPEED_NORM);
       r.pose.airborne = ny > AIR_Y;
       r.pose.facing = r.facing;
+      r.body.update(r.pose, dt);
       r.tag.position.set(p.x, ny + TAG_Y, p.z);
       r.ch.update(r.pose, dt);
     }
@@ -122,11 +154,11 @@ export class RemotePlayers {
       trim: THEME.crowdBody[i % THEME.crowdBody.length], ink: THEME.crowdBody[i % THEME.crowdBody.length],
       skin: THEME.crowdSkin[i % THEME.crowdSkin.length], hair: THEME.crowdBody[(i + 3) % THEME.crowdBody.length], boots: D.neon[i % D.neon.length],
     });
-    ch.setStyle(styleFromSeed(301 + i * 7)); // other players' own styles are not sent yet: a varied look per pool slot
+    ch.setStyle(styleFromSeed(301 + i * 7)); // until their own look arrives (LOOK)
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
     tag.scale.set(TAG_W, (TAG_W * TAG_PX_H) / TAG_PX_W, 1);
     this.group.add(ch.root, tag);
-    return { ch, tag, target: new THREE.Vector3(), facing: 0, id: -1, name: "", lastY: 0, seenAt: 0,
+    return { ch, tag, target: new THREE.Vector3(), body: new BodyReaction(), facing: 0, id: -1, name: "", lastY: 0, seenAt: 0,
       pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike: null, facing: 0 } };
   }
 
