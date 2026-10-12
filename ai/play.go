@@ -15,7 +15,7 @@ func (b *Bot) thinkRally(s *sim.State, slot int) sim.PlayerInput {
 		b.resetCharge()
 		return b.recover(s, slot)
 	}
-	if b.missed && s.Rally.ShotCount == b.missedShot {
+	if b.missed && s.Rally.ShotCount == b.missedShot && lastTouch(s) == b.missedTouch {
 		// This bot whiffed this ball (a mistimed shot): it does not get a
 		// second try at the same crossing.
 		b.resetCharge()
@@ -150,7 +150,7 @@ func (b *Bot) strike(s *sim.State, slot int, in sim.PlayerInput) sim.PlayerInput
 	// any reachable tick, and touching the serve first loses the point.
 	canRelease := b.holdTicks > 1 && !s.Rally.ServeBoxPending
 	if canRelease && (b.releaseNow(me, cfg, early, buf) || b.holdTicks > maxHoldTicks) {
-		b.missed, b.missedShot = b.mistimed, s.Rally.ShotCount
+		b.missed, b.missedShot, b.missedTouch = b.mistimed, s.Rally.ShotCount, lastTouch(s)
 		b.release(cfg)
 		in.Buttons &^= sim.BtnStrike | sim.BtnLob
 		return b.withAim(in)

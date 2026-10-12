@@ -40,3 +40,15 @@ func lobCharge(s *sim.State, slot, maxT int) int {
 func finishing(s *sim.State, slot int) bool {
 	return s.Rally.LastTeam == s.Players[slot].Team
 }
+
+// touchKey identifies the last touch of a rally: passes keep ShotCount, so
+// the whiff lock also needs who touched last and how many team touches.
+type touchKey struct {
+	team, player int8
+	touches      uint8
+}
+
+func lastTouch(s *sim.State) touchKey {
+	r := &s.Rally
+	return touchKey{team: r.LastTeam, player: r.LastPlayer, touches: r.TeamTouches}
+}

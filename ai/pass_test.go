@@ -116,3 +116,25 @@ func passRuns(seed uint64) (maxRun, passes, aba int) {
 	}
 	return maxRun, passes, aba
 }
+
+// A bot that whiffed the rival's ball still plays its partner's set of that
+// same ball: the miss lock is per touch, and passes do not bump ShotCount.
+func TestBotWhoWhiffedStillTakesTheSet(t *testing.T) {
+	m := setUpBall(1)
+	bot := New(Hard, 0)
+	bot.Level.MissChance = 0
+	s := m.State()
+	bot.missed, bot.missedShot, bot.missedTouch = true, s.Rally.ShotCount, touchKey{team: 1, player: 2, touches: 1}
+	kicked := false
+	for tick := 0; tick < 3*sim.TickRate && !kicked; tick++ {
+		s := m.State()
+		var in [sim.MaxPlayers]sim.PlayerInput
+		in[0] = bot.Think(&s, 0)
+		for _, e := range m.Step(in) {
+			kicked = kicked || e.Kind == sim.EvKick && e.Player == 0
+		}
+	}
+	if !kicked {
+		t.Fatal("the bot that whiffed the rival's ball ignored its partner's set")
+	}
+}
