@@ -34,9 +34,9 @@ function coil(b: Bones, x: SideRig, s: number, w: number, hip: number, shoulder:
 
 /** BAJO (instep drive): heel cocked behind with the torso over the ball, the
  * planted knee loaded, arms counter-balancing on the diagonal (far arm forward
- * and across, kick-side arm back); a whipped swing to a ~75° finish. */
+ * and out, kick-side arm back); a whipped swing to a ~75° finish. */
 function low(b: Bones, x: SideRig, s: number, w: number): void {
-  x.kUp.rotation.x += w * (-0.25 + sw(s, 0.95, -1.05));
+  x.kUp.rotation.x += w * (-0.4 + sw(s, 1.1, -0.9)); // +0.7 cocked, ~-0.55 at contact, -1.3 finish
   x.kLeg.rotation.x += w * (0.35 + sw(s, 1.35, -0.25));
   x.kUp.rotation.y -= x.d * w * 0.2; // open the hip a little: instep, not toe
   x.kFoot.rotation.x += w * 0.45; // pointed toe
