@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { StrikeTier } from "./config";
 import { applyContactIk } from "./contact";
 import { applyCheer, applySlump, cheerHop } from "./gestures";
+import { applyFidget, applyShuffle, applySkid } from "./footwork";
+import { FootworkClock } from "./footwork-clock";
 import { applyAir, applyIdle, applyLocomotion, applyRest } from "./poses";
 import { BROW_REST_Y, Rig, groundSnap, resetRig } from "./rig";
 import { Side, createSides, sideFromLocalX } from "./sides";
@@ -41,6 +43,8 @@ export interface CharacterPose {
   /** Reaction weights 0..1 (gestures.ts): festejo after winning a set/match, bajón after losing. */
   cheer?: number;
   slump?: number;
+  /** Side shuffle -1..1 (footwork.ts): + steps to the body's left; 0 = run facing the move. */
+  strafe?: number;
 }
 
 const TAU = Math.PI * 2;
@@ -70,6 +74,7 @@ export function createAnimator(rig: Rig): Animator {
   let phase = 0;
   let wasAir = false;
   let land = 0; // 1 at touchdown, fades to 0 over LAND_S
+  const feet = new FootworkClock();
   const sides = createSides(rig.bones);
 
   /** Contact in root space (local), or false when there is none. */
@@ -104,10 +109,17 @@ export function createAnimator(rig: Rig): Animator {
     const speed = THREE.MathUtils.clamp(pose.speed, 0, 1);
     applyRest(rig.bones);
     const gesture = Math.max(pose.cheer ?? 0, pose.slump ?? 0); // a reaction replaces the ready stance
-    applyIdle(rig.bones, time, k * (1 - speed) * (1 - air) * (1 - gesture));
+    const still = k * (1 - speed) * (1 - air) * (1 - gesture);
+    applyIdle(rig.bones, time, still);
+    // Looking around would fight the eyes on the ball (look.ts): with a ball only the stretch plays.
+    if (feet.fidget === "stretch" || !pose.lookAt) applyFidget(rig.bones, feet.fidget, feet.fidgetU, still * feet.fidgetW);
     // A charged kick takes over the legs: the run fades so the cocked heel never folds through the thigh.
     const charge = THREE.MathUtils.clamp(pose.charge, 0, 1);
-    applyLocomotion(rig.bones, phase, k * speed * (1 - air) * (1 - CHARGE_RUN_DAMP * charge));
+    const move = k * speed * (1 - air) * (1 - CHARGE_RUN_DAMP * charge);
+    const strafe = THREE.MathUtils.clamp(pose.strafe ?? 0, -1, 1);
+    applyLocomotion(rig.bones, phase, move * (1 - Math.abs(strafe)));
+    applyShuffle(rig.bones, phase, Math.sign(strafe), move * Math.abs(strafe));
+    applySkid(rig.bones, k * (1 - air) * feet.skid);
     applyAir(rig.bones, pose.verticalVel, k * air);
     applyCheer(rig.bones, time, k * (pose.cheer ?? 0)); // not gated by air: no snap when jumping mid-cheer
     applySlump(rig.bones, time, k * (pose.slump ?? 0));
@@ -134,6 +146,7 @@ export function createAnimator(rig: Rig): Animator {
     const hasLocal = contactLocal(st);
     const side = pickSide(st, hasLocal);
     const active = st !== null && st.t > 0;
+    feet.update(speed, !pose.airborne, active || pose.charge > 0, dt);
     baseLayers(pose, 1 - (active ? strikeWeight(st.t) : 0));
     strikeLayer(pose, side);
     const squash = active ? impactBell(st.t, SQUASH_HALF_WIDTH) : 0;

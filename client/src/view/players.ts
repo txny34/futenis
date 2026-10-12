@@ -7,6 +7,7 @@ import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import { moodFor } from "./player-moods";
 import { BodyReaction, reactionFor } from "./body-reaction";
+import { Steer, steer } from "./steer";
 import {
   EventKind, Extra, MAX_PLAYERS, Mode, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
 } from "../snapshot";
@@ -15,7 +16,6 @@ const TEAM_SHIRTS = THEME.team;
 const PARTNER_SHORTS = THEME.fx.partnerShorts; // slot 0 / slot 1 of a team
 const TICK_RATE = 120; // mirrors sim.TickRate
 const SPEED_REF = 7.5; // m/s mapped to pose.speed = 1 (top run speed)
-const FACING_MIN_SPEED = 0.5; // below this, players face the net
 const FACE_POS_X = Math.PI / 2; // facing +X (team 0 looks at the net)
 const STRIKE_DURATION_S = 0.45;
 const STRIKE_START_T = IMPACT_T * 0.5; // events arrive at impact: show the tail of the wind-up
@@ -28,6 +28,7 @@ interface Slot {
   readonly contact: THREE.Vector3;
   readonly flash: HitFlash;
   readonly body: BodyReaction;
+  readonly steer: Steer;
   strikeT: number;
   strikeTier: StrikeTier;
   strikePerfect: boolean;
@@ -47,7 +48,7 @@ function makeSlot(scene: THREE.Scene, i: number): Slot {
   const pose: CharacterPose = {
     speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: FACE_POS_X,
   };
-  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), body: new BodyReaction(), strikeT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
+  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), body: new BodyReaction(), steer: { side: false, strafe: 0, facing: i === HUMAN_SLOT ? FACE_POS_X : -FACE_POS_X }, strikeT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
 }
 
 /** Up to 4 procedural characters posed from the interpolated snapshot. Allocation-free per frame. */
@@ -159,7 +160,9 @@ export class PlayersView {
     p.charge = curr[e + Extra.Charge];
     s.body.update(p, dt);
     p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
-    p.facing = speed > FACING_MIN_SPEED ? Math.atan2(vx, vz) : teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X;
+    steer(s.steer, vx, vz, p.speed, p.airborne, teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X, dt);
+    p.strafe = s.steer.strafe; // padel side step facing the net (view/steer.ts)
+    p.facing = s.steer.facing;
     this.advanceStrike(s, dt);
     s.character.update(p, dt);
   }
