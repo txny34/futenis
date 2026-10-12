@@ -6,12 +6,12 @@ import (
 	"github.com/txny34/futenis/sim"
 )
 
-// thinkRally chases, charges and strikes when this team may touch the ball
-// (one touch per TEAM per crossing, 2v2 partner included); otherwise it
-// recovers / covers.
+// thinkRally chases, charges and strikes when this player may touch the
+// ball (sim.CanTouch: the rival holds it, or its 2v2 partner just set it
+// up); otherwise it recovers / covers.
 func (b *Bot) thinkRally(s *sim.State, slot int) sim.PlayerInput {
 	me := &s.Players[slot]
-	if s.Rally.LastTeam == me.Team || s.Rally.LastTeam < 0 {
+	if !sim.CanTouch(s, int8(slot)) {
 		b.resetCharge()
 		return b.recover(s, slot)
 	}
@@ -98,6 +98,9 @@ func (b *Bot) isChaser(s *sim.State, slot int) bool {
 		return true
 	}
 	mate := slot ^ 1
+	if !sim.CanTouch(s, int8(mate)) {
+		return true // the partner just touched it (a pass): it is mine
+	}
 	me, m := &s.Players[slot], &s.Players[mate]
 	cfg := &s.Cfg
 	mine := ticksToReach(me, standSpot(me, b.plan.ball, b.plan.off), b.speedFor(me, cfg), cfg.PlayerAccel)
@@ -189,6 +192,9 @@ func (b *Bot) chooseShot(s *sim.State, slot int) {
 	} else {
 		b.aimZ = signed(b.hash(s, slot, 6)) * wide
 		b.aimX = fwd * (3 + unit(b.hash(s, slot, 7))*5)
+	}
+	if shot == sim.BtnLob && sim.PassReady(s, int8(slot)) {
+		shot = sim.BtnStrike // bots never pass (a Lob here would set up the partner)
 	}
 	b.aimX += signed(b.hash(s, slot, 8)) * b.Level.AimNoise
 	b.aimZ += signed(b.hash(s, slot, 9)) * b.Level.AimNoise
