@@ -1,4 +1,3 @@
-import type { SimEvent } from "./snapshot";
 import { Sound } from "./audio/sound";
 import { Tutorial } from "./tutorial/tutorial";
 import { setupAccount, type Account } from "./lobby/account";
@@ -6,8 +5,7 @@ import { extraOverlayOpen } from "./ui/overlays";
 import { LANG, t } from "./i18n/t";
 import { captureErrors } from "./report/errors";
 import { buildReport } from "./report/report";
-import { LONG_RALLY } from "./feel/hype";
-import { ChallengeSession, MEDALS } from "./profile/challenges";
+import { ChallengeSession } from "./profile/challenges";
 import { applyThemeCss } from "./env/theme";
 import { setHintKeys } from "./ui/key-hints";
 import { mountDevPanel, isDevMode } from "./dev/panel";
@@ -18,9 +16,8 @@ import { GameLoop, LoopState } from "./loop";
 import { BottomBar } from "./lobby/bottom-bar";
 import { stylesOpener } from "./ui/styles/open-styles";
 import { ProfileCard } from "./lobby/profile-card";
-import { recorder } from "./profile/recorder";
-import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions, onPadEvent, safeStart } from "./lobby/flow";
-import { showResult } from "./lobby/replay-flow";
+import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions, safeStart } from "./lobby/flow";
+import { hookLoop } from "./loop-hooks";
 import { startOnline } from "./lobby/online-flow";
 import { isOnline } from "./lobby/online-state";
 import { Tape } from "./replay/tape";
@@ -32,8 +29,6 @@ import { PlayModal } from "./ui/play-modal/play-modal";
 // Boot straight into the lobby (docs/design/lobby.md §7): no title, no main menu.
 const RESET_KEY = "KeyR";
 const FEED_KEY = "KeyB";
-const HYPE_STREAK_ROAR = 0.6; // a streak gets a smaller roar than a puntazo
-const MEDAL_ROAR = 0.5;
 
 function requireElement(id: string): HTMLElement {
   const e = document.getElementById(id);
@@ -148,14 +143,6 @@ function lobbyMenu(app: () => App, menu: MenuUI, account: Account): void {
   }));
 }
 
-function onMedal(app: App, e: SimEvent): void {
-  const earned = app.challenges.onEvent(e);
-  if (earned.length === 0) return;
-  const top = earned[earned.length - 1]; // banner shows one; every medal is saved
-  app.hud.medal(t(`¡${MEDALS[top.medal].toUpperCase()}! ${top.def.title}`, `${MEDALS[top.medal].toUpperCase()}! ${top.def.title}`), performance.now());
-  app.sound.cheer(MEDAL_ROAR);
-}
-
 function boot(): void {
   captureErrors();
   document.documentElement.lang = LANG;
@@ -175,11 +162,7 @@ function boot(): void {
   };
   ref = app;
   const loop = new GameLoop(engine, view, hud, controls, state);
-  loop.onMatchOver = (r, snap) => showResult(app, r, snap);
-  loop.onStep = (n, a) => { if (!app.replaying && !isOnline() && !app.inLobby && app.mode !== "playground") app.tape.push(n, a); };
-  loop.onGameEvent = (e) => { recorder().onEvent(e); app.sound.onEvent(e); app.tutorial.onEvent(e); onMedal(app, e); };
-  loop.onHype = (m) => app.sound.cheer(m.touches >= LONG_RALLY ? 1 : HYPE_STREAK_ROAR);
-  loop.onPadEvent = (kind, pad) => onPadEvent(app, kind, pad);
+  hookLoop(app, loop);
   app.loop = loop;
   wire(app, menu);
   menu.setReport((note) => buildReport({
