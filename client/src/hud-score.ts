@@ -3,7 +3,7 @@ import { Mode, Snap } from "./snapshot";
 
 // Scoreboard: sets won + points of the current set per team (best of 3 sets,
 // each first to 5, win by 2) + server dot, a SET/MATCH POINT glow on the
-// team one point away (sim EvMatchPoint; every EvPoint
+// team one point away (sim EvSetPoint / EvMatchPoint; every EvPoint
 // clears it first, Hud.onEvent; after a mid-match rejoin it shows from the next point), and a rally shot counter ("7 golpes") top-right that pulses on
 // every new touch. DOM nodes are built once; text only changes on change.
 const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const;
@@ -50,6 +50,9 @@ export class Scoreboard {
     this.points[1].textContent = String(score1);
     this.sets[0].textContent = String(sets0);
     this.sets[1].textContent = String(sets1);
+    const match = mode === Mode.OneVsOne || mode === Mode.TwoVsTwo; // the lobby is a single tally
+    this.sets[0].hidden = !match;
+    this.sets[1].hidden = !match;
     this.score.dataset.server = String(server);
   }
 

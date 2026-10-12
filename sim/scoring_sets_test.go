@@ -91,3 +91,25 @@ func sameSides(got, want []int8) bool {
 	}
 	return true
 }
+
+// After a set the winner serves the next one from 0-0, from the first box,
+// once the point pause ends.
+func TestSets_SetWinnerServesTheNextSet(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Mode, cfg.PointsToWin, cfg.SetsToWin = Mode1v1, 5, 2
+	m := NewMatch(cfg)
+	s := m.State()
+	s.Score = [2]int{2, 4}
+	s.Phase = PhaseRally
+	awardPointSimple(&s, 1, nil)
+	if s.Phase != PhasePoint || s.Server != 1 || s.Sets != [2]int{0, 1} {
+		t.Fatalf("phase=%d server=%d sets=%v, want the point pause, server 1, sets [0 1]", s.Phase, s.Server, s.Sets)
+	}
+	m.Restore(s)
+	for i := 0; i < PointPauseTicks+2 && m.State().Phase == PhasePoint; i++ {
+		m.Step([MaxPlayers]PlayerInput{})
+	}
+	if got := m.State(); got.Phase != PhaseServe || got.Server != 1 || got.Rally.ServeBox != 0 || got.Score != [2]int{} {
+		t.Fatalf("phase=%d server=%d box=%d score=%v, want team 1 serving from box 0 at 0-0", got.Phase, got.Server, got.Rally.ServeBox, got.Score)
+	}
+}

@@ -229,7 +229,7 @@ const (
 	EvGamePoint  // Side is one point away from winning the current game
 	EvBreakPoint // Side (the non-server team) is one point away from winning the server's game
 	EvGameWon    // Side won the current game (Rally.Games incremented)
-	EvSetWon     // Side won the current set (Rally.Sets incremented)
+	EvSetWon     // Side won the current set (State.Sets incremented)
 	EvAce        // Side's serve was never touched by the receiver and won the point outright
 	EvMatchWon   // Side won the match (Config.SetsToWin sets); replaces EvGameOver for ScoringPadel
 
