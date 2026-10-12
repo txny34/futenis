@@ -62,6 +62,7 @@ func TestRejoinResumesHeldSeat(t *testing.T) {
 	if s := readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+match.TokenLen); string(s[wire.HeaderLen:]) != token {
 		t.Fatal("rejoin token changed")
 	}
+	readMsg(ctx, t, back, wire.MsgStyles, wire.StylesMsgLen) // everyone's look, again
 	readMsg(ctx, t, c1, wire.MsgPeerBack, wire.HeaderLen)
 	tick <- time.Time{}
 	readMsg(ctx, t, c1, wire.MsgFrame, wire.FrameLen)
@@ -130,6 +131,7 @@ func TestRejoinReplacesAConnectionNotSeenDropped(t *testing.T) {
 	back := dialRejoin(ctx, t, srv, token) // c2 still open: wifi -> 4G switch
 	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
 	readMsg(ctx, t, back, wire.MsgSeat, wire.HeaderLen+match.TokenLen)
+	readMsg(ctx, t, back, wire.MsgStyles, wire.StylesMsgLen)
 	expectClose(ctx, t, c2, wire.CloseReplace)
 	tick <- time.Time{} // the match never paused nor ended
 	readMsg(ctx, t, c1, wire.MsgFrame, wire.FrameLen)

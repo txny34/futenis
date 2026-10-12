@@ -73,6 +73,7 @@ function boot(): void {
   engine.onStatus = (s, ping) => {
     net.textContent = `${t("Sala", "Room")} ${room} · ${statusText(s)}${s === "jugando" ? ` · ${ping} ms` : ""}${lagText}`;
   };
+  engine.looks.onLooks = (looks) => view.players.setLooks(looks);
   view.setLobby(false);
   view.rig.face(0);
   controls.enabled = true;

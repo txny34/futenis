@@ -23,6 +23,7 @@ const (
 
 	MsgInput    = 0x01
 	MsgPing     = 0x02
+	MsgStyle    = 0x04 // the sender's look: StyleLen opaque bytes (0x03 is the ranked AUTH)
 	MsgWelcome  = 0x81
 	MsgWaiting  = 0x82
 	MsgFrame    = 0x83
@@ -31,6 +32,7 @@ const (
 	MsgSeat     = 0x87 // rejoin token (ASCII hex) after the header
 	MsgPeerAway = 0x88 // f64: seconds the dropped player has to come back
 	MsgPeerBack = 0x89
+	MsgStyles   = 0x8A // every seat's look: MaxPlayers x StyleLen, server slot order
 
 	InputFloats = 6
 	InputLen    = HeaderLen + InputFloats*8
@@ -39,7 +41,17 @@ const (
 	FrameLen    = HeaderLen + game.OutLen*8
 
 	maxButtons = 255
+
+	// StyleLen: a look is [present, hair, headwear, skin, hairColor, hatColor,
+	// headSize, build] bytes. The server only relays them; the client
+	// validates (client/src/net/style-wire.ts). present 0 = bot or empty seat.
+	StyleLen     = 8
+	StyleMsgLen  = HeaderLen + StyleLen
+	StylesMsgLen = HeaderLen + sim.MaxPlayers*StyleLen
 )
+
+// Style is one seat's look as relayed (see StyleLen).
+type Style [StyleLen]byte
 
 var ErrBadMessage = errors.New("wire: malformed message")
 
@@ -129,5 +141,34 @@ func EncodeInput(vals [InputFloats]float64) []byte {
 	for i, v := range vals {
 		PutF64(b, i, v)
 	}
+	return b
+}
+
+// DecodeStyle parses a STYLE message; the result is marked present.
+func DecodeStyle(b []byte) (Style, bool) {
+	var st Style
+	if len(b) != StyleMsgLen || b[0] != MsgStyle || b[1] != Version {
+		return st, false
+	}
+	copy(st[:], b[HeaderLen:])
+	st[0] = 1
+	return st, true
+}
+
+// EncodeStyles builds a STYLES message with every seat's look.
+func EncodeStyles(styles [sim.MaxPlayers]Style) []byte {
+	b := make([]byte, StylesMsgLen)
+	PutHeader(b, MsgStyles)
+	for i, st := range styles {
+		copy(b[HeaderLen+i*StyleLen:], st[:])
+	}
+	return b
+}
+
+// EncodeStyle builds a STYLE as a client sends it (tests, tools).
+func EncodeStyle(st Style) []byte {
+	b := make([]byte, StyleMsgLen)
+	PutHeader(b, MsgStyle)
+	copy(b[HeaderLen:], st[:])
 	return b
 }

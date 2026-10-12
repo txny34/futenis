@@ -5,6 +5,7 @@ import {
   CLOSE_GONE, CLOSE_REQUEUE, CLOSE_STATUS, NORMAL_CLOSE, REJOINABLE, REJOIN_EVERY_MS, REJOIN_WINDOW_MS, authMessage, rejoinToken, rejoinUrl, type NetStatus,
 } from "./net-status";
 import { HEADER, INPUT_MSG_LEN, Msg, PING_MSG_LEN, PROTO_VERSION, f64At, setF64At, writeHeader } from "./protocol";
+import { StyleLink } from "./style-wire";
 export type { NetStatus } from "./net-status";
 
 const FRAME_BYTES = HEADER + OUT_LEN * 8;
@@ -13,7 +14,7 @@ const QUEUE_CAP = 256;
 // backlog of frames (hidden tab: no rAF, no drain) can never push them out.
 const CONTROL_CAP = 32;
 const CONTROL_BYTES = HEADER + 2 * 8;
-const CONTROL_SLOT = HEADER + 32; // largest control message: SEAT (hex token)
+const CONTROL_SLOT = HEADER + 32; // largest control messages: SEAT (hex token), STYLES (4 x 8)
 const PING_EVERY_MS = 1000;
 // Inputs are held levels: one per sim tick (120 Hz) is enough, whatever the display rate.
 const INPUT_EVERY_MS = 1000 / 120;
@@ -44,6 +45,8 @@ export class RemoteEngine implements StepEngine {
   private retryUntil = 0; // end of the rejoin window (performance.now ms)
   private retryTimer = 0;
   private awayUntil = 0; // when the dropped rival's hold runs out
+  /** Every seat's look (STYLES); set its onLooks. */
+  readonly looks = new StyleLink((msg) => this.up.push(msg, performance.now()));
 
   /** auth: Supabase session token, sent as the first message (ranked queues only). */
   constructor(private readonly url: string, lagMs: number, private readonly auth = "") {
@@ -94,6 +97,7 @@ export class RemoteEngine implements StepEngine {
   /** Leaves the match for good: no status change, no reconnect. */
   close(): void {
     window.clearTimeout(this.retryTimer);
+    this.looks.dispose();
     const ws = this.ws;
     this.ws = null;
     if (ws) { ws.onclose = null; ws.onmessage = null; ws.close(NORMAL_CLOSE); } // 1000: the server frees the seat now
@@ -138,14 +142,12 @@ export class RemoteEngine implements StepEngine {
           this.ws?.close();
         } else {
           this.setStatus("jugando");
+          this.looks.welcome(msg[2]);
         }
         break;
-      case Msg.Waiting:
-        if (this.status === "conectando") this.setStatus("esperando rival");
-        break;
-      case Msg.PeerLeft:
-        this.setStatus("el rival se fue");
-        break;
+      case Msg.Waiting: if (this.status === "conectando") this.setStatus("esperando rival"); break;
+      case Msg.PeerLeft: this.setStatus("el rival se fue"); break;
+      case Msg.Styles: this.looks.receive(msg, len); break;
       case Msg.Seat:
         this.token = rejoinToken(msg.subarray(HEADER, len)) ?? this.token;
         break;
@@ -154,9 +156,7 @@ export class RemoteEngine implements StepEngine {
         this.awayUntil = performance.now() + f64At(view, 0) * 1000;
         this.setStatus("rival reconectando");
         break;
-      case Msg.PeerBack:
-        if (this.status === "rival reconectando") this.setStatus("jugando");
-        break;
+      case Msg.PeerBack: if (this.status === "rival reconectando") this.setStatus("jugando"); break;
       case Msg.Result:
         if (len >= CONTROL_BYTES) this.onResult(f64At(view, 0), f64At(view, 1));
         break;

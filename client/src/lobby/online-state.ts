@@ -23,6 +23,7 @@ export function leaveOnline(app: App): void {
   remote.close();
   remote = null;
   app.loop?.setEngine(app.engine);
+  app.view.players.setLooks(null); // back to the bots' looks
   app.hud.error("");
   for (const cb of leaveCbs) cb();
 }

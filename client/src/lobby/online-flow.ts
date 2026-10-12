@@ -151,6 +151,7 @@ function connect(app: App, mode: QueueMode, url: string, token: string): void {
   const remote = new RemoteEngine(url, 0, token);
   remote.onResult = (before, after) => onRanked(app, mode, before, after);
   remote.onStatus = (s, ping) => onStatus(app, remote, s, ping);
+  remote.looks.onLooks = (looks) => app.view.players.setLooks(looks);
   setRemote(remote);
   app.mode = mode;
   app.last = null; // Revancha requeues (see showResult); never a bot rematch
