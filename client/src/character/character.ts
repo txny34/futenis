@@ -4,6 +4,7 @@ import { CharacterLook, DEFAULT_LOOK } from "./config";
 import { Emotion } from "./expressions";
 import { LookMaterials, applyLook, createMaterials, disposeMaterials } from "./materials";
 import { countTriangles, dressRig, restyle } from "./parts";
+import { createSecondary } from "./secondary";
 import { CharacterStyle } from "./style";
 import { THEME } from "../env/theme";
 import { Rig, createRig } from "./rig";
@@ -30,6 +31,7 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
   const materials: LookMaterials = createMaterials(look);
   const dressing = dressRig(rig, materials);
   const face = dressing.face;
+  const secondary = createSecondary(dressing.headDress, () => dressing.hair);
   let style: Readonly<CharacterStyle> | null = null;
   const styleColors = (): void => {
     if (style === null) return;
@@ -47,6 +49,7 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
     update: (pose, dt) => {
       animator.update(pose, dt);
       face.update(pose, dt);
+      secondary.update(rig.root, pose.facing, dt);
     },
     express: (emotion, holdS) => face.express(emotion, holdS),
     setLook: (l) => {
