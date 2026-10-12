@@ -67,6 +67,8 @@ function main(): void {
   const closeCam = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
   const FACE_CLOSEUP = 4; // last close-up angle: the face, for the expressions
   const FACE_DIST = 0.85;
+  const HAND_CLOSEUP = 5;
+  const HAND_DIST = 0.9;
 
   const info = `${Math.round(character.triangles)} tris · ${Object.keys(character.rig.bones).length} bones`;
   const ctl = buildControls(ui, info);
@@ -75,6 +77,14 @@ function main(): void {
   const headPos = new THREE.Vector3();
   const headDir = new THREE.Vector3();
   function placeCloseup(): void {
+    if (ctl.closeupAngle === HAND_CLOSEUP) {
+      character.rig.bones.handR.getWorldPosition(headPos);
+      character.rig.root.getWorldDirection(headDir);
+      closeCam.position.copy(headPos).addScaledVector(headDir, HAND_DIST);
+      closeCam.position.x -= 0.35; // from the front-right: palm, fingers and thumb in view
+      closeCam.lookAt(headPos);
+      return;
+    }
     if (ctl.closeupAngle === FACE_CLOSEUP) {
       const head = character.rig.bones.head;
       head.getWorldPosition(headPos);
@@ -114,6 +124,7 @@ function main(): void {
       character.setStyle(styleSeed === 0 ? DEFAULT_STYLE : styleFromSeed(styleSeed));
     }
     if (ctl.emotion !== null) character.express(ctl.emotion, 0.2); // held while picked
+    f.pose.lookAt = f.ballVisible ? f.ball : null;
     character.update(f.pose, dt);
     ball.visible = f.ballVisible;
     ball.position.copy(f.ball);

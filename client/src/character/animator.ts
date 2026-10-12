@@ -35,6 +35,8 @@ export interface CharacterPose {
   strike: StrikePose | null;
   /** Yaw in radians about +Y; 0 faces +Z, PI/2 faces +X. */
   facing: number;
+  /** World point to keep an eye on (the ball), or null/omitted to look ahead. */
+  lookAt?: THREE.Vector3 | null;
 }
 
 const TAU = Math.PI * 2;
@@ -48,6 +50,8 @@ const MAX_HEAD_LIFT = 0.6;
 /** Headers always hop a little so ALTO reads as a jump. */
 const MIN_HEAD_HOP = 0.08;
 const CHARGE_RUN_DAMP = 0.75;
+const LAND_SQUASH = 0.09; // touchdown absorb after a jump
+const LAND_S = 0.18;
 /** Covers the contact squash and spine flex so the brow chain stays in reach. */
 const HEAD_LIFT_MARGIN = 0.14; // + the header's bent knees lowering the brow at contact
 
@@ -60,6 +64,8 @@ export interface Animator {
 export function createAnimator(rig: Rig): Animator {
   let time = 0;
   let phase = 0;
+  let wasAir = false;
+  let land = 0; // 1 at touchdown, fades to 0 over LAND_S
   const sides = createSides(rig.bones);
 
   /** Contact in root space (local), or false when there is none. */
@@ -125,7 +131,10 @@ export function createAnimator(rig: Rig): Animator {
     strikeLayer(pose, side);
     const squash = active ? impactBell(st.t, SQUASH_HALF_WIDTH) : 0;
     const air = pose.airborne ? Math.min(AIR_STRETCH_MAX, Math.abs(pose.verticalVel) * AIR_STRETCH_PER_MPS) : 0;
-    stretch(air - CONTACT_SQUASH * squash);
+    if (wasAir && !pose.airborne) land = 1;
+    wasAir = pose.airborne;
+    land = Math.max(0, land - dt / LAND_S);
+    stretch(air - CONTACT_SQUASH * squash - LAND_SQUASH * land * land);
     if (!pose.airborne) groundSnap(rig);
     if (!active) return;
     headLift(st, hasLocal);

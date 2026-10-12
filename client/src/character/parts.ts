@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { BODY } from "./config";
 import { Face, createFace } from "./face";
 import { buildHairGroup } from "./hair";
+import { HandRig, buildHand } from "./hands";
 import { HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_Y } from "./head";
 import { LookMaterials } from "./materials";
 import { CharacterStyle, DEFAULT_STYLE } from "./style";
@@ -45,6 +46,7 @@ export interface Dressing {
   readonly headDress: THREE.Group;
   /** Torso shells widened by style.build. */
   readonly torso: readonly THREE.Mesh[];
+  readonly hands: readonly HandRig[];
   hair: THREE.Group;
   /** Shape the current hair group was built for (rebuilt only when it changes). */
   hairKey: string;
@@ -52,7 +54,7 @@ export interface Dressing {
 
 const hairKeyOf = (s: Readonly<CharacterStyle>): string => `${s.hair}/${s.headwear}`;
 
-function dressHead(rig: Rig, m: LookMaterials): Omit<Dressing, "torso"> {
+function dressHead(rig: Rig, m: LookMaterials): Omit<Dressing, "torso" | "hands"> {
   const headDress = new THREE.Group();
   rig.bones.head.add(headDress);
   add(headDress, S.ball(BODY.headRadius, 16, 12), m.skin, 0, HEAD_Y, 0, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_SCALE_XZ);
@@ -80,16 +82,13 @@ export function restyle(d: Dressing, style: Readonly<CharacterStyle>, m: LookMat
   d.headDress.add(d.hair);
 }
 
-function dressArm(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
+function dressArm(rig: Rig, m: LookMaterials, s: "L" | "R"): HandRig {
   const b = rig.bones;
   const inward = s === "L" ? -1 : 1; // the body's center is -X for the left arm
   add(b[`upperArm${s}` as const], S.taperCapsule(0.066, 0.058, 0.1), m.shirt); // short sleeve over the joint
   add(b[`upperArm${s}` as const], S.taperCapsule(0.05, 0.043, BODY.upperArm), m.skin);
   add(b[`foreArm${s}` as const], S.taperCapsule(0.045, 0.034, BODY.foreArm), m.skin);
-  // Mitten hand: a flat palm and a thumb pointing forward-inward.
-  add(b[`hand${s}` as const], S.ball(0.046, 10, 8), m.skin, 0, -0.045, 0.004, 0.72, 1.18, 0.62);
-  const thumb = add(b[`hand${s}` as const], S.ball(0.018, 8, 6), m.skin, inward * 0.022, -0.03, 0.026, 1, 1.6, 1);
-  thumb.rotation.z = inward * 0.5;
+  return buildHand(b[`hand${s}` as const], m.skin, inward);
 }
 
 function dressLeg(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
@@ -117,11 +116,10 @@ function dressShoe(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
 export function dressRig(rig: Rig, m: LookMaterials): Dressing {
   const torso = dressTorso(rig, m);
   const head = dressHead(rig, m);
-  dressArm(rig, m, "L");
-  dressArm(rig, m, "R");
+  const hands = [dressArm(rig, m, "L"), dressArm(rig, m, "R")];
   dressLeg(rig, m, "L");
   dressLeg(rig, m, "R");
-  return { ...head, torso };
+  return { ...head, torso, hands };
 }
 
 /** Triangle count of everything under root (for the §6 budget). */

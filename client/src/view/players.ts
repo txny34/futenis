@@ -6,7 +6,7 @@ import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import { moodFor } from "./player-moods";
 import {
-  EventKind, Extra, MAX_PLAYERS, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
+  EventKind, Extra, MAX_PLAYERS, Mode, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
 } from "../snapshot";
 
 const TEAM_SHIRTS = THEME.team;
@@ -50,6 +50,7 @@ function makeSlot(scene: THREE.Scene, i: number): Slot {
 export class PlayersView {
   private readonly slots: Slot[];
   private lastNumPlayers = -1;
+  private readonly ball = new THREE.Vector3(); // every player keeps an eye on it (character/look.ts)
   private ballDead = false;
 
   constructor(scene: THREE.Scene) {
@@ -108,6 +109,7 @@ export class PlayersView {
   update(prev: Float64Array, curr: Float64Array, alpha: number, dt: number): void {
     const n = curr[Snap.NumPlayers] | 0;
     if (n !== this.lastNumPlayers) this.recolor(n);
+    this.ball.set(lerp(prev[Snap.BallX], curr[Snap.BallX], alpha), lerp(prev[Snap.BallY], curr[Snap.BallY], alpha), lerp(prev[Snap.BallZ], curr[Snap.BallZ], alpha));
     for (let i = 0; i < MAX_PLAYERS; i++) {
       const s = this.slots[i];
       s.character.root.visible = i < n;
@@ -133,6 +135,7 @@ export class PlayersView {
     p.airborne = curr[e + Extra.OnGround] === 0;
     p.verticalVel = (curr[PLAYER_POS[i] + 1] - prev[PLAYER_POS[i] + 1]) * TICK_RATE;
     p.charge = curr[e + Extra.Charge];
+    p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
     p.facing = speed > FACING_MIN_SPEED ? Math.atan2(vx, vz) : teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X;
     this.advanceStrike(s, dt);
     s.character.update(p, dt);

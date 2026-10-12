@@ -23,12 +23,15 @@ const BLINK_SPAN_S = 3.2;
 const MOUTH_W = 0.56; // radians of the head sphere the mouth patch spans
 const MOUTH_H = 0.3;
 const FOCUS_CHARGE = 0.15;
+const PUPIL_REST_X = 0;
+const PUPIL_GAZE = 0.006; // m of pupil shift per rad of gaze
 const EFFORT_CHARGE = 0.7;
 
 export interface Face {
   /** Shows `emotion` for `holdS` seconds, then the pose decides again. */
   express(emotion: Emotion, holdS: number): void;
-  update(pose: CharacterPose, dt: number): void;
+  /** gazeYaw/gazePitch (rad): where the head is looking, so the pupils lead it a little. */
+  update(pose: CharacterPose, dt: number, gazeYaw?: number, gazePitch?: number): void;
 }
 
 interface Eye { readonly lid: THREE.Mesh; readonly pupil: THREE.Object3D; readonly brow: THREE.Mesh; readonly side: number }
@@ -122,7 +125,11 @@ export function createFace(head: THREE.Object3D, m: LookMaterials): Face {
       held = emotion;
       holdLeft = holdS;
     },
-    update(pose, dt) {
+    update(pose, dt, gazeYaw = 0, gazePitch = 0) {
+      for (const eye of eyes) { // the pupils lead the head toward what it tracks
+        eye.pupil.position.x = PUPIL_REST_X + gazeYaw * PUPIL_GAZE;
+        eye.pupil.position.y = gazePitch * PUPIL_GAZE;
+      }
       if (held !== null && (holdLeft -= dt) <= 0) held = null;
       const emotion = pick(pose);
       const e = EXPRESSIONS[emotion];
