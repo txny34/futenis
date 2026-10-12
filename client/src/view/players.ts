@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { THEME } from "../env/theme";
-import { Character, CharacterPose, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter, styleFromSeed } from "../character/character";
+import { Character, CharacterPose, CharacterStyle, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter, styleFromSeed } from "../character/character";
+import type { Looks } from "../net/style-wire";
 import { loadStyle, onStyleChange } from "../profile/style-store";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
@@ -36,10 +37,11 @@ interface Slot {
 
 const HUMAN_SLOT = 0; // the local player is always slot 0 (online frames are rotated server-side)
 const BOT_STYLE_SEED = 17; // varied, stable looks for the other slots
+const botStyle = (i: number): CharacterStyle => styleFromSeed(BOT_STYLE_SEED + i * 31);
 
 function makeSlot(scene: THREE.Scene, i: number): Slot {
   const character = createCharacter(DEFAULT_LOOK);
-  character.setStyle(i === HUMAN_SLOT ? loadStyle() : styleFromSeed(BOT_STYLE_SEED + i * 31));
+  character.setStyle(i === HUMAN_SLOT ? loadStyle() : botStyle(i));
   character.root.traverse((o) => { o.castShadow = true; });
   scene.add(character.root);
   const strike = { tier: "low" as StrikeTier, perfect: false, t: 0, contact: null };
@@ -55,11 +57,23 @@ export class PlayersView {
   private lastNumPlayers = -1;
   private readonly ball = new THREE.Vector3(); // every player keeps an eye on it (character/look.ts)
   private ballDead = false;
+  private readonly lookKeys: string[] = [];
 
   constructor(scene: THREE.Scene) {
     this.slots = [];
     for (let i = 0; i < MAX_PLAYERS; i++) this.slots.push(makeSlot(scene, i));
     onStyleChange((st) => this.slots[HUMAN_SLOT].character.setStyle(st)); // Estilos edits show at once
+  }
+
+  /** Online: the other players' own looks (null entries and null = the bot looks). Slot 0 stays mine. */
+  setLooks(looks: Looks | null): void {
+    for (let i = 1; i < MAX_PLAYERS; i++) {
+      const st = looks?.[i] ?? botStyle(i);
+      const key = JSON.stringify(st);
+      if (key === this.lookKeys[i]) continue; // restyling rebuilds meshes: only seats that changed
+      this.lookKeys[i] = key;
+      this.slots[i].character.setStyle(st);
+    }
   }
 
   /** Starts strike clips from EvKick/EvBodyHit/EvWhiff (a body graze on a dead ball is ignored). */
