@@ -619,7 +619,7 @@ SnapLen
 ```
 
 `SnapP0Y`/`SnapP1Y` ya existen y pasan a tener valor real. `Charge` = `ChargeTicks/chargeMaxTicks`.
-`Flags` = `ShotType | (StaminaLock>0)<<1`.
+`Flags` = `ShotType | (StaminaLock>0)<<1 | PassReady<<2` (bit 2 agregado con los pases 2v2, §19.3).
 
 ### 11.3 wasm
 
@@ -864,9 +864,15 @@ recibe `[MaxPlayers]PlayerInput` (los slots no usados se ignoran). `State` sigue
 
 ### 19.3 Reglas por EQUIPO (no por jugador)
 
-- **Un toque por equipo por cruce**: cualquiera de los dos compañeros puede golpear, pero sólo cuenta
-  **un** toque total — si el compañero que no golpeó también toca la pelota en el mismo cruce, es doble
-  toque (falta), igual que si el mismo jugador la tocara dos veces.
+- **Pases (futvóley, 2v2)**: hasta **3 toques por equipo por cruce** (`RallyState.TouchLimit`; 1 en 1v1),
+  nunca el mismo jugador dos veces seguidas (A→B→A vale; A→A es doble toque). El límite de **1 pique**
+  del lado vale para toda la posesión: un pase no regala otro pique. El tercer toque tiene que cruzar
+  (si cae en el propio campo es falta). El saque no se puede pasar (el compañero del sacador que toca el
+  saque comete doble toque); el que recibe espera el pique y puede devolver de primera o pasar.
+  Input: **Globo con `PassReady`** (sim, `rules_pass.go`) = levantada suave al compañero (`passVelocity`,
+  sin desvío ni potencia). `Flags` bit 2 = `PassReady` → el HUD muestra "Pase". Los bots rematan el pase
+  del compañero y nunca pasan (v1).
+- *(Antes: un toque por equipo por cruce — el compañero que tocaba en el mismo cruce era doble toque.)*
 - `RallyState.LastKicker` → **`RallyState.LastTeam`** (mismo rol, ahora nombrado por equipo) +
   **`RallyState.LastPlayer`** (qué jugador específico, dentro de ese equipo, tocó — informativo /
   para wave1, no participa hoy en la decisión de punto, que sigue siendo 100% a nivel equipo).
