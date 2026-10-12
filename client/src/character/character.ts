@@ -3,7 +3,8 @@ import { Animator, CharacterPose, createAnimator } from "./animator";
 import { CharacterLook, DEFAULT_LOOK } from "./config";
 import { Emotion } from "./expressions";
 import { LookMaterials, applyLook, createMaterials, disposeMaterials } from "./materials";
-import { countTriangles, dressRig, restyle } from "./parts";
+import { TORSO_DEPTH, countTriangles, dressRig, restyle } from "./parts";
+import { createJersey } from "./jersey";
 import { createSecondary } from "./secondary";
 import { createHands } from "./hands";
 import { createLook } from "./look";
@@ -25,6 +26,8 @@ export interface Character {
   setLook(look: CharacterLook): void;
   /** Hair, headwear, skin/hair/hat colors, head size and build (customizer, bots). */
   setStyle(style: Readonly<CharacterStyle>): void;
+  /** Name and number on the back of the shirt, printed in the kit's ink. */
+  setJersey(number: number, name: string): void;
   dispose(): void;
 }
 
@@ -44,6 +47,9 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
     materials.hair.color.setHex(fx.hairColors[style.hairColor] ?? fx.hairColors[0]);
     materials.hat.color.setHex(fx.hatColors[style.hatColor] ?? fx.hatColors[0]);
   };
+  const jersey = createJersey(rig.bones.chest, TORSO_DEPTH);
+  let ink = look.ink;
+  let shirt = { number: 0, name: "" };
   const animator: Animator = createAnimator(rig);
   const triangles = countTriangles(rig.root);
   return {
@@ -60,14 +66,22 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
     express: (emotion, holdS) => face.express(emotion, holdS),
     setLook: (l) => {
       applyLook(materials, l);
+      ink = l.ink;
+      jersey.set(shirt.number, shirt.name, ink);
       styleColors(); // the team kit never overrides the player's own skin/hair
     },
     setStyle: (st) => {
       style = st;
       restyle(dressing, st, materials);
+      jersey.mesh.scale.x = st.build; // the print widens with the torso
       styleColors();
     },
+    setJersey: (number, name) => {
+      shirt = { number, name };
+      jersey.set(number, name, ink);
+    },
     dispose: () => {
+      jersey.dispose();
       rig.root.traverse((o) => {
         if (o instanceof THREE.Mesh) (o.geometry as THREE.BufferGeometry).dispose();
       });

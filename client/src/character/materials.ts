@@ -47,6 +47,7 @@ function toon(color: number): THREE.MeshToonMaterial {
 export interface LookMaterials {
   readonly shirt: THREE.MeshToonMaterial;
   readonly shorts: THREE.MeshToonMaterial;
+  readonly trim: THREE.MeshToonMaterial;
   readonly skin: THREE.MeshToonMaterial;
   readonly hair: THREE.MeshToonMaterial;
   readonly boots: THREE.MeshToonMaterial;
@@ -65,6 +66,7 @@ export function createMaterials(look: CharacterLook): LookMaterials {
   return {
     shirt: toon(look.shirt),
     shorts: toon(look.shorts),
+    trim: toon(look.trim),
     skin: toon(look.skin),
     hair: toon(look.hair),
     boots: toon(look.boots),
@@ -81,6 +83,7 @@ export function createMaterials(look: CharacterLook): LookMaterials {
 export function applyLook(m: LookMaterials, look: CharacterLook): void {
   m.shirt.color.setHex(look.shirt);
   m.shorts.color.setHex(look.shorts);
+  m.trim.color.setHex(look.trim);
   m.skin.color.setHex(look.skin);
   m.hair.color.setHex(look.hair);
   m.boots.color.setHex(look.boots);

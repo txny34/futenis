@@ -36,6 +36,7 @@ export class Npcs {
     SPECS.forEach((spec, i) => {
       const ch = createCharacter({
         shirt: D.npcShirts[i % D.npcShirts.length], shorts: THEME.crowdBody[i % THEME.crowdBody.length],
+        trim: THEME.crowdBody[i % THEME.crowdBody.length], ink: THEME.crowdBody[i % THEME.crowdBody.length],
         skin: THEME.crowdSkin[i % THEME.crowdSkin.length], hair: THEME.crowdBody[(i + 3) % THEME.crowdBody.length], boots: D.neon[i % D.neon.length],
       });
       ch.setStyle(styleFromSeed(101 + i * 13)); // a crowd of different faces and hairdos

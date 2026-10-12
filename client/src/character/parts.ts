@@ -31,13 +31,15 @@ function dressTorso(rig: Rig, m: LookMaterials): THREE.Mesh[] {
   const b = rig.bones;
   add(b.hips, S.profileLathe(S.PELVIS_PROFILE), m.shorts, 0, 0, 0, 1, 1, PELVIS_DEPTH);
   add(b.neck, S.taperCapsule(0.06, 0.07, 0.07), m.skin, 0, 0.05, 0);
-  const collar = add(b.neck, new THREE.TorusGeometry(0.075, 0.017, 6, 16), m.shorts, 0, -0.005, 0.005, 1, 1, 0.85);
+  const collar = add(b.neck, new THREE.TorusGeometry(0.075, 0.017, 6, 16), m.trim, 0, -0.005, 0.005, 1, 1, 0.85);
   collar.rotation.x = Math.PI / 2 + 0.25; // the trim sits lower at the front, like a crew neck
   return [
     add(b.spine, S.profileLathe(S.LOWER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH),
     add(b.chest, S.profileLathe(S.UPPER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH),
   ];
 }
+
+export { TORSO_DEPTH };
 
 /** The parts a style changes after the build (see restyle). */
 export interface Dressing {
@@ -98,7 +100,7 @@ function dressLeg(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
   add(b[`upLeg${s}` as const], S.taperCapsule(0.102, 0.098, 0.16), m.shorts); // football shorts leg, above the knee
   add(b[`upLeg${s}` as const], S.taperCapsule(0.094, 0.068, thigh), m.skin);
   add(b[`leg${s}` as const], S.taperCapsule(0.07, 0.046, shin), m.skin); // calf taper
-  add(b[`leg${s}` as const], S.taperCapsule(0.058, 0.052, 0.17), m.shorts, 0, -shin + 0.2, 0); // tall sock over the calf
+  add(b[`leg${s}` as const], S.taperCapsule(0.058, 0.052, 0.17), m.trim, 0, -shin + 0.2, 0); // tall sock over the calf
   dressShoe(rig, m, s);
 }
 

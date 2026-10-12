@@ -35,7 +35,7 @@ const FLOOR_PAD = { w: 44, d: 24, z: -3 } as const; // starts just past the lobb
 interface Athlete { readonly ch: Character; readonly pose: CharacterPose; readonly strike: StrikePose; readonly side: 1 | -1; z: number }
 
 function athlete(shirt: number, side: 1 | -1): Athlete {
-  const ch = createCharacter({ shirt, shorts: THEME.crowdBody[0], skin: THEME.crowdSkin[side > 0 ? 1 : 0], hair: THEME.crowdBody[3], boots: THEME.lobbyDecor.neon[1] });
+  const ch = createCharacter({ shirt, shorts: THEME.crowdBody[0], trim: THEME.crowdBody[0], ink: THEME.crowdBody[0], skin: THEME.crowdSkin[side > 0 ? 1 : 0], hair: THEME.crowdBody[3], boots: THEME.lobbyDecor.neon[1] });
   ch.setStyle(styleFromSeed(side > 0 ? 7 : 11));
   const strike: StrikePose = { tier: "low", t: 0, contact: null };
   return { ch, strike, side, z: 0, pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: side * Math.PI / 2 } };

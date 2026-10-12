@@ -3,6 +3,8 @@ import { THEME } from "../env/theme";
 import { Character, CharacterPose, CharacterStyle, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter, styleFromSeed } from "../character/character";
 import type { Looks } from "../net/style-wire";
 import { loadStyle, onStyleChange } from "../profile/style-store";
+import { displayName } from "../profile/display-name";
+import { profileStore } from "../profile/store";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import { moodFor } from "./player-moods";
@@ -12,8 +14,7 @@ import {
   EventKind, Extra, MAX_PLAYERS, Mode, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
 } from "../snapshot";
 
-const TEAM_SHIRTS = THEME.team;
-const PARTNER_SHORTS = THEME.fx.partnerShorts; // slot 0 / slot 1 of a team
+const KITS = THEME.kits;
 const TICK_RATE = 120; // mirrors sim.TickRate
 const SPEED_REF = 7.5; // m/s mapped to pose.speed = 1 (top run speed)
 const FACE_POS_X = Math.PI / 2; // facing +X (team 0 looks at the net)
@@ -39,9 +40,15 @@ const HUMAN_SLOT = 0; // the local player is always slot 0 (online frames are ro
 const BOT_STYLE_SEED = 17; // varied, stable looks for the other slots
 const botStyle = (i: number): CharacterStyle => styleFromSeed(BOT_STYLE_SEED + i * 31);
 
+/** Style plus the shirt print: my name on mine, the number only on the others. */
+function wear(ch: Character, st: Readonly<CharacterStyle>, i: number): void {
+  ch.setStyle(st);
+  ch.setJersey(st.number, i === HUMAN_SLOT ? displayName(profileStore().get().name) : "");
+}
+
 function makeSlot(scene: THREE.Scene, i: number): Slot {
   const character = createCharacter(DEFAULT_LOOK);
-  character.setStyle(i === HUMAN_SLOT ? loadStyle() : botStyle(i));
+  wear(character, i === HUMAN_SLOT ? loadStyle() : botStyle(i), i);
   character.root.traverse((o) => { o.castShadow = true; });
   scene.add(character.root);
   const strike = { tier: "low" as StrikeTier, perfect: false, t: 0, contact: null };
@@ -62,7 +69,7 @@ export class PlayersView {
   constructor(scene: THREE.Scene) {
     this.slots = [];
     for (let i = 0; i < MAX_PLAYERS; i++) this.slots.push(makeSlot(scene, i));
-    onStyleChange((st) => this.slots[HUMAN_SLOT].character.setStyle(st)); // Estilos edits show at once
+    onStyleChange((st) => wear(this.slots[HUMAN_SLOT].character, st, HUMAN_SLOT)); // Estilos edits show at once
   }
 
   /** Online: the other players' own looks (null entries and null = the bot looks). Slot 0 stays mine. */
@@ -72,7 +79,7 @@ export class PlayersView {
       const key = JSON.stringify(st);
       if (key === this.lookKeys[i]) continue; // restyling rebuilds meshes: only seats that changed
       this.lookKeys[i] = key;
-      this.slots[i].character.setStyle(st);
+      wear(this.slots[i].character, st, i);
     }
   }
 
@@ -184,7 +191,8 @@ export class PlayersView {
     for (let i = 0; i < MAX_PLAYERS; i++) {
       const team = teamOf(i, n);
       const slotInTeam = n >= MAX_PLAYERS ? i % 2 : 0;
-      this.slots[i].character.setLook({ ...DEFAULT_LOOK, shirt: TEAM_SHIRTS[team & 1], shorts: PARTNER_SHORTS[slotInTeam] });
+      const kit = KITS[team & 1];
+      this.slots[i].character.setLook({ ...DEFAULT_LOOK, shirt: kit.shirt, shorts: kit.shorts[slotInTeam], trim: kit.trim, ink: kit.ink });
     }
   }
 }

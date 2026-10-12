@@ -13,6 +13,7 @@ const STYLE_LEN = 8;
 const SEATS = 4;
 export const STYLE_MSG_LEN = HEADER + STYLE_LEN;
 export const STYLES_MSG_LEN = HEADER + SEATS * STYLE_LEN;
+const SEAT_NUMBERS = [9, 7, 11, 5] as const;
 
 /** A look per view slot (slot 0 = me); null = a bot or an empty seat. */
 export type Looks = readonly (CharacterStyle | null)[];
@@ -38,6 +39,7 @@ export function decodeStyles(msg: Uint8Array, len: number, me: number): Looks | 
     looks[s ^ me] = sanitizeStyle({
       hair: HAIR_STYLES[msg[o + 1]], headwear: HEADWEAR[msg[o + 2]], skin: msg[o + 3], hairColor: msg[o + 4],
       hatColor: msg[o + 5], headSize: fromByte(msg[o + 6], HEAD_SIZE_RANGE), build: fromByte(msg[o + 7], BUILD_RANGE),
+      number: SEAT_NUMBERS[s], // not on the wire (8 bytes): a stable number per seat
     });
   }
   return looks;

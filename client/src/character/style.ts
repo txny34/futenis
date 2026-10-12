@@ -21,13 +21,16 @@ export interface CharacterStyle {
   headSize: number;
   /** Shoulder/torso width: 0.92..1.06 (1 = default). */
   build: number;
+  /** Shirt number 0..99 (printed on the back). */
+  number: number;
 }
 
 export const HEAD_SIZE_RANGE = [0.92, 1.08] as const;
 export const BUILD_RANGE = [0.92, 1.06] as const;
+export const MAX_SHIRT_NUMBER = 99;
 
 export const DEFAULT_STYLE: Readonly<CharacterStyle> = {
-  hair: "short", headwear: "none", skin: 1, hairColor: 0, hatColor: 0, headSize: 1, build: 1,
+  hair: "short", headwear: "none", skin: 1, hairColor: 0, hatColor: 0, headSize: 1, build: 1, number: 10,
 };
 
 const clamp = (v: number, [lo, hi]: readonly [number, number]): number => Math.min(hi, Math.max(lo, v));
@@ -45,6 +48,7 @@ export function sanitizeStyle(raw: unknown): CharacterStyle {
     hatColor: index(r.hatColor, fx.hatColors.length),
     headSize: clamp(Number.isFinite(r.headSize) ? (r.headSize as number) : 1, HEAD_SIZE_RANGE),
     build: clamp(Number.isFinite(r.build) ? (r.build as number) : 1, BUILD_RANGE),
+    number: Number.isInteger(r.number) ? clamp(r.number as number, [0, MAX_SHIRT_NUMBER]) : DEFAULT_STYLE.number,
   };
 }
 
@@ -69,5 +73,6 @@ export function styleFromSeed(seed: number): CharacterStyle {
     hatColor: next(fx.hatColors.length),
     headSize: span(HEAD_SIZE_RANGE),
     build: span(BUILD_RANGE),
+    number: 1 + next(MAX_SHIRT_NUMBER),
   };
 }

@@ -56,6 +56,10 @@ export const BODY = {
 export interface CharacterLook {
   shirt: number;
   shorts: number;
+  /** Collar and socks. */
+  trim: number;
+  /** Name and number printed on the back. */
+  ink: number;
   skin: number;
   hair: number;
   boots: number;
@@ -64,6 +68,8 @@ export interface CharacterLook {
 export const DEFAULT_LOOK: Readonly<CharacterLook> = {
   shirt: 0xe5484d,
   shorts: 0xf2f2f2,
+  trim: 0xf2f2f2,
+  ink: 0xf2f2f2,
   skin: 0xe0ac7e,
   hair: 0x2b1d14,
   boots: 0x1f6feb,
