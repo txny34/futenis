@@ -152,6 +152,32 @@ func TestRankedRoomRefusesSameUserOrNetwork(t *testing.T) {
 	}
 }
 
+// JoinRanked checks and records the account under the seat's lock: a second
+// player of the same account or network is refused before taking a seat, so
+// the room keeps waiting for a real rival.
+func TestJoinRankedRefusesSameUserOrNetwork(t *testing.T) {
+	cases := []struct {
+		name, user, net string
+		conflict        bool
+	}{
+		{"other account and network", userB, "10.0.0.2", false},
+		{"same account", userA, "10.0.0.2", true},
+		{"same network", userB, "10.0.0.1", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := match.NewRoom(sim.Mode1v1, "test")
+			if slot, _, _, c := r.JoinRanked(&peertest.Peer{}, match.Ranked{Claim: ranked.Claim{UID: userA}, Network: "10.0.0.1"}); slot != 0 || c {
+				t.Fatalf("first seat: slot %d conflict %v", slot, c)
+			}
+			slot, start, _, c := r.JoinRanked(&peertest.Peer{}, match.Ranked{Claim: ranked.Claim{UID: tc.user}, Network: tc.net})
+			if c != tc.conflict || (slot >= 0) == tc.conflict || start == tc.conflict {
+				t.Fatalf("slot %d start %v conflict %v, want conflict %v", slot, start, c, tc.conflict)
+			}
+		})
+	}
+}
+
 func TestApplyEloCeiling(t *testing.T) {
 	next := ranked.ApplyElo(map[string]int{"a": ranked.EloCeiling, "b": ranked.EloCeiling}, [2][]string{{"a"}, {"b"}}, 0)
 	if next["a"] > ranked.EloCeiling {

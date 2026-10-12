@@ -168,6 +168,7 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 var (
 	errBusy    = errors.New("hub: at its room cap")
 	errRefused = errors.New("hub: no seat (room full or already queued)")
+	errSameNet = errors.New("hub: same account or network already in that room")
 )
 
 // seatErr classifies a join result: no room (hub full) or no seat.
@@ -184,13 +185,25 @@ func seatErr(r *match.Room, slot int) error {
 // join finds or creates the room for code and joins p, retrying once if the
 // room closed concurrently. r is nil when the hub is full.
 func (h *hub) join(code string, mode sim.Mode, p match.Peer) (r *match.Room, slot int, start bool, humans int) {
+	r, slot, start, humans, _ = h.joinAs(code, mode, p, nil)
+	return r, slot, start, humans
+}
+
+// joinAs is join for a ranked player when m is set (seat and account recorded
+// atomically); conflict: m's account or network is already in that room.
+func (h *hub) joinAs(code string, mode sim.Mode, p match.Peer, m *match.Ranked) (r *match.Room, slot int, start bool, humans int, conflict bool) {
 	for range 2 {
 		if r = h.roomFor(code, mode); r == nil {
-			return nil, -1, false, 0
+			return nil, -1, false, 0, false
 		}
-		if slot, start, humans = r.Join(p); slot >= 0 || !r.IsClosed() {
-			return r, slot, start, humans
+		if m != nil {
+			slot, start, humans, conflict = r.JoinRanked(p, *m)
+		} else {
+			slot, start, humans = r.Join(p)
+		}
+		if slot >= 0 || conflict || !r.IsClosed() {
+			return r, slot, start, humans, conflict
 		}
 	}
-	return r, -1, false, 0
+	return r, -1, false, 0, false
 }

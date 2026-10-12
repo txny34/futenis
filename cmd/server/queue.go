@@ -159,17 +159,22 @@ func (h *hub) leaveQueue(mode, code, key string) {
 	h.mu.Unlock()
 }
 
-// joinQueue seats p in mode's open room. err is errBusy (hub at its room cap)
-// or errRefused (already queued, or no room took p). Rooms that filled,
+// joinQueue seats p in mode's open room (m: ranked account, see hub.joinAs).
+// err is errBusy (hub at its room cap), errSameNet (m's account or network
+// already waits there) or errRefused (already queued, or no room took p). Rooms that filled,
 // started or went stale concurrently are skipped (bounded retries).
-func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int) (code string, r *match.Room, slot int, start bool, humans int, err error) {
+func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int, m *match.Ranked) (code string, r *match.Room, slot int, start bool, humans int, err error) {
 	for range 3 {
 		code, ok := h.queueRoom(mode, key, elo)
 		if !ok {
 			return code, nil, -1, false, 0, errRefused
 		}
-		if r, slot, start, humans = h.join(code, queueModes[mode], p); r == nil {
+		r, slot, start, humans, conflict := h.joinAs(code, queueModes[mode], p, m)
+		switch {
+		case r == nil:
 			return code, nil, -1, false, 0, errBusy
+		case conflict:
+			return code, nil, -1, false, 0, errSameNet
 		}
 		switch {
 		case slot >= 0 && start:

@@ -52,16 +52,11 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		if isRanked {
 			elo = h.ratingFor(ctx, rankedMode, cl.UID)
 		}
-		code, r, slot, start, humans, joinErr = h.joinQueue(queued, p, key, elo)
-		if isRanked && joinErr == nil && !r.MarkRanked(slot, cl, network) {
-			r.Leave(slot, p, false)
-			if r.IsClosed() {
-				h.forget(code, r)
-			}
-			h.leaveQueue(queued, code, key)
-			p.Close(wire.CloseFull, "same account or network already in this match")
-			return
+		var m *match.Ranked
+		if isRanked {
+			m = &match.Ranked{Claim: cl, Network: network}
 		}
+		code, r, slot, start, humans, joinErr = h.joinQueue(queued, p, key, elo, m)
 	} else {
 		r, slot, start, humans = h.join(code, sim.Mode1v1, p)
 		joinErr = seatErr(r, slot)
@@ -69,6 +64,9 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 	switch {
 	case errors.Is(joinErr, errBusy):
 		p.Close(wire.CloseBusy, "server full")
+		return
+	case errors.Is(joinErr, errSameNet):
+		p.Close(wire.CloseFull, "same account or network already in this match")
 		return
 	case joinErr != nil:
 		p.Close(wire.CloseFull, "room full")
@@ -78,7 +76,7 @@ func (h *hub) serve(ctx context.Context, code, queued, key string, c *websocket.
 		h.announce(r, rankedMode)
 	} else {
 		if queued != "" {
-			defer h.leaveQueue(queued, code, key) // only a seated waiter owns a queue spot
+			defer h.leaveQueue(queued, code, key) // only a seated waiter owns a queue spot (a no-op once its room started)
 		}
 		h.armFill(r, humans, queued, code)
 		stop := h.expireAlone(r, p)

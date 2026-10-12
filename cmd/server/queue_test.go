@@ -127,28 +127,38 @@ func TestQueueDuplicateRejectionKeepsOwner(t *testing.T) {
 	expectClose(ctx, t, c, wire.CloseFull)
 }
 
-// The rival can fill and start the room between the first player's join and
-// its queue claim: that player is in a live match and must stay, not leave
-// (which ended the match right after WELCOME).
-func TestQueueSettleWaitAfterRivalStarted(t *testing.T) {
-	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
-	code, _ := h.queueRoom("1v1", "a", ranked.EloDefault)
-	r, _, _, _ := h.join(code, sim.Mode1v1, &peertest.Peer{})
-	if _, _, start, _ := h.join(code, sim.Mode1v1, &peertest.Peer{}); !start {
-		t.Fatal("second join did not start the match")
+// The rival can fill and start the room between a player's join and its queue
+// claim: that player is in a live match and must stay (leaving ended the
+// match right after WELCOME). A waiter of a room no longer open must not stay.
+func TestQueueSettleWait(t *testing.T) {
+	cases := []struct {
+		name         string
+		open, rival  bool // queue entry still open / a rival filled the room
+		closed, want bool
+	}{
+		{"claimable", true, false, false, true},
+		{"rival started it", false, true, false, true},
+		{"entry gone, still waiting", false, false, false, false},
+		{"started then ended", false, true, true, false},
 	}
-	h.closeQueueRoom("1v1", code)
-	if !h.settleWait("1v1", code, "a", r) {
-		t.Fatal("the first player must keep its seat in the started match")
-	}
-}
-
-func TestQueueSettleWaitRefusesClosedEntry(t *testing.T) {
-	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
-	code, _ := h.queueRoom("1v1", "a", ranked.EloDefault)
-	r, _, _, _ := h.join(code, sim.Mode1v1, &peertest.Peer{})
-	h.closeQueueRoom("1v1", code)
-	if h.settleWait("1v1", code, "a", r) {
-		t.Fatal("a waiter of a room no longer open must not stay stranded")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+			code, _ := h.queueRoom("1v1", "a", ranked.EloDefault)
+			a := &peertest.Peer{}
+			r, slot, _, _ := h.join(code, sim.Mode1v1, a)
+			if tc.rival {
+				h.join(code, sim.Mode1v1, &peertest.Peer{})
+			}
+			if !tc.open {
+				h.closeQueueRoom("1v1", code)
+			}
+			if tc.closed {
+				r.Leave(slot, a, false)
+			}
+			if got := h.settleWait("1v1", code, "a", r); got != tc.want {
+				t.Fatalf("settleWait = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
