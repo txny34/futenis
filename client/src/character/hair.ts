@@ -65,12 +65,17 @@ function headband(g: THREE.Object3D, mat: THREE.Material): void {
   band.rotation.x = Math.PI / 2 + 0.12;
 }
 
-/** Hair + headwear for `style`, ready to parent to the head bone. */
+/** Hair + headwear for `style`, ready to parent to the head dressing. The group's
+ * origin is the skull center, so the secondary-motion swing stays on the head. */
 export function buildHairGroup(style: CharacterStyle, m: HairMats): THREE.Group {
+  const pivot = new THREE.Group();
+  pivot.position.y = HEAD_Y;
   const g = new THREE.Group();
+  g.position.y = -HEAD_Y;
+  pivot.add(g);
   const capped = style.headwear === "cap";
   if (!capped || style.hair === "ponytail") HAIR[style.hair](g, m.hair);
   if (capped) cap(g, m.hat);
   if (style.headwear === "headband") headband(g, m.hat);
-  return g;
+  return pivot;
 }

@@ -72,7 +72,7 @@ export function createFace(head: THREE.Object3D, m: LookMaterials): Face {
   let held: Emotion | null = null;
   let holdLeft = 0;
   let shown: Emotion | null = null;
-  let seed = (seedCounter++ * 2654435761) >>> 0;
+  let seed = Math.imul(seedCounter++, 0x9e3779b1) >>> 0;
   const rand = (): number => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;

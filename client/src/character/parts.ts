@@ -44,9 +44,13 @@ export interface Dressing {
   /** Torso shells widened by style.build. */
   readonly torso: readonly THREE.Mesh[];
   hair: THREE.Group;
+  /** Shape the current hair group was built for (rebuilt only when it changes). */
+  hairKey: string;
 }
 
-function dressHead(rig: Rig, m: LookMaterials): { face: Face; headDress: THREE.Group; hair: THREE.Group } {
+const hairKeyOf = (s: Readonly<CharacterStyle>): string => `${s.hair}/${s.headwear}`;
+
+function dressHead(rig: Rig, m: LookMaterials): Omit<Dressing, "torso"> {
   const headDress = new THREE.Group();
   rig.bones.head.add(headDress);
   add(headDress, S.ball(BODY.headRadius, 16, 12), m.skin, 0, HEAD_Y, 0, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_SCALE_XZ);
@@ -56,7 +60,7 @@ function dressHead(rig: Rig, m: LookMaterials): { face: Face; headDress: THREE.G
   add(headDress, ear, m.skin, -earX, HEAD_Y, 0);
   const hair = buildHairGroup(DEFAULT_STYLE, m);
   headDress.add(hair);
-  return { face: createFace(headDress, m), headDress, hair };
+  return { face: createFace(headDress, m), headDress, hair, hairKey: hairKeyOf(DEFAULT_STYLE) };
 }
 
 /** Applies the shape side of a style: head size, build and the hair/headwear group. */
@@ -65,6 +69,9 @@ export function restyle(d: Dressing, style: Readonly<CharacterStyle>, m: LookMat
   d.headDress.scale.setScalar(s);
   d.headDress.position.y = HEAD_Y * (1 - s); // pivot on the head center
   for (const mesh of d.torso) mesh.scale.x = style.build;
+  const key = hairKeyOf(style);
+  if (key === d.hairKey) return; // size/build/colors only: no geometry rebuild
+  d.hairKey = key;
   d.headDress.remove(d.hair);
   d.hair.traverse((o) => { if (o instanceof THREE.Mesh) (o.geometry as THREE.BufferGeometry).dispose(); });
   d.hair = buildHairGroup(style, m);

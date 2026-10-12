@@ -123,7 +123,7 @@ async function load(app: App): Promise<void> {
 }
 
 function lobbyBar(app: () => App): BottomBar {
-  const styles = stylesOpener(() => app().menu.isOpen, () => lobbyOverlay(app()));
+  const styles = stylesOpener(() => app().menu.isOpen || app().play.isOpen || extraOverlayOpen(), () => lobbyOverlay(app()));
   return new BottomBar(document.body, { play: () => { if (!app().menu.isOpen) app().play.open(); }, styles });
 }
 

@@ -13,15 +13,16 @@ const HAIR_DAMP = 6;
 const HEAD_GAIN = 0.012; // rad per m/s^2 of acceleration
 const HAIR_GAIN = 0.022;
 const MAX_TILT = 0.35;
+const MAX_HAIR_SWING = 0.1; // relative to the head: more would lift the hair off the skull
 const MAX_ACCEL = 40; // m/s^2: teleports (respawn, replay jumps) are ignored above this
 
 interface Spring { x: number; v: number }
 
-function step(s: Spring, target: number, k: number, damp: number, dt: number): void {
+function step(s: Spring, target: number, k: number, damp: number, dt: number, max: number): void {
   s.v += ((target - s.x) * k - s.v * damp) * dt;
   s.x += s.v * dt;
-  if (s.x > MAX_TILT) s.x = MAX_TILT;
-  else if (s.x < -MAX_TILT) s.x = -MAX_TILT;
+  if (s.x > max) s.x = max;
+  else if (s.x < -max) s.x = -max;
 }
 
 export interface Secondary {
@@ -51,10 +52,10 @@ export function createSecondary(head: THREE.Object3D, hair: () => THREE.Object3D
       const sin = Math.sin(facing), cos = Math.cos(facing);
       const fwd = ax * sin + az * cos;
       const side = ax * cos - az * sin;
-      step(headPitch, fwd * HEAD_GAIN, HEAD_K, HEAD_DAMP, dt); // braking (fwd < 0) pitches the head forward
-      step(headRoll, -side * HEAD_GAIN, HEAD_K, HEAD_DAMP, dt);
-      step(hairPitch, fwd * HAIR_GAIN, HAIR_K, HAIR_DAMP, dt);
-      step(hairRoll, -side * HAIR_GAIN, HAIR_K, HAIR_DAMP, dt);
+      step(headPitch, fwd * HEAD_GAIN, HEAD_K, HEAD_DAMP, dt, MAX_TILT); // braking (fwd < 0) pitches the head forward
+      step(headRoll, -side * HEAD_GAIN, HEAD_K, HEAD_DAMP, dt, MAX_TILT);
+      step(hairPitch, fwd * HAIR_GAIN, HAIR_K, HAIR_DAMP, dt, MAX_HAIR_SWING);
+      step(hairRoll, -side * HAIR_GAIN, HAIR_K, HAIR_DAMP, dt, MAX_HAIR_SWING);
       head.rotation.x = -headPitch.x;
       head.rotation.z = headRoll.x;
       const h = hair();

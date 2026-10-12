@@ -43,18 +43,21 @@ export function sanitizeStyle(raw: unknown): CharacterStyle {
     skin: index(r.skin, fx.skinTones.length),
     hairColor: index(r.hairColor, fx.hairColors.length),
     hatColor: index(r.hatColor, fx.hatColors.length),
-    headSize: clamp(typeof r.headSize === "number" ? r.headSize : 1, HEAD_SIZE_RANGE),
-    build: clamp(typeof r.build === "number" ? r.build : 1, BUILD_RANGE),
+    headSize: clamp(Number.isFinite(r.headSize) ? (r.headSize as number) : 1, HEAD_SIZE_RANGE),
+    build: clamp(Number.isFinite(r.build) ? (r.build as number) : 1, BUILD_RANGE),
   };
 }
 
 /** A varied but stable style for a bot/NPC from an integer seed. */
 export function styleFromSeed(seed: number): CharacterStyle {
-  let h = (seed * 2654435761) >>> 0;
+  // 32-bit integer mixing (Math.imul): a plain double multiply loses the low
+  // bits past 2^53 and skews every pick toward 0.
+  let h = Math.imul(seed | 0, 0x9e3779b1) >>> 0;
   const next = (n: number): number => {
-    h = (h ^ (h >>> 15)) * 2246822519 >>> 0;
-    h = (h ^ (h >>> 13)) * 3266489917 >>> 0;
-    return (h >>> 8) % n;
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h % n;
   };
   const fx = THEME.fx;
   const span = (r: readonly [number, number]): number => r[0] + ((next(1000) / 999) * (r[1] - r[0]));
