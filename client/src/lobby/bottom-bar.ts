@@ -19,6 +19,7 @@ const RIGHT: ReadonlyArray<readonly [IconName, string]> = [
 
 export interface BarActions {
   play: () => void;
+  styles: () => void;
 }
 
 export class BottomBar {
@@ -28,7 +29,7 @@ export class BottomBar {
   private readonly panel: MissionsPanel;
   private toastTimer = 0;
 
-  constructor(parent: HTMLElement, a: BarActions) {
+  constructor(parent: HTMLElement, private readonly a: BarActions) {
     this.panel = new MissionsPanel(parent);
     const bar = el("nav", "fx-lobby__bar", "", { "aria-label": "Lobby" });
     bar.append(...LEFT.map(([i, l]) => this.dockButton(i, l)), button(t("JUGAR", "PLAY"), a.play, "fx-lobby__play"));
@@ -54,6 +55,7 @@ export class BottomBar {
     b.addEventListener("click", () => {
       b.blur();
       if (name === "missions") this.panel.collapsed = !this.panel.collapsed;
+      else if (name === "styles") this.a.styles();
       else this.soon();
     });
     return b;

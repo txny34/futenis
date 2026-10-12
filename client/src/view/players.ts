@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { THEME } from "../env/theme";
-import { Character, CharacterPose, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter } from "../character/character";
+import { Character, CharacterPose, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter, styleFromSeed } from "../character/character";
+import { loadStyle, onStyleChange } from "../profile/style-store";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import { moodFor } from "./player-moods";
@@ -30,8 +31,12 @@ interface Slot {
   hasContact: boolean;
 }
 
-function makeSlot(scene: THREE.Scene): Slot {
+const HUMAN_SLOT = 0; // the local player is always slot 0 (online frames are rotated server-side)
+const BOT_STYLE_SEED = 17; // varied, stable looks for the other slots
+
+function makeSlot(scene: THREE.Scene, i: number): Slot {
   const character = createCharacter(DEFAULT_LOOK);
+  character.setStyle(i === HUMAN_SLOT ? loadStyle() : styleFromSeed(BOT_STYLE_SEED + i * 31));
   character.root.traverse((o) => { o.castShadow = true; });
   scene.add(character.root);
   const strike = { tier: "low" as StrikeTier, perfect: false, t: 0, contact: null };
@@ -49,7 +54,8 @@ export class PlayersView {
 
   constructor(scene: THREE.Scene) {
     this.slots = [];
-    for (let i = 0; i < MAX_PLAYERS; i++) this.slots.push(makeSlot(scene));
+    for (let i = 0; i < MAX_PLAYERS; i++) this.slots.push(makeSlot(scene, i));
+    onStyleChange((st) => this.slots[HUMAN_SLOT].character.setStyle(st)); // Estilos edits show at once
   }
 
   /** Starts strike clips from EvKick/EvBodyHit/EvWhiff (a body graze on a dead ball is ignored). */

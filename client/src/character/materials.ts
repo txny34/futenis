@@ -35,6 +35,8 @@ export interface LookMaterials {
   readonly pupil: THREE.MeshBasicMaterial;
   /** Mouth decal: lit like the skin, its map set by the face (atlas cell). */
   readonly mouth: THREE.MeshToonMaterial;
+  /** Headwear (cap, headband): colored by the style. */
+  readonly hat: THREE.MeshToonMaterial;
 }
 
 export function createMaterials(look: CharacterLook): LookMaterials {
@@ -47,6 +49,7 @@ export function createMaterials(look: CharacterLook): LookMaterials {
     eyeWhite: new THREE.MeshBasicMaterial({ color: EYE_WHITE }),
     pupil: new THREE.MeshBasicMaterial({ color: EYE_PUPIL }),
     mouth: new THREE.MeshToonMaterial({ gradientMap: gradientMap(), alphaTest: 0.5 }),
+    hat: toon(THEME.fx.hatColors[0]),
   };
 }
 

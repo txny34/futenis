@@ -22,6 +22,10 @@ export interface FxTheme {
   readonly mouth: number;
   readonly teeth: number;
   readonly tongue: number;
+  /** Character customizer palettes (character/style.ts): skin, hair, headwear. */
+  readonly skinTones: readonly number[];
+  readonly hairColors: readonly number[];
+  readonly hatColors: readonly number[];
 }
 
 export const FX: FxTheme = {
@@ -40,4 +44,7 @@ export const FX: FxTheme = {
   mouth: 0x3a1418,
   teeth: 0xfdf8f0,
   tongue: 0xe8607a,
+  skinTones: [0xf6d2b8, 0xe0ac7e, 0xc68a5e, 0x9a6440, 0x6e4529, 0x4a2c1a],
+  hairColors: [0x2b1d14, 0x5a3720, 0xa8642f, 0xe0b45a, 0xd8d4cc, 0x1b1e2b],
+  hatColors: [0x19e3ff, 0xff4fa3, 0xe6ff1f, 0xffd23f, 0xf2f2f2, 0x1d2438],
 };

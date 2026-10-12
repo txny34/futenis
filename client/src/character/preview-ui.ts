@@ -14,6 +14,8 @@ export interface PreviewControls {
   side: SideMode;
   /** Expression picked in the face row; null = the pose decides. */
   emotion: Emotion | null;
+  /** styleFromSeed seed (0 = default style); bumped by "style: next". */
+  styleSeed: number;
 }
 
 const CLOSEUP_ANGLES = 5; // 4 around the body + a face close-up (FACE_CLOSEUP)
@@ -52,7 +54,11 @@ function emotionButtons(ctl: PreviewControls, host: HTMLElement): void {
     buttons.forEach((b, i) => b.classList.toggle("on", names[i] === e));
   }
   auto.classList.add("on");
-  row.append(auto, ...buttons);
+  const style = button("style: next", () => {
+    ctl.styleSeed++;
+    style.textContent = `style: #${ctl.styleSeed}`;
+  });
+  row.append(auto, ...buttons, style);
   host.appendChild(row);
 }
 
@@ -102,7 +108,7 @@ function scrubControls(ctl: PreviewControls, row: HTMLElement): void {
 
 export function buildControls(host: HTMLElement, info: string): PreviewControls {
   const ctl: PreviewControls = {
-    state: "idle", speed: 0.6, showHitbox: true, closeupAngle: 0, scrub: null, paused: false, side: "auto", emotion: null,
+    state: "idle", speed: 0.6, showHitbox: true, closeupAngle: 0, scrub: null, paused: false, side: "auto", emotion: null, styleSeed: 0,
   };
   stateButtons(ctl, host);
   emotionButtons(ctl, host);

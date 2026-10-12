@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createCharacter } from "./character";
+import { DEFAULT_STYLE, createCharacter, styleFromSeed } from "./character";
 import { BODY, DEFAULT_LOOK } from "./config";
 import { createHitboxOverlay } from "./debug";
 import { createDriver } from "./preview-driver";
@@ -101,6 +101,7 @@ function main(): void {
   const size = new THREE.Vector2();
   let last = performance.now();
   let clock = 0;
+  let styleSeed = 0;
   function frame(now: number): void {
     const dt = ctl.paused ? 0 : Math.min(MAX_DT, (now - last) / 1000);
     last = now;
@@ -108,6 +109,10 @@ function main(): void {
     driver.step(ctl.state, ctl.speed, clock, ctl.scrub, ctl.side);
     const f = driver.frame;
     character.root.position.y = f.rootY;
+    if (ctl.styleSeed !== styleSeed) {
+      styleSeed = ctl.styleSeed;
+      character.setStyle(styleSeed === 0 ? DEFAULT_STYLE : styleFromSeed(styleSeed));
+    }
     if (ctl.emotion !== null) character.express(ctl.emotion, 0.2); // held while picked
     character.update(f.pose, dt);
     ball.visible = f.ballVisible;

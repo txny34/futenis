@@ -16,6 +16,7 @@ import { Hud } from "./hud";
 import { Controls } from "./input";
 import { GameLoop, LoopState } from "./loop";
 import { BottomBar } from "./lobby/bottom-bar";
+import { stylesOpener } from "./ui/styles/open-styles";
 import { ProfileCard } from "./lobby/profile-card";
 import { recorder } from "./profile/recorder";
 import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions, onPadEvent, safeStart } from "./lobby/flow";
@@ -122,7 +123,8 @@ async function load(app: App): Promise<void> {
 }
 
 function lobbyBar(app: () => App): BottomBar {
-  return new BottomBar(document.body, { play: () => { if (!app().menu.isOpen) app().play.open(); } });
+  const styles = stylesOpener(() => app().menu.isOpen, () => lobbyOverlay(app()));
+  return new BottomBar(document.body, { play: () => { if (!app().menu.isOpen) app().play.open(); }, styles });
 }
 
 function playModal(app: () => App): PlayModal {

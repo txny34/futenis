@@ -1,0 +1,41 @@
+/* "Estilos" (ui/styles/styles-modal.ts): customizer with a live 3D preview.
+   Colors only from the --fx-* tokens (menu.css :root); swatches paint theme palette entries. */
+.fx-styles {
+  position: fixed; inset: 0; z-index: 20; overflow-y: auto;
+  display: grid; grid-template-rows: auto 1fr auto; gap: 16px; padding: 24px 32px;
+  font-family: var(--fx-body); color: var(--fx-line);
+  background: rgba(3, 10, 26, .82); backdrop-filter: blur(8px);
+}
+.fx-styles[hidden] { display: none; }
+.fx-styles__title { margin: 0; font: 400 26px var(--fx-display); color: var(--fx-ball); }
+.fx-styles__close {
+  position: absolute; top: 18px; right: 22px; width: 44px; height: 44px; border-radius: 12px; cursor: pointer;
+  background: var(--fx-card); color: var(--fx-line); border: 2px solid rgba(233, 241, 255, .18); font-size: 20px;
+}
+.fx-styles__close:hover, .fx-styles__close:focus-visible { border-color: var(--fx-hot); color: var(--fx-hot); }
+.fx-styles__body {
+  display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 560px); gap: 32px;
+  justify-content: center; align-items: start;
+}
+.fx-styles__stage {
+  display: grid; place-items: center; border-radius: var(--fx-radius);
+  background: radial-gradient(circle at 50% 40%, rgba(223, 255, 31, .14), transparent 62%), var(--fx-card);
+  border: 2px solid rgba(233, 241, 255, .12);
+}
+.fx-styles__canvas { width: 300px; max-width: 100%; height: auto; aspect-ratio: 300 / 380; }
+.fx-styles__form { display: grid; gap: 14px; padding: 18px; border-radius: var(--fx-radius); background: var(--fx-card); border: 2px solid rgba(233, 241, 255, .12); }
+.fx-styles__swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.fx-styles__swatch {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+  border: 3px solid rgba(233, 241, 255, .18); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .2);
+  transition: transform .12s ease, border-color .12s ease;
+}
+.fx-styles__swatch:hover { transform: scale(1.1); }
+.fx-styles__swatch:focus-visible { outline: 2px solid var(--fx-ball); outline-offset: 2px; }
+.fx-styles__swatch[aria-checked="true"] { border-color: var(--fx-ball); transform: scale(1.12); }
+.fx-styles__foot { display: flex; justify-content: center; gap: 14px; }
+@media (max-width: 760px) {
+  .fx-styles { padding: 16px; }
+  .fx-styles__body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .fx-styles__swatch { transition: none; } }
