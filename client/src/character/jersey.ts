@@ -41,7 +41,7 @@ export function createJersey(chest: THREE.Object3D, depth: number): Jersey {
     mesh,
     set(number, name, ink) {
       const n = Math.max(0, Math.min(99, Math.round(number)));
-      const label = name.trim().toUpperCase().slice(0, MAX_NAME);
+      const label = Array.from(name.trim()).slice(0, MAX_NAME).join("").toUpperCase(); // code points: no split emoji
       const next = `${n}|${label}|${ink}`;
       if (next === key || !ctx) return;
       key = next;

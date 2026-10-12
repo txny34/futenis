@@ -4,7 +4,7 @@ import { CharacterLook, DEFAULT_LOOK } from "./config";
 import { Emotion } from "./expressions";
 import { LookMaterials, applyLook, createMaterials, disposeMaterials } from "./materials";
 import { TORSO_DEPTH, countTriangles, dressRig, restyle } from "./parts";
-import { createJersey } from "./jersey";
+import { Jersey, createJersey } from "./jersey";
 import { createSecondary } from "./secondary";
 import { createHands } from "./hands";
 import { createLook } from "./look";
@@ -47,7 +47,7 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
     materials.hair.color.setHex(fx.hairColors[style.hairColor] ?? fx.hairColors[0]);
     materials.hat.color.setHex(fx.hatColors[style.hatColor] ?? fx.hatColors[0]);
   };
-  const jersey = createJersey(rig.bones.chest, TORSO_DEPTH);
+  let jersey: Jersey | null = null; // built on the first setJersey: NPCs never print one
   let ink = look.ink;
   let shirt = { number: 0, name: "" };
   const animator: Animator = createAnimator(rig);
@@ -67,21 +67,25 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
     setLook: (l) => {
       applyLook(materials, l);
       ink = l.ink;
-      jersey.set(shirt.number, shirt.name, ink);
+      jersey?.set(shirt.number, shirt.name, ink);
       styleColors(); // the team kit never overrides the player's own skin/hair
     },
     setStyle: (st) => {
       style = st;
       restyle(dressing, st, materials);
-      jersey.mesh.scale.x = st.build; // the print widens with the torso
+      if (jersey) jersey.mesh.scale.x = st.build; // the print widens with the torso
       styleColors();
     },
     setJersey: (number, name) => {
       shirt = { number, name };
+      if (!jersey) {
+        jersey = createJersey(rig.bones.chest, TORSO_DEPTH);
+        jersey.mesh.scale.x = style?.build ?? 1;
+      }
       jersey.set(number, name, ink);
     },
     dispose: () => {
-      jersey.dispose();
+      jersey?.dispose();
       rig.root.traverse((o) => {
         if (o instanceof THREE.Mesh) (o.geometry as THREE.BufferGeometry).dispose();
       });

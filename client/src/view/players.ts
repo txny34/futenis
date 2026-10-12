@@ -3,8 +3,7 @@ import { THEME } from "../env/theme";
 import { Character, CharacterPose, CharacterStyle, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter, styleFromSeed } from "../character/character";
 import type { Looks } from "../net/style-wire";
 import { loadStyle, onStyleChange } from "../profile/style-store";
-import { displayName } from "../profile/display-name";
-import { profileStore } from "../profile/store";
+import { myShirtName, onShirtNameChange } from "./shirt-name";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import { moodFor } from "./player-moods";
@@ -43,7 +42,7 @@ const botStyle = (i: number): CharacterStyle => styleFromSeed(BOT_STYLE_SEED + i
 /** Style plus the shirt print: my name on mine, the number only on the others. */
 function wear(ch: Character, st: Readonly<CharacterStyle>, i: number): void {
   ch.setStyle(st);
-  ch.setJersey(st.number, i === HUMAN_SLOT ? displayName(profileStore().get().name) : "");
+  ch.setJersey(st.number, i === HUMAN_SLOT ? myShirtName() : "");
 }
 
 function makeSlot(scene: THREE.Scene, i: number): Slot {
@@ -70,6 +69,7 @@ export class PlayersView {
     this.slots = [];
     for (let i = 0; i < MAX_PLAYERS; i++) this.slots.push(makeSlot(scene, i));
     onStyleChange((st) => wear(this.slots[HUMAN_SLOT].character, st, HUMAN_SLOT)); // Estilos edits show at once
+    onShirtNameChange(() => wear(this.slots[HUMAN_SLOT].character, loadStyle(), HUMAN_SLOT));
   }
 
   /** Online: the other players' own looks (null entries and null = the bot looks). Slot 0 stays mine. */
