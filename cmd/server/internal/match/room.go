@@ -90,16 +90,48 @@ func (r *Room) TeamOf(slot int) int {
 // nobody plays against themselves, and two accounts from one network can't
 // trade wins.
 func (r *Room) MarkRanked(slot int, c ranked.Claim, network string) bool {
-	user := c.UID
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.conflictLocked(slot, c.UID, network) {
+		return false
+	}
+	r.markLocked(slot, c, network)
+	return true
+}
+
+// Ranked is a verified account and its network joining a ranked room.
+type Ranked struct {
+	Claim   ranked.Claim
+	Network string
+}
+
+// JoinRanked is Join plus MarkRanked under one lock: the same account/network
+// check never depends on which player arrived (or marked) first. conflict
+// reports a refusal for that reason (slot -1).
+func (r *Room) JoinRanked(p Peer, m Ranked) (slot int, start bool, humans int, conflict bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.conflictLocked(-1, m.Claim.UID, m.Network) {
+		return -1, false, 0, !r.closed && !r.started
+	}
+	slot, start, humans = r.joinLocked(p)
+	if slot >= 0 {
+		r.markLocked(slot, m.Claim, m.Network)
+	}
+	return slot, start, humans, false
+}
+
+func (r *Room) conflictLocked(slot int, user, network string) bool {
 	for i := range r.users {
 		if i != slot && (r.users[i] == user || (r.nets[i] != "" && r.nets[i] == network)) {
-			return false
+			return true
 		}
 	}
-	r.ranked, r.users[slot], r.nets[slot], r.claims[slot] = true, user, network, c
-	return true
+	return false
+}
+
+func (r *Room) markLocked(slot int, c ranked.Claim, network string) {
+	r.ranked, r.users[slot], r.nets[slot], r.claims[slot] = true, c.UID, network, c
 }
 
 // NewRoom is an empty room of mode, known to the hub as code.
@@ -155,6 +187,10 @@ func (r *Room) SetRankedHooks(onOver func(winner int, users [sim.MaxPlayers]stri
 func (r *Room) Join(p Peer) (slot int, start bool, humans int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.joinLocked(p)
+}
+
+func (r *Room) joinLocked(p Peer) (slot int, start bool, humans int) {
 	if r.closed || r.started {
 		return -1, false, 0
 	}

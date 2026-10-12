@@ -139,6 +139,17 @@ func (h *hub) claimWait(mode, code, key string) bool {
 	return true
 }
 
+// settleWait claims key's wait in code, or accepts that a rival already
+// filled and started the room between join and claim (the open entry is gone
+// but the seat is in a live match: leaving now would kill it).
+func (h *hub) settleWait(mode, code, key string, r *match.Room) bool {
+	if h.claimWait(mode, code, key) {
+		return true
+	}
+	_, started := r.StartedAt()
+	return started && !r.IsClosed()
+}
+
 // leaveQueue forgets key as a waiter of code (it may queue again).
 func (h *hub) leaveQueue(mode, code, key string) {
 	h.mu.Lock()
@@ -148,23 +159,28 @@ func (h *hub) leaveQueue(mode, code, key string) {
 	h.mu.Unlock()
 }
 
-// joinQueue seats p in mode's open room. err is errBusy (hub at its room cap)
-// or errRefused (already queued, or no room took p). Rooms that filled,
+// joinQueue seats p in mode's open room (m: ranked account, see hub.joinAs).
+// err is errBusy (hub at its room cap), errSameNet (m's account or network
+// already waits there) or errRefused (already queued, or no room took p). Rooms that filled,
 // started or went stale concurrently are skipped (bounded retries).
-func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int) (code string, r *match.Room, slot int, start bool, humans int, err error) {
+func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int, m *match.Ranked) (code string, r *match.Room, slot int, start bool, humans int, err error) {
 	for range 3 {
 		code, ok := h.queueRoom(mode, key, elo)
 		if !ok {
 			return code, nil, -1, false, 0, errRefused
 		}
-		if r, slot, start, humans = h.join(code, queueModes[mode], p); r == nil {
+		r, slot, start, humans, conflict := h.joinAs(code, queueModes[mode], p, m)
+		switch {
+		case r == nil:
 			return code, nil, -1, false, 0, errBusy
+		case conflict:
+			return code, nil, -1, false, 0, errSameNet
 		}
 		switch {
 		case slot >= 0 && start:
 			h.closeQueueRoom(mode, code)
 			return code, r, slot, true, humans, nil
-		case slot >= 0 && h.claimWait(mode, code, key):
+		case slot >= 0 && h.settleWait(mode, code, key, r):
 			return code, r, slot, false, humans, nil
 		case slot >= 0:
 			r.Leave(slot, p, false)
