@@ -96,7 +96,7 @@ func TestQueue2v2LeaverIsReplacedByBot(t *testing.T) {
 	readWelcome(ctx, t, a)
 	readWelcome(ctx, t, b)
 	b.Close(websocket.StatusNormalClosure, "")
-	time.Sleep(50 * time.Millisecond) // let the server see the leave
+	time.Sleep(50 * time.Millisecond)                     // let the server see the leave
 	readMsg(ctx, t, a, wire.MsgStyles, wire.StylesMsgLen) // b's seat goes back to the bot's look
 	tick <- time.Time{}
 	readMsg(ctx, t, a, wire.MsgFrame, wire.FrameLen) // the match goes on for a
