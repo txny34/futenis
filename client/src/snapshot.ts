@@ -79,6 +79,8 @@ export const EventKind = {
   PadEnter: 24, PadLeave: 25, PadStart: 26,
   // Simple scoring (1v1/2v2): side would win the match with the next point.
   MatchPoint: 27,
+  // Best of 3 sets: side would win the set (not yet the match) with the next point.
+  SetPoint: 28,
 } as const;
 
 // Mirrors sim.BodyPart. Index 0 = PartNone.

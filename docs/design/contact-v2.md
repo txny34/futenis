@@ -1162,7 +1162,7 @@ Todo **append-only** (ningún índice/valor anterior se mueve):
 
 ## 21. Puntuación de pádel
 
-> **Reemplazado (puntaje simple):** los partidos 1v1/2v2 se juegan a 5 puntos, diferencia de 2 con tope en 7, con `EvMatchPoint`. El modelo de pádel de abajo queda en el sim pero no se usa.
+> **Reemplazado (puntaje simple por sets):** los partidos 1v1/2v2 son al mejor de 3 sets (`SetsToWin` 2); cada set es a 5 puntos, diferencia de 2 con tope en 7. `EvSetWon` al cerrar un set (el marcador vuelve a 0-0), `EvSetPoint`/`EvMatchPoint` tras cada punto. El 15/30/40 de abajo queda en el sim pero no se usa.
 
 `Config.ScoringMode` (`ScoringSimple` | `ScoringPadel`, `sim/scoring.go`) decide qué modelo de
 puntaje corre. **`ScoringSimple` es el valor cero**: el comportamiento legacy de wave 0

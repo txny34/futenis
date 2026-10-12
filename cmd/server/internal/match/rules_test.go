@@ -61,7 +61,11 @@ func TestGameOverWinner(t *testing.T) {
 	out[sim.SnapLen+sim.SnapPhase] = float64(sim.PhaseGameOver)
 	out[sim.SnapLen+sim.SnapScore0], out[sim.SnapLen+sim.SnapScore1] = 3, 5
 	if w, over := gameOverWinner(out); !over || w != 1 {
-		t.Fatalf("w=%d over=%v", w, over)
+		t.Fatalf("single tally: w=%d over=%v", w, over)
+	}
+	out[sim.SnapLen+sim.SnapSets0], out[sim.SnapLen+sim.SnapSets1] = 2, 1
+	if w, over := gameOverWinner(out); !over || w != 0 {
+		t.Fatalf("sets decide over the last set's points: w=%d over=%v", w, over)
 	}
 }
 

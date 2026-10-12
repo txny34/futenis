@@ -90,13 +90,21 @@ func (ss *session) configure(mode, difficulty, pointsToWin, humanMask int) error
 	return nil
 }
 
+// matchSetsToWin: 1v1/2v2 are the best of 3 sets, each set first to
+// PointsToWin (win by 2, capped; sim scoring_sets.go).
+const matchSetsToWin = 2
+
 // applyMatchFormat sets the scoring model: every mode plays the flat point
-// tally (first to PointsToWin, win by 2, capped; sim EvMatchPoint), padel
-// scoring stays in the sim but is no longer used. The first server
-// alternates with the parity of n (the configure call count).
+// tally (sim ScoringSimple); 1v1/2v2 play it in sets, the lobby and the
+// playground as a single tally. The first server alternates with the parity
+// of n (the configure call count).
 func applyMatchFormat(cfg *sim.Config, n int) {
 	cfg.FirstServer = int8(n % 2)
 	cfg.ScoringMode = sim.ScoringSimple
+	cfg.SetsToWin = 1
+	if cfg.Mode == sim.Mode1v1 || cfg.Mode == sim.Mode2v2 {
+		cfg.SetsToWin = matchSetsToWin
+	}
 }
 
 func (ss *session) setHumanMask(mask int) error {

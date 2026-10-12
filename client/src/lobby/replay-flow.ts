@@ -39,9 +39,9 @@ export function showResult(app: App, r: Readonly<MatchResult>, snap: Float64Arra
   app.controls.enabled = false;
   app.controls.releaseAll();
   if (isOnline()) markOnlineOver();
-  const winner = r.winner >= 0 ? r.winner : snap[Snap.Score0] >= snap[Snap.Score1] ? 0 : 1;
-  // The final points come from the snapshot (exact after a rejoin or dropped events).
-  const p0 = snap[Snap.Score0], p1 = snap[Snap.Score1];
+  const winner = r.winner >= 0 ? r.winner : snap[Snap.Sets0] >= snap[Snap.Sets1] ? 0 : 1;
+  // The final sets come from the snapshot (exact after a rejoin or dropped events).
+  const p0 = snap[Snap.Sets0], p1 = snap[Snap.Sets1];
   const elo = app.replaying ? null : recorder().matchOver(winner === HUMAN_TEAM, p0, p1);
   const rankNote = elo ? rankChange(elo.before, elo.after) : null;
   app.screens.showResult({ won: winner === HUMAN_TEAM, games0: p0, games1: p1, rankNote }, {

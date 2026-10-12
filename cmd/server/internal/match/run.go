@@ -134,8 +134,16 @@ func gameOverWinner(out []float64) (int, bool) {
 	if int(cur[sim.SnapPhase]) != int(sim.PhaseGameOver) {
 		return 0, false
 	}
-	if cur[sim.SnapScore1] > cur[sim.SnapScore0] {
-		return 1, true
+	if s0, s1 := cur[sim.SnapSets0], cur[sim.SnapSets1]; s0 != s1 {
+		return boolTeam(s1 > s0), true // best of 3 sets
 	}
-	return 0, true
+	return boolTeam(cur[sim.SnapScore1] > cur[sim.SnapScore0]), true // a single-tally room
+}
+
+// boolTeam is team 1 when b, else team 0.
+func boolTeam(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

@@ -247,6 +247,10 @@ const (
 	// Simple-scoring match point (1v1/2v2), appended after EvPadStart: after
 	// a point, Side would win the match with the next one (one event per team).
 	EvMatchPoint
+
+	// Simple scoring with sets (SetsToWin > 1), appended after EvMatchPoint:
+	// Side would win the current set (not yet the match) with the next point.
+	EvSetPoint
 )
 
 // Event is emitted by Step. Side meaning depends on Kind:

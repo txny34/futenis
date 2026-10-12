@@ -22,6 +22,7 @@ interface WasmLayout {
   evPadLeave: number;
   evPadStart: number;
   evMatchPoint: number;
+  evSetPoint: number;
   cfgLobbyHoldTime: number;
   cfgLobbyHalfX: number;
   cfgLobbyHalfZ: number;
