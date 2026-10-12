@@ -54,12 +54,14 @@ func TestQueuePairsArrivalsTwoByTwo(t *testing.T) {
 func TestQueueSkipsAbandonedWait(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	srv := newQueueHub()
+	var h *hub
+	srv := newTestHubWith(func(x *hub) { x.proxied, h = true, x })
 	defer srv.Close()
 
 	a := dialQueue(ctx, t, srv, "10.0.0.5")
 	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	a.Close(websocket.StatusNormalClosure, "")
+	waitNoRooms(ctx, t, h) // Close returns before the server ran a's leave: b could meet the leaving a
 	b := dialQueue(ctx, t, srv, "10.0.0.6")
 	readMsg(ctx, t, b, wire.MsgWaiting, wire.HeaderLen)
 	c := dialQueue(ctx, t, srv, "10.0.0.7")
@@ -101,12 +103,13 @@ func TestQueueOnePerIP(t *testing.T) {
 func TestQueueRejoinAfterLeaving(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	srv := newQueueHub()
+	var h *hub
+	srv := newTestHubWith(func(x *hub) { x.proxied, h = true, x })
 	defer srv.Close()
 	a := dialQueue(ctx, t, srv, "10.0.1.1")
 	readMsg(ctx, t, a, wire.MsgWaiting, wire.HeaderLen)
 	a.Close(websocket.StatusNormalClosure, "")
-	time.Sleep(50 * time.Millisecond) // let the server see the leave
+	waitNoRooms(ctx, t, h) // the server saw the leave
 	again := dialQueue(ctx, t, srv, "10.0.1.1")
 	readMsg(ctx, t, again, wire.MsgWaiting, wire.HeaderLen)
 }
@@ -160,5 +163,23 @@ func TestQueueSettleWait(t *testing.T) {
 				t.Fatalf("settleWait = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// waitNoRooms polls until the hub forgot every room (the leaves ran).
+func waitNoRooms(ctx context.Context, t *testing.T, h *hub) {
+	t.Helper()
+	for {
+		h.mu.Lock()
+		n := len(h.rooms)
+		h.mu.Unlock()
+		if n == 0 {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("%d rooms still open", n)
+		case <-time.After(time.Millisecond):
+		}
 	}
 }
