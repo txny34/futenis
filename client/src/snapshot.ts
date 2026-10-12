@@ -51,6 +51,8 @@ export const POINT_LABELS = ["0", "15", "30", "40", "AD"] as const;
 
 export const FLAG_LOB = 1;
 export const FLAG_STAMINA_LOCK = 2;
+/** 2v2: this player's next touch can be a pass (sim PassReady): Globo becomes Pase. */
+export const FLAG_PASS_READY = 4;
 
 /** Team of player i (sim teamPlayers: 2v2 -> {0,1},{2,3}; 1v1 -> index = team). */
 export function teamOf(i: number, numPlayers: number): number {

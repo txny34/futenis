@@ -3,7 +3,7 @@ import { FULL_CHARGE, svgNode } from "./hud-svg";
 import { t } from "./i18n/t";
 import { keyHint } from "./ui/key-hints";
 import type { KeyAction } from "./ui/keybinds";
-import { Extra, FLAG_LOB, PLAYER_DASH, PLAYER_EXTRA } from "./snapshot";
+import { Extra, FLAG_LOB, FLAG_PASS_READY, PLAYER_DASH, PLAYER_EXTRA } from "./snapshot";
 
 // Bottom-center action bar (Dash · Golpe · Globo; jump stays on its key but is not
 // shown, like most games): round ability buttons with SVG icons, a progress
@@ -22,10 +22,13 @@ interface ActionDef {
   readonly id: IconId; readonly label: string; readonly key: string; readonly bind?: KeyAction; readonly ring: boolean;
 }
 
+const LOB_LABEL = t("Globo", "Lob");
+const PASS_LABEL = t("Pase", "Pass");
+
 const ACTIONS: readonly ActionDef[] = [
   { id: "dash", label: "Dash", key: "Q", bind: "dash", ring: true },
   { id: "strike", label: t("Golpe", "Strike"), key: "Click", ring: true },
-  { id: "lob", label: t("Globo", "Lob"), key: t("Click der", "Right click"), ring: false },
+  { id: "lob", label: LOB_LABEL, key: t("Click der", "Right click"), ring: false },
 ];
 
 interface Slot {
@@ -57,6 +60,7 @@ function button(def: ActionDef): Slot {
     icon.append(ring);
   }
   icon.append(actionFigure(def.id));
+  if (def.id === "lob") icon.append(actionFigure("pass")); // shown instead while a 2v2 pass is ready
   const label = document.createElement("span");
   label.className = "act__label";
   label.textContent = def.label;
@@ -71,6 +75,7 @@ export class ActionBar {
   readonly root = document.createElement("div");
   private readonly slots: Readonly<Record<IconId, Slot>>;
   private lastFull = false;
+  private lastPass = false;
 
   constructor() {
     this.root.id = "actions";
@@ -96,6 +101,17 @@ export class ActionBar {
       this.slots.strike.root.classList.toggle("is-full", full);
     }
     this.set(this.slots.lob, 0, (flags & FLAG_LOB) !== 0, false);
+    this.setPass((flags & FLAG_PASS_READY) !== 0);
+  }
+
+  /** 2v2: Globo turns into Pase while the human's next touch can set up the partner. */
+  private setPass(ready: boolean): void {
+    if (ready === this.lastPass) return;
+    this.lastPass = ready;
+    const lob = this.slots.lob.root;
+    lob.classList.toggle("is-pass", ready);
+    const label = lob.querySelector(".act__label");
+    if (label) label.textContent = ready ? PASS_LABEL : LOB_LABEL;
   }
 
   /** cooling: on cooldown (dimmed); dropping it plays the "ready" pulse in CSS. */

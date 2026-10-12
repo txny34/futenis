@@ -76,6 +76,12 @@
   font: 700 calc(14px * var(--hud-scale)) / 1.6 var(--fx-body, system-ui); color: var(--hud-text);
   padding: 0 7px; background: color-mix(in srgb, var(--hud-ink) 75%, transparent); border: 1px solid rgba(255, 255, 255, .15); border-radius: 5px; white-space: nowrap;
 }
+/* 2v2: Globo becomes Pase (sim PassReady) — swap the art and pulse the glow */
+.act__fig--pass { display: none; }
+.act--lob.is-pass .act__fig--lob { display: none; }
+.act--lob.is-pass .act__fig--pass { display: inline; }
+.act--lob.is-pass .act__track { animation: act-pass 1s ease-in-out infinite alternate; }
+.act--lob.is-pass .act__label { animation: act-pass-label .5s ease-out; }
 .act.is-active .act__svg { transform: scale(1.14) rotate(-4deg); }
 .act.is-active .act__track { filter: brightness(1.25) drop-shadow(0 0 10px var(--act-fill)); }
 .act.is-active .act__wave { animation: act-wave .45s ease-out; }
@@ -84,6 +90,8 @@
 .act.is-cooling .act__fig { opacity: .55; }
 .act--dash:not(.is-cooling) .act__wave { animation: act-wave .6s ease-out; }
 
+@keyframes act-pass { from { filter: drop-shadow(0 0 2px var(--act-fill)); } to { filter: brightness(1.25) drop-shadow(0 0 14px var(--act-fill)); } }
+@keyframes act-pass-label { 40% { transform: scale(1.35); } }
 @keyframes act-bob { 50% { transform: translateY(-1.5px); } }
 @keyframes act-hit { 40% { transform: translateX(2px) rotate(8deg) scale(1.08); } }
 @keyframes act-wave { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.35); } }
@@ -144,7 +152,7 @@
 @keyframes charge-burst-a { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
 @keyframes charge-burst-b { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
 @keyframes act-full { from { filter: brightness(1.1) drop-shadow(0 0 6px var(--act-fill)); } to { filter: brightness(1.4) drop-shadow(0 0 16px var(--hud-ring)); } }
-@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track, #score b { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track, .act--lob .act__track, .act__label, #score b { animation: none !important; }
   .act__svg, .charge__track { transition: none; } }
 
 @media (max-width: 640px) {

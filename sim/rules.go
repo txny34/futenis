@@ -112,8 +112,8 @@ func judgeRally(s *State, ev []Event) []Event {
 // judgeEvent inspects a single tick event against the current RallyState and
 // reports the winning team and whether the point is decided. It also
 // advances RallyState.LastTeam/LastPlayer/BouncesOnSide for non-decisive
-// kicks and bounces, enforcing the "max 1 touch per TEAM" padel rule
-// (either partner may hit in 2v2, but only one touch total counts).
+// kicks and bounces, enforcing the per-team touch limit (1 in 1v1; 2v2
+// passes up to TouchLimit, never the same player twice: rules_pass.go).
 func judgeEvent(r *RallyState, e Event) (winner int8, decided bool) {
 	k := r.LastTeam
 	if k < 0 {
@@ -168,11 +168,20 @@ func judgeKickEvent(r *RallyState, k int8, e Event) (int8, bool) {
 			r.BodyGraze = false // the strike takes over the graze: still one touch
 			return 0, false
 		}
+		if isLegalPass(r, e) {
+			takePass(r, e)
+			return 0, false
+		}
 		return faultOnKickerSide(r, k)
 	}
 	r.LastTeam = e.Side
 	r.LastPlayer = e.Player
+	// The bounce the ball already took on the new team's side counts toward
+	// its possession (one bounce per side per crossing, passes included).
+	own := r.BouncesOnSide[e.Side]
 	r.BouncesOnSide = [2]int{}
+	r.BouncesOnSide[e.Side] = own
+	r.TeamTouches = 1
 	r.ShotCount++
 	r.ServeUntouched = false
 	markBodyGraze(r, e)
@@ -203,6 +212,10 @@ func markBodyGraze(r *RallyState, e Event) {
 // second bounce.
 func judgeBounceEvent(r *RallyState, k int8, e Event) (int8, bool) {
 	if e.Side == k {
+		if ownBounceAllowed(r, k) {
+			r.BouncesOnSide[k]++
+			return 0, false
+		}
 		return faultOnKickerSide(r, k)
 	}
 	r.BouncesOnSide[e.Side]++
@@ -308,6 +321,7 @@ func resetForServe(s *State, server int8) {
 		ServerPlayer: sp,
 		ServeAttempt: 1,
 		ServeBox:     serveBoxForScore(s.Score),
+		TouchLimit:   touchLimit(s),
 	}
 
 	placeServe(s, server)

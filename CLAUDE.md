@@ -1,6 +1,6 @@
 # futenis — Rules del proyecto
 
-Futtenis (fútbol-tenis) en cancha de pádel con paredes. **1v1 y 2v2** (+ Playground). **Un toque por equipo por cruce.**
+Futtenis (fútbol-tenis) en cancha de pádel con paredes. **1v1 y 2v2** (+ Playground). **1v1: un toque por cruce. 2v2: hasta 3 por equipo (pases, nunca el mismo jugador dos seguidas).**
 Reglas = **reglamento de pádel** adaptado al pie (saque, cuadros, let, doble falta). **Puntaje simple**: a 5, diferencia de 2 (tope 7), con MATCH POINT (`EvMatchPoint`); el puntaje de pádel queda en el sim sin usar.
 Juego de navegador, meta comercial (online, skins, pase de batalla) — **ingeniería primero, arte después**.
 
