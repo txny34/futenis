@@ -108,7 +108,7 @@ func (h *hub) expireAlone(r *match.Room, p match.Peer) (stop func()) {
 	return func() { mu.Lock(); t.Stop(); mu.Unlock() }
 }
 
-// readLoop applies INPUT/answers PING until the peer disconnects, idles out,
+// readLoop applies INPUT/STYLE and answers PING until the peer disconnects, idles out,
 // floods or sends garbage.
 // It reports lost when the connection dropped (not a normal close, nor one the
 // server made): the seat may then be held for a rejoin.
@@ -138,6 +138,10 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *match.Room
 		}
 		if typ == websocket.MessageBinary && wire.IsPing(b) {
 			_ = p.Send(wire.EncodePong(pong, b))
+			continue
+		}
+		if st, ok := wire.DecodeStyle(b); typ == websocket.MessageBinary && ok {
+			r.SetStyle(slot, p, st, time.Now())
 			continue
 		}
 		in, err := wire.DecodeInput(b)
