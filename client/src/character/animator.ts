@@ -47,8 +47,9 @@ const AIR_STRETCH_MAX = 0.06;
 const MAX_HEAD_LIFT = 0.6;
 /** Headers always hop a little so ALTO reads as a jump. */
 const MIN_HEAD_HOP = 0.08;
+const CHARGE_RUN_DAMP = 0.75;
 /** Covers the contact squash and spine flex so the brow chain stays in reach. */
-const HEAD_LIFT_MARGIN = 0.08;
+const HEAD_LIFT_MARGIN = 0.14; // + the header's bent knees lowering the brow at contact
 
 const local = new THREE.Vector3();
 
@@ -93,7 +94,9 @@ export function createAnimator(rig: Rig): Animator {
     const speed = THREE.MathUtils.clamp(pose.speed, 0, 1);
     applyRest(rig.bones);
     applyIdle(rig.bones, time, k * (1 - speed) * (1 - air));
-    applyLocomotion(rig.bones, phase, k * speed * (1 - air));
+    // A charged kick takes over the legs: the run fades so the cocked heel never folds through the thigh.
+    const charge = THREE.MathUtils.clamp(pose.charge, 0, 1);
+    applyLocomotion(rig.bones, phase, k * speed * (1 - air) * (1 - CHARGE_RUN_DAMP * charge));
     applyAir(rig.bones, pose.verticalVel, k * air);
   }
 

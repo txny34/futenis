@@ -32,57 +32,64 @@ function coil(b: Bones, x: SideRig, s: number, w: number, hip: number, shoulder:
   b.chest.rotation.y += x.d * w * sw(s, -shoulder, shoulder);
 }
 
-/** BAJO: thigh cocked far back with a tight knee, whip through, high finish. */
+/** BAJO (instep drive): heel cocked behind with the torso over the ball, the
+ * planted knee loaded, arms counter-balancing on the diagonal (far arm forward
+ * and out, kick-side arm back); a whipped swing to a ~75° finish. */
 function low(b: Bones, x: SideRig, s: number, w: number): void {
-  x.kUp.rotation.x += w * (-0.6 + sw(s, 1.9, -1.5));
-  x.kLeg.rotation.x += w * (0.25 + sw(s, 2.1, -0.2));
-  x.kUp.rotation.y -= x.d * w * 0.3; // side-foot: open the hip
-  x.kFoot.rotation.x += w * 0.5;
-  plant(x, w, 0.8);
-  coil(b, x, s, w, 0.6, 0.5);
-  b.spine.rotation.z -= x.d * w * 0.25;
-  b.spine.rotation.x -= w * (0.1 + Math.max(0, s) * 0.35);
-  armsOut(x, w, 0.8, 1.5);
-  x.pArm.rotation.x -= w * 0.4;
-  x.kArm.rotation.x += w * sw(s, -0.6, 0.8);
-  x.pFore.rotation.x -= w * 0.4;
-}
-
-/** MEDIO: arch back with arms wide, pop the chest through, fold over after. */
-function mid(b: Bones, x: SideRig, s: number, w: number): void {
-  b.spine.rotation.x += w * sw(s, -0.75, 0.5);
-  b.chest.rotation.x += w * sw(s, -0.4, 0.25);
-  b.neck.rotation.x += w * sw(s, 0.4, -0.15);
-  b.spine.rotation.y += x.d * w * sw(s, -0.35, 0.35);
-  x.kArm.rotation.x += w * sw(s, -0.3, 0.5);
-  x.pArm.rotation.x += w * sw(s, -0.3, 0.5);
-  armsOut(x, w, 1.4 + sw(s, 0.2, -0.4), 1.4 + sw(s, 0.2, -0.4));
+  x.kUp.rotation.x += w * (-0.4 + sw(s, 1.1, -0.9)); // +0.7 cocked, ~-0.55 at contact, -1.3 finish
+  x.kLeg.rotation.x += w * (0.35 + sw(s, 1.35, -0.25));
+  x.kUp.rotation.y -= x.d * w * 0.2; // open the hip a little: instep, not toe
+  x.kFoot.rotation.x += w * 0.45; // pointed toe
+  plant(x, w, 0.7);
+  coil(b, x, s, w, 0.55, 0.45);
+  b.spine.rotation.z -= x.d * w * 0.18; // lean over the planted leg
+  b.spine.rotation.x += w * (0.15 - Math.max(0, s) * 0.3); // over the ball, then a small lean back
+  x.pArm.rotation.x -= w * (0.75 + sw(s, -0.2, 0.25)); // far arm forward and up
+  x.pArm.rotation.z += x.d * w * 0.45;
+  x.pFore.rotation.x -= w * 0.75;
+  x.kArm.rotation.x += w * (0.45 + sw(s, 0.15, 0.1)); // kick-side arm back for balance
+  x.kArm.rotation.z -= x.d * w * 0.65;
   x.kFore.rotation.x -= w * 0.5;
-  x.pFore.rotation.x -= w * 0.5;
-  plant(x, w, 0.55);
-  x.kUp.rotation.x -= w * (0.25 + sw(s, 0, 0.2));
-  x.kLeg.rotation.x += w * 0.5;
 }
 
-/** ALTO: crouch-load with the neck cocked back, rise, snap the brow through. */
+/** MEDIO (chest control): arms low, open and back with soft elbows; arch to
+ * cushion, then push the chest through. */
+function mid(b: Bones, x: SideRig, s: number, w: number): void {
+  b.spine.rotation.x += w * sw(s, -0.5, 0.35);
+  b.chest.rotation.x += w * sw(s, -0.3, 0.2);
+  b.neck.rotation.x += w * sw(s, 0.35, -0.1);
+  b.spine.rotation.y += x.d * w * sw(s, -0.25, 0.25);
+  armsOut(x, w, 0.75, 0.75);
+  x.kArm.rotation.x += w * 0.35;
+  x.pArm.rotation.x += w * 0.35;
+  x.kFore.rotation.x -= w * 0.85;
+  x.pFore.rotation.x -= w * 0.85;
+  plant(x, w, 0.55);
+  x.kUp.rotation.x -= w * (0.2 + sw(s, 0, 0.15));
+  x.kLeg.rotation.x += w * 0.45;
+}
+
+/** ALTO (header): crouch with the arms swung back, jump driving the arms up,
+ * arch the back and whip the neck through the ball; legs tuck in the air. */
 function high(b: Bones, x: SideRig, s: number, w: number): void {
-  b.spine.rotation.x += w * sw(s, -0.65, 0.5);
-  b.chest.rotation.x += w * sw(s, -0.3, 0.25);
-  b.neck.rotation.x += w * sw(s, -0.6, 1.0);
-  b.head.rotation.x += w * sw(s, -0.25, 0.4);
-  x.kArm.rotation.x += w * sw(s, 0.6, 1.3);
-  x.pArm.rotation.x += w * sw(s, 0.6, 1.3);
-  armsOut(x, w, 0.6, 0.6);
-  x.kFore.rotation.x -= w * 0.6;
-  x.pFore.rotation.x -= w * 0.6;
-  const crouch = sw(s, 0.45, 0);
-  const knees = sw(s, 0.85, 0.1);
-  x.kUp.rotation.x -= w * crouch;
-  x.pUp.rotation.x -= w * crouch;
+  b.spine.rotation.x += w * sw(s, -0.35, 0.45);
+  b.chest.rotation.x += w * sw(s, -0.25, 0.25);
+  b.neck.rotation.x += w * sw(s, -0.55, 0.9);
+  b.head.rotation.x += w * sw(s, -0.25, 0.35);
+  const arms = sw(s, 0.7, -1.25); // back on the load, up and forward on the jump
+  x.kArm.rotation.x += w * arms;
+  x.pArm.rotation.x += w * arms;
+  armsOut(x, w, 0.4, 0.4);
+  x.kFore.rotation.x -= w * 0.9;
+  x.pFore.rotation.x -= w * 0.9;
+  const thighs = sw(s, 0.55, 0.45);
+  const knees = 0.3 + sw(s, 0.9, 0.9); // never straight-legged: loaded crouch, bent at contact, tucked after
+  x.kUp.rotation.x -= w * thighs;
+  x.pUp.rotation.x -= w * thighs;
   x.kLeg.rotation.x += w * knees;
   x.pLeg.rotation.x += w * knees;
-  x.kFoot.rotation.x += w * 0.6;
-  x.pFoot.rotation.x += w * 0.6;
+  x.kFoot.rotation.x += w * 0.5;
+  x.pFoot.rotation.x += w * 0.5;
 }
 
 type PoseFn = (b: Bones, x: SideRig, s: number, w: number) => void;
