@@ -6,16 +6,16 @@ import (
 	"github.com/txny34/futenis/sim"
 )
 
-// thinkRally chases, charges and strikes when this team may touch the ball
-// (one touch per TEAM per crossing, 2v2 partner included); otherwise it
-// recovers / covers.
+// thinkRally chases, charges and strikes when this player may touch the
+// ball (sim.CanTouch: the rival holds it, or its 2v2 partner just set it
+// up); otherwise it recovers / covers.
 func (b *Bot) thinkRally(s *sim.State, slot int) sim.PlayerInput {
 	me := &s.Players[slot]
-	if s.Rally.LastTeam == me.Team || s.Rally.LastTeam < 0 {
+	if !sim.CanTouch(s, int8(slot)) {
 		b.resetCharge()
 		return b.recover(s, slot)
 	}
-	if b.missed && s.Rally.ShotCount == b.missedShot {
+	if b.missed && s.Rally.ShotCount == b.missedShot && lastTouch(s) == b.missedTouch {
 		// This bot whiffed this ball (a mistimed shot): it does not get a
 		// second try at the same crossing.
 		b.resetCharge()
@@ -98,6 +98,9 @@ func (b *Bot) isChaser(s *sim.State, slot int) bool {
 		return true
 	}
 	mate := slot ^ 1
+	if !sim.CanTouch(s, int8(mate)) {
+		return true // the partner just touched it (a pass): it is mine
+	}
 	me, m := &s.Players[slot], &s.Players[mate]
 	cfg := &s.Cfg
 	mine := ticksToReach(me, standSpot(me, b.plan.ball, b.plan.off), b.speedFor(me, cfg), cfg.PlayerAccel)
@@ -147,7 +150,7 @@ func (b *Bot) strike(s *sim.State, slot int, in sim.PlayerInput) sim.PlayerInput
 	// any reachable tick, and touching the serve first loses the point.
 	canRelease := b.holdTicks > 1 && !s.Rally.ServeBoxPending
 	if canRelease && (b.releaseNow(me, cfg, early, buf) || b.holdTicks > maxHoldTicks) {
-		b.missed, b.missedShot = b.mistimed, s.Rally.ShotCount
+		b.missed, b.missedShot, b.missedTouch = b.mistimed, s.Rally.ShotCount, lastTouch(s)
 		b.release(cfg)
 		in.Buttons &^= sim.BtnStrike | sim.BtnLob
 		return b.withAim(in)
@@ -170,6 +173,9 @@ func (b *Bot) withAim(in sim.PlayerInput) sim.PlayerInput {
 // a short backspin drop against a deep opponent. Low-decision bots pick a
 // random spot. Aim noise is added on top.
 func (b *Bot) chooseShot(s *sim.State, slot int) {
+	if b.choosePass(s, slot) {
+		return
+	}
 	me := &s.Players[slot]
 	fwd := forward(me.Team)
 	ox, oz := opponentsCentroid(s, me.Team)
@@ -177,10 +183,12 @@ func (b *Bot) chooseShot(s *sim.State, slot int) {
 	shot := sim.BtnStrike
 	b.spin = 0
 	b.mistimed = unit(b.hash(s, slot, 9)) < b.missChance()
-	if unit(b.hash(s, slot, 4)) < b.Level.Decision {
+	smash := finishing(s, slot) // the partner's set: always the best, hardest shot
+	if smash || unit(b.hash(s, slot, 4)) < b.Level.Decision {
 		b.aimZ = -math.Copysign(wide, oz)
 		b.aimX = fwd * (sim.CourtHalfLength - b.Level.LineMargin - 0.5)
 		switch {
+		case smash:
 		case math.Abs(ox) < 3.5:
 			shot = sim.BtnLob
 		case math.Abs(ox) > 7.5 && unit(b.hash(s, slot, 5)) < b.Level.DropChance:
@@ -217,7 +225,7 @@ func (b *Bot) chargeFor(s *sim.State, slot int, shot uint8) int {
 	cfg := &s.Cfg
 	maxT := ticksOfSec(cfg.ChargeMaxTime)
 	if shot == sim.BtnLob {
-		return maxT / 4
+		return lobCharge(s, slot, maxT)
 	}
 	from := b.plan.ball.Pos
 	part, _ := sim.BestPart(cfg, from.Y, b.plan.off, false)

@@ -619,7 +619,7 @@ SnapLen
 ```
 
 `SnapP0Y`/`SnapP1Y` ya existen y pasan a tener valor real. `Charge` = `ChargeTicks/chargeMaxTicks`.
-`Flags` = `ShotType | (StaminaLock>0)<<1`.
+`Flags` = `ShotType | (StaminaLock>0)<<1 | PassOnRelease<<2` (bit 2 agregado con los pases 2v2, §19.3).
 
 ### 11.3 wasm
 
@@ -864,9 +864,23 @@ recibe `[MaxPlayers]PlayerInput` (los slots no usados se ignoran). `State` sigue
 
 ### 19.3 Reglas por EQUIPO (no por jugador)
 
-- **Un toque por equipo por cruce**: cualquiera de los dos compañeros puede golpear, pero sólo cuenta
-  **un** toque total — si el compañero que no golpeó también toca la pelota en el mismo cruce, es doble
-  toque (falta), igual que si el mismo jugador la tocara dos veces.
+- **Pases (futvóley, 2v2)**: hasta **3 toques por equipo por cruce** (`RallyState.TouchLimit`; 1 en 1v1),
+  nunca el mismo jugador dos veces seguidas (A→B→A vale; A→A es doble toque). El límite de **1 pique**
+  del lado vale para toda la posesión: un pase no regala otro pique. El tercer toque tiene que cruzar
+  (si cae en el propio campo es falta). El saque no se puede pasar (el compañero del sacador que toca el
+  saque comete doble toque); el que recibe espera el pique y puede devolver de primera o pasar.
+  Input: **Globo tocado** (soltado con carga < `PassMaxCharge` = 0.3) con `PassReady` = levantada suave
+  que cae 1 m delante del compañero, hacia la red (`passVelocity`, sin desvío ni potencia); **Globo
+  cargado** = globo normal, así el globo defensivo sigue existiendo en cualquier toque. `Flags` bit 2 =
+  "soltar ahora es pase" → el HUD muestra "Pase" y vuelve a "Globo" al cargar. Los bots pasan
+  (`Level.PassChance`), arman A-B-A y el que remata elige siempre el mejor tiro.
+  Detalles: el pase sale con **cualquier parte del cuerpo** (levantar de cabeza es futvóley; ignora
+  `AllowLob`) y sin desvío de calidad. Un pase sólo vale mientras la pelota **no llegó al lado rival**
+  (sin pique rival y sobre el propio medio); si el compañero toca un tiro propio que ya cruzó, el punto
+  es del equipo que tiró (como antes). El pique que la pelota ya dio del lado del equipo antes de su
+  primer toque cuenta para su posesión (p. ej. tras el pique del saque en el cuadro, el que recibe ya
+  no puede dejarla picar otra vez antes de pasar).
+- *(Antes: un toque por equipo por cruce — el compañero que tocaba en el mismo cruce era doble toque.)*
 - `RallyState.LastKicker` → **`RallyState.LastTeam`** (mismo rol, ahora nombrado por equipo) +
   **`RallyState.LastPlayer`** (qué jugador específico, dentro de ese equipo, tocó — informativo /
   para wave1, no participa hoy en la decisión de punto, que sigue siendo 100% a nivel equipo).

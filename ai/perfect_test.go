@@ -13,6 +13,8 @@ const perfectRunTicks = 90 * sim.TickRate
 // game over) and returns the share of PERFECT rally kicks. The serve and
 // its return are excluded: both are played side-on by design (the body
 // capsule rules out a close stand-off there), so they are never PERFECT.
+// It calibrates shot skill, so the bots do not pass (2v2 team play and the
+// smashes it sets up are covered by pass_test.go).
 func rallyPerfectRate(d Difficulty) float64 {
 	kicks, perfect := 0, 0
 	for _, mode := range []sim.Mode{sim.Mode1v1, sim.Mode2v2} {
@@ -22,6 +24,7 @@ func rallyPerfectRate(d Difficulty) float64 {
 		var bots [sim.MaxPlayers]Bot
 		for i := range bots {
 			bots[i] = New(d, i)
+			bots[i].Level.PassChance = 0
 		}
 		for t := 0; t < perfectRunTicks; t++ {
 			s := m.State()

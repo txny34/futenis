@@ -262,9 +262,9 @@ type Event struct {
 	Spin    float64  // EvKick
 }
 
-// RallyState is the bookkeeping the rules need inside a rally. One touch
-// per TEAM per crossing: either partner may return the ball in 2v2, but
-// only one touch total counts (docs/design/contact-v2.md "Modos y 2v2").
+// RallyState is the bookkeeping the rules need inside a rally. 1v1: one
+// touch per crossing; 2v2: up to TouchLimit touches per team, never the same
+// player twice in a row (passes, rules_pass.go; docs/design/contact-v2.md §19.3).
 type RallyState struct {
 	LastTeam      int8   // -1 if none yet; the team (not player) that last legally touched the ball
 	LastPlayer    int8   // -1 if none yet; which of State.Players (within LastTeam) actually touched it
@@ -313,6 +313,12 @@ type RallyState struct {
 	// within bodyMergeTicks is the same touch, not a double touch (rules.go).
 	BodyGraze     bool
 	BodyGrazeTick uint32
+	// 2v2 passes (futvóley, rules_pass.go): TeamTouches is how many touches
+	// LastTeam has made in this possession (1 on the touch that took it);
+	// TouchLimit is the per-team cap set by resetForServe/replayServe
+	// (1 in 1v1, maxDoublesTouches in 2v2; 0 reads as 1).
+	TeamTouches uint8
+	TouchLimit  uint8
 }
 
 // serveBoxForScore returns which diagonal service box the server must serve
