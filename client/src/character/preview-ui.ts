@@ -18,7 +18,7 @@ export interface PreviewControls {
   styleSeed: number;
 }
 
-const CLOSEUP_ANGLES = 5; // 4 around the body + a face close-up (FACE_CLOSEUP)
+const CLOSEUP_ANGLES = 6; // 4 around the body + face and hand close-ups
 
 function button(label: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement("button");
