@@ -139,6 +139,17 @@ func (h *hub) claimWait(mode, code, key string) bool {
 	return true
 }
 
+// settleWait claims key's wait in code, or accepts that a rival already
+// filled and started the room between join and claim (the open entry is gone
+// but the seat is in a live match: leaving now would kill it).
+func (h *hub) settleWait(mode, code, key string, r *match.Room) bool {
+	if h.claimWait(mode, code, key) {
+		return true
+	}
+	_, started := r.StartedAt()
+	return started && !r.IsClosed()
+}
+
 // leaveQueue forgets key as a waiter of code (it may queue again).
 func (h *hub) leaveQueue(mode, code, key string) {
 	h.mu.Lock()
@@ -164,7 +175,7 @@ func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int) (code st
 		case slot >= 0 && start:
 			h.closeQueueRoom(mode, code)
 			return code, r, slot, true, humans, nil
-		case slot >= 0 && h.claimWait(mode, code, key):
+		case slot >= 0 && h.settleWait(mode, code, key, r):
 			return code, r, slot, false, humans, nil
 		case slot >= 0:
 			r.Leave(slot, p, false)

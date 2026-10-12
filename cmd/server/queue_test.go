@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
-	"net/http"
-	"net/http/httptest"
-
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
+	"github.com/txny34/futenis/sim"
 )
 
 // newQueueHub trusts Fly-Client-IP so each test client can have its own IP.
@@ -122,4 +125,30 @@ func TestQueueDuplicateRejectionKeepsOwner(t *testing.T) {
 	time.Sleep(50 * time.Millisecond) // the server runs b's cleanup
 	c := dialQueue(ctx, t, srv, "10.0.3.1")
 	expectClose(ctx, t, c, wire.CloseFull)
+}
+
+// The rival can fill and start the room between the first player's join and
+// its queue claim: that player is in a live match and must stay, not leave
+// (which ended the match right after WELCOME).
+func TestQueueSettleWaitAfterRivalStarted(t *testing.T) {
+	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+	code, _ := h.queueRoom("1v1", "a", ranked.EloDefault)
+	r, _, _, _ := h.join(code, sim.Mode1v1, &peertest.Peer{})
+	if _, _, start, _ := h.join(code, sim.Mode1v1, &peertest.Peer{}); !start {
+		t.Fatal("second join did not start the match")
+	}
+	h.closeQueueRoom("1v1", code)
+	if !h.settleWait("1v1", code, "a", r) {
+		t.Fatal("the first player must keep its seat in the started match")
+	}
+}
+
+func TestQueueSettleWaitRefusesClosedEntry(t *testing.T) {
+	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+	code, _ := h.queueRoom("1v1", "a", ranked.EloDefault)
+	r, _, _, _ := h.join(code, sim.Mode1v1, &peertest.Peer{})
+	h.closeQueueRoom("1v1", code)
+	if h.settleWait("1v1", code, "a", r) {
+		t.Fatal("a waiter of a room no longer open must not stay stranded")
+	}
 }
