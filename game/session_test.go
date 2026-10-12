@@ -114,6 +114,27 @@ func TestConfigRoundTripKeepsModeAndPoints(t *testing.T) {
 	}
 }
 
+// A raw setConfig (browser console) can't switch a session to padel scoring:
+// the client only handles sets, so the match format stays as configured.
+func TestReadConfigKeepsMatchFormat(t *testing.T) {
+	ss := defaultSession()
+	_ = ss.configure(int(sim.Mode1v1), 0, 5, 0)
+	want := ss.cfg
+	c := ss.cfg
+	c.ScoringMode, c.SetsToWin, c.FirstServer = sim.ScoringPadel, 1, 1-want.FirstServer
+	scratch := make([]float64, sim.CfgLen)
+	buf := make([]byte, cfgBytes)
+	sim.WriteConfig(&c, scratch)
+	encodeFloats(buf, scratch)
+	if err := ss.readConfig(buf, scratch); err != nil {
+		t.Fatal(err)
+	}
+	got := ss.match.State().Cfg
+	if got.ScoringMode != want.ScoringMode || got.SetsToWin != want.SetsToWin || got.FirstServer != want.FirstServer {
+		t.Fatalf("match format changed: %+v", got)
+	}
+}
+
 func TestConfigureSetsMatchFormatAndAlternatesServer(t *testing.T) {
 	ss := defaultSession()
 	if err := ss.configure(int(sim.Mode1v1), 0, 5, 1); err != nil {
