@@ -33,6 +33,8 @@ export interface LookMaterials {
   readonly boots: THREE.MeshToonMaterial;
   readonly eyeWhite: THREE.MeshBasicMaterial;
   readonly pupil: THREE.MeshBasicMaterial;
+  /** Mouth decal: lit like the skin, its map set by the face (atlas cell). */
+  readonly mouth: THREE.MeshToonMaterial;
 }
 
 export function createMaterials(look: CharacterLook): LookMaterials {
@@ -44,6 +46,7 @@ export function createMaterials(look: CharacterLook): LookMaterials {
     boots: toon(look.boots),
     eyeWhite: new THREE.MeshBasicMaterial({ color: EYE_WHITE }),
     pupil: new THREE.MeshBasicMaterial({ color: EYE_PUPIL }),
+    mouth: new THREE.MeshToonMaterial({ gradientMap: gradientMap(), alphaTest: 0.5 }),
   };
 }
 
@@ -57,5 +60,6 @@ export function applyLook(m: LookMaterials, look: CharacterLook): void {
 }
 
 export function disposeMaterials(m: LookMaterials): void {
+  m.mouth.map?.dispose(); // the face's view of the shared atlas
   for (const mat of Object.values(m)) mat.dispose();
 }

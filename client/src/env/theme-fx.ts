@@ -18,6 +18,10 @@ export interface FxTheme {
   readonly partnerShorts: readonly [number, number];
   readonly eyeWhite: number;
   readonly eyePupil: number;
+  /** Mouth atlas (character/mouth-atlas.ts): lips/inside, teeth, tongue. */
+  readonly mouth: number;
+  readonly teeth: number;
+  readonly tongue: number;
 }
 
 export const FX: FxTheme = {
@@ -33,4 +37,7 @@ export const FX: FxTheme = {
   partnerShorts: [0xf2f2f2, 0x2b2f36],
   eyeWhite: 0xffffff,
   eyePupil: 0x111111,
+  mouth: 0x3a1418,
+  teeth: 0xfdf8f0,
+  tongue: 0xe8607a,
 };

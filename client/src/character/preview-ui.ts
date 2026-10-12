@@ -1,3 +1,4 @@
+import { EXPRESSIONS, Emotion } from "./expressions";
 import { DEMO_STATES, DemoState, SideMode } from "./preview-driver";
 
 // DOM controls for the character preview page.
@@ -11,9 +12,11 @@ export interface PreviewControls {
   scrub: number | null;
   paused: boolean;
   side: SideMode;
+  /** Expression picked in the face row; null = the pose decides. */
+  emotion: Emotion | null;
 }
 
-const CLOSEUP_ANGLES = 4;
+const CLOSEUP_ANGLES = 5; // 4 around the body + a face close-up (FACE_CLOSEUP)
 
 function button(label: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement("button");
@@ -34,6 +37,22 @@ function stateButtons(ctl: PreviewControls, host: HTMLElement): void {
     return b;
   });
   for (const b of buttons) row.appendChild(b);
+  host.appendChild(row);
+}
+
+function emotionButtons(ctl: PreviewControls, host: HTMLElement): void {
+  const row = document.createElement("div");
+  row.className = "row";
+  const names = Object.keys(EXPRESSIONS) as Emotion[];
+  const auto = button("face: auto", () => pick(null));
+  const buttons = names.map((e) => button(e, () => pick(e)));
+  function pick(e: Emotion | null): void {
+    ctl.emotion = e;
+    auto.classList.toggle("on", e === null);
+    buttons.forEach((b, i) => b.classList.toggle("on", names[i] === e));
+  }
+  auto.classList.add("on");
+  row.append(auto, ...buttons);
   host.appendChild(row);
 }
 
@@ -83,9 +102,10 @@ function scrubControls(ctl: PreviewControls, row: HTMLElement): void {
 
 export function buildControls(host: HTMLElement, info: string): PreviewControls {
   const ctl: PreviewControls = {
-    state: "idle", speed: 0.6, showHitbox: true, closeupAngle: 0, scrub: null, paused: false, side: "auto",
+    state: "idle", speed: 0.6, showHitbox: true, closeupAngle: 0, scrub: null, paused: false, side: "auto", emotion: null,
   };
   stateButtons(ctl, host);
+  emotionButtons(ctl, host);
   const row = document.createElement("div");
   row.className = "row";
   slider(row, "speed", ctl.speed, (v) => { ctl.speed = v; });

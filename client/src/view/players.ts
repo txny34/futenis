@@ -3,6 +3,7 @@ import { THEME } from "../env/theme";
 import { Character, CharacterPose, DEFAULT_LOOK, PART_TIER, StrikeTier, createCharacter } from "../character/character";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
+import { moodFor } from "./player-moods";
 import {
   EventKind, Extra, MAX_PLAYERS, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
 } from "../snapshot";
@@ -54,6 +55,7 @@ export class PlayersView {
   /** Starts strike clips from EvKick/EvBodyHit/EvWhiff (a body graze on a dead ball is ignored). */
   onEvent(e: SimEvent): void {
     this.trackBall(e.kind);
+    this.react(e);
     if (e.kind !== EventKind.Kick && e.kind !== EventKind.BodyHit && e.kind !== EventKind.Whiff) return;
     if (e.kind === EventKind.BodyHit && this.ballDead) return;
     if (e.player < 0 || e.player >= MAX_PLAYERS) return;
@@ -64,6 +66,15 @@ export class PlayersView {
     s.strikeT = STRIKE_START_T;
     s.hasContact = e.kind !== EventKind.Whiff;
     s.contact.set(e.x, e.y, e.z);
+  }
+
+  /** Faces for the event: every active player reacts by their team (player-moods.ts). */
+  private react(e: SimEvent): void {
+    const n = Math.max(this.lastNumPlayers, 0);
+    for (let i = 0; i < n; i++) {
+      const mood = moodFor(e, i, teamOf(i, n));
+      if (mood !== null) this.slots[i].character.express(mood.emotion, mood.holdS);
+    }
   }
 
   /** Dead between a point/fault and the next toss or machine feed. No reset needed: the sim emits Toss/Feed before any live BodyHit. */

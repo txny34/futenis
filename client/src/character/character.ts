@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Animator, CharacterPose, createAnimator } from "./animator";
 import { CharacterLook, DEFAULT_LOOK } from "./config";
+import { Emotion } from "./expressions";
 import { LookMaterials, applyLook, createMaterials, disposeMaterials } from "./materials";
 import { countTriangles, dressRig } from "./parts";
 import { Rig, createRig } from "./rig";
@@ -14,6 +15,8 @@ export interface Character {
   readonly rig: Rig;
   readonly triangles: number;
   update(pose: CharacterPose, dt: number): void;
+  /** Shows a facial expression for holdS seconds (game events: points, perfects...). */
+  express(emotion: Emotion, holdS: number): void;
   setLook(look: CharacterLook): void;
   dispose(): void;
 }
@@ -21,14 +24,18 @@ export interface Character {
 export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
   const rig = createRig();
   const materials: LookMaterials = createMaterials(look);
-  dressRig(rig, materials);
+  const face = dressRig(rig, materials);
   const animator: Animator = createAnimator(rig);
   const triangles = countTriangles(rig.root);
   return {
     root: rig.root,
     rig,
     triangles,
-    update: (pose, dt) => animator.update(pose, dt),
+    update: (pose, dt) => {
+      animator.update(pose, dt);
+      face.update(pose, dt);
+    },
+    express: (emotion, holdS) => face.express(emotion, holdS),
     setLook: (l) => applyLook(materials, l),
     dispose: () => {
       rig.root.traverse((o) => {
@@ -41,4 +48,5 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
 
 export type { CharacterPose, StrikePose } from "./animator";
 export type { CharacterLook, StrikePart, StrikeTier } from "./config";
+export type { Emotion } from "./expressions";
 export { BODY, DEFAULT_LOOK, PART_TIER, SIM_ZONES } from "./config";

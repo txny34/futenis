@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { BODY } from "./config";
+import { Face, createFace } from "./face";
+import { HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_Y } from "./head";
 import { LookMaterials } from "./materials";
 import { Rig } from "./rig";
 import * as S from "./shapes";
@@ -10,19 +12,6 @@ import * as S from "./shapes";
 
 const TORSO_DEPTH = 0.62;
 const PELVIS_DEPTH = 0.78;
-// Visual-only head scale (toy look). Widens/deepens; height is capped by the
-// 1.80 m hitbox, so BODY heights stay untouched.
-const HEAD_SCALE_XZ = 1.15;
-const HEAD_SCALE_Y = 1.0;
-const HEAD_Y = BODY.headCenter - BODY.headBase;
-const FACE_Z = BODY.headRadius * HEAD_SCALE_XZ * 0.93;
-const EYE_X = 0.055;
-const EYE_Y = HEAD_Y + 0.015;
-const PUPIL_FORWARD = 0.014;
-const BROW_Y = EYE_Y + 0.045;
-const BROW_TILT = 0.25;
-const MOUTH_Y = HEAD_Y - 0.055;
-
 function add(
   parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material,
   x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1,
@@ -46,27 +35,13 @@ function dressTorso(rig: Rig, m: LookMaterials): void {
 function dressHair(head: THREE.Object3D, m: LookMaterials): void {
   const r = BODY.headRadius * 1.04;
   const cap = add(head, S.cap(r, 0.55), m.hair, 0, HEAD_Y + 0.005, -0.008, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_SCALE_XZ);
-  cap.rotation.x = -0.55;
+  cap.rotation.x = -0.78; // tilted back: a forehead to show the brows on
   const tuft = S.ball(0.05, 8, 6);
   add(head, tuft, m.hair, 0.03, HEAD_Y + 0.13, -0.02, 1.4, 0.7, 1.2).rotation.z = 0.4;
   add(head, tuft, m.hair, -0.04, HEAD_Y + 0.12, 0.03, 1.3, 0.6, 1.1).rotation.z = -0.3;
 }
 
-function dressFace(head: THREE.Object3D, m: LookMaterials): void {
-  const eye = S.ball(0.03, 10, 8);
-  const pupil = S.ball(0.017, 8, 6);
-  const brow = new THREE.BoxGeometry(0.05, 0.012, 0.015);
-  const mouth = new THREE.BoxGeometry(0.045, 0.01, 0.012);
-  for (const side of [1, -1]) {
-    add(head, eye, m.eyeWhite, side * EYE_X, EYE_Y, FACE_Z - 0.01, 1, 1.2, 0.5);
-    add(head, pupil, m.pupil, side * EYE_X, EYE_Y, FACE_Z + PUPIL_FORWARD - 0.01, 1, 1.3, 0.5);
-    const b = add(head, brow, m.hair, side * EYE_X, BROW_Y, FACE_Z - 0.012);
-    b.rotation.z = -side * BROW_TILT;
-  }
-  add(head, mouth, m.pupil, 0, MOUTH_Y, FACE_Z - 0.022);
-}
-
-function dressHead(rig: Rig, m: LookMaterials): void {
+function dressHead(rig: Rig, m: LookMaterials): Face {
   const head = rig.bones.head;
   add(head, S.ball(BODY.headRadius, 16, 12), m.skin, 0, HEAD_Y, 0, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_SCALE_XZ);
   const ear = S.ball(0.034, 8, 6);
@@ -74,7 +49,7 @@ function dressHead(rig: Rig, m: LookMaterials): void {
   add(head, ear, m.skin, earX, HEAD_Y, 0);
   add(head, ear, m.skin, -earX, HEAD_Y, 0);
   dressHair(head, m);
-  dressFace(head, m);
+  return createFace(head, m);
 }
 
 function dressArm(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
@@ -98,14 +73,15 @@ function dressLeg(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
   add(b[`toe${s}` as const], S.ball(0.06, 10, 6), m.boots, 0, 0.015, -0.01, 1.05, 0.75, 1.1);
 }
 
-/** Builds all body meshes onto the rig. */
-export function dressRig(rig: Rig, m: LookMaterials): void {
+/** Builds all body meshes onto the rig; returns the expressive face. */
+export function dressRig(rig: Rig, m: LookMaterials): Face {
   dressTorso(rig, m);
-  dressHead(rig, m);
+  const face = dressHead(rig, m);
   dressArm(rig, m, "L");
   dressArm(rig, m, "R");
   dressLeg(rig, m, "L");
   dressLeg(rig, m, "R");
+  return face;
 }
 
 /** Triangle count of everything under root (for the §6 budget). */
