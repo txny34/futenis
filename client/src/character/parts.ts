@@ -13,7 +13,7 @@ import * as S from "./shapes";
 // segmented toy look hides joints behind rounded caps.
 
 const TORSO_DEPTH = 0.62;
-const PELVIS_DEPTH = 0.78;
+const PELVIS_DEPTH = 0.7;
 function add(
   parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material,
   x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1,
@@ -29,7 +29,9 @@ function add(
 function dressTorso(rig: Rig, m: LookMaterials): THREE.Mesh[] {
   const b = rig.bones;
   add(b.hips, S.profileLathe(S.PELVIS_PROFILE), m.shorts, 0, 0, 0, 1, 1, PELVIS_DEPTH);
-  add(b.neck, S.taperCapsule(0.055, 0.065, 0.08), m.skin, 0, 0.07, 0);
+  add(b.neck, S.taperCapsule(0.06, 0.07, 0.07), m.skin, 0, 0.05, 0);
+  const collar = add(b.neck, new THREE.TorusGeometry(0.075, 0.017, 6, 16), m.shorts, 0, -0.005, 0.005, 1, 1, 0.85);
+  collar.rotation.x = Math.PI / 2 + 0.25; // the trim sits lower at the front, like a crew neck
   return [
     add(b.spine, S.profileLathe(S.LOWER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH),
     add(b.chest, S.profileLathe(S.UPPER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH),
@@ -80,23 +82,35 @@ export function restyle(d: Dressing, style: Readonly<CharacterStyle>, m: LookMat
 
 function dressArm(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
   const b = rig.bones;
-  add(b[`upperArm${s}` as const], S.ball(0.078, 10, 8), m.shirt, 0, -0.01, 0);
-  add(b[`upperArm${s}` as const], S.taperCapsule(0.07, 0.062, 0.1), m.shirt);
-  add(b[`upperArm${s}` as const], S.taperCapsule(0.053, 0.046, BODY.upperArm), m.skin);
-  add(b[`foreArm${s}` as const], S.taperCapsule(0.047, 0.04, BODY.foreArm), m.skin);
-  add(b[`hand${s}` as const], S.ball(0.06, 10, 8), m.skin, 0, -0.04, 0.005, 0.8, 1, 1);
+  const inward = s === "L" ? -1 : 1; // the body's center is -X for the left arm
+  add(b[`upperArm${s}` as const], S.taperCapsule(0.066, 0.058, 0.1), m.shirt); // short sleeve over the joint
+  add(b[`upperArm${s}` as const], S.taperCapsule(0.05, 0.043, BODY.upperArm), m.skin);
+  add(b[`foreArm${s}` as const], S.taperCapsule(0.045, 0.034, BODY.foreArm), m.skin);
+  // Mitten hand: a flat palm and a thumb pointing forward-inward.
+  add(b[`hand${s}` as const], S.ball(0.046, 10, 8), m.skin, 0, -0.045, 0.004, 0.72, 1.18, 0.62);
+  const thumb = add(b[`hand${s}` as const], S.ball(0.018, 8, 6), m.skin, inward * 0.022, -0.03, 0.026, 1, 1.6, 1);
+  thumb.rotation.z = inward * 0.5;
 }
 
 function dressLeg(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
   const b = rig.bones;
   const thigh = BODY.hip - BODY.knee;
   const shin = BODY.knee - BODY.ankle;
-  add(b[`upLeg${s}` as const], S.taperCapsule(0.1, 0.09, 0.2), m.shorts);
-  add(b[`upLeg${s}` as const], S.taperCapsule(0.09, 0.064, thigh), m.skin);
-  add(b[`leg${s}` as const], S.taperCapsule(0.06, 0.045, shin), m.skin);
-  add(b[`leg${s}` as const], S.taperCapsule(0.05, 0.05, 0.1), m.shorts, 0, -shin + 0.13, 0);
-  add(b[`foot${s}` as const], S.bootShape(0.058, 0.13), m.boots, 0, -0.04, 0.055, 1.1, 0.85, 1);
-  add(b[`toe${s}` as const], S.ball(0.06, 10, 6), m.boots, 0, 0.015, -0.01, 1.05, 0.75, 1.1);
+  add(b[`upLeg${s}` as const], S.taperCapsule(0.102, 0.098, 0.16), m.shorts); // football shorts leg, above the knee
+  add(b[`upLeg${s}` as const], S.taperCapsule(0.094, 0.068, thigh), m.skin);
+  add(b[`leg${s}` as const], S.taperCapsule(0.07, 0.046, shin), m.skin); // calf taper
+  add(b[`leg${s}` as const], S.taperCapsule(0.058, 0.052, 0.17), m.shorts, 0, -shin + 0.2, 0); // tall sock over the calf
+  dressShoe(rig, m, s);
+}
+
+/** Sneaker: colored upper, white sole slab, a lace stripe on top. */
+function dressShoe(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
+  const b = rig.bones;
+  add(b[`foot${s}` as const], S.bootShape(0.056, 0.13), m.boots, 0, -0.035, 0.055, 1.08, 0.8, 1);
+  add(b[`toe${s}` as const], S.ball(0.058, 10, 6), m.boots, 0, 0.012, -0.01, 1.04, 0.72, 1.12);
+  add(b[`foot${s}` as const], S.bootShape(0.058, 0.17), m.sole, 0, -0.078, 0.07, 1.12, 0.3, 1.06);
+  const laces = add(b[`foot${s}` as const], new THREE.BoxGeometry(0.04, 0.008, 0.07), m.sole, 0, 0.012, 0.075);
+  laces.rotation.x = -0.35;
 }
 
 /** Builds all body meshes onto the rig; returns what a style can change later. */

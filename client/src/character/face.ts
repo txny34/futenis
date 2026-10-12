@@ -31,7 +31,21 @@ export interface Face {
   update(pose: CharacterPose, dt: number): void;
 }
 
-interface Eye { readonly lid: THREE.Mesh; readonly pupil: THREE.Mesh; readonly brow: THREE.Mesh; readonly side: number }
+interface Eye { readonly lid: THREE.Mesh; readonly pupil: THREE.Object3D; readonly brow: THREE.Mesh; readonly side: number }
+
+/** Iris + pupil + catch-light, scaled together (pupil dilation reads as the whole eye's focus). */
+function buildIris(m: LookMaterials, side: number): THREE.Group {
+  const g = new THREE.Group();
+  g.position.z = 0.024;
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.0165, 12, 8), m.iris));
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0095, 10, 6), m.pupil);
+  pupil.position.z = 0.0105;
+  g.add(pupil);
+  const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0042, 6, 4), m.eyeWhite);
+  glint.position.set(side * 0.005 + 0.004, 0.006, 0.0165); // the light comes from the upper left
+  g.add(glint);
+  return g;
+}
 
 let seedCounter = 1;
 
@@ -41,9 +55,7 @@ function buildEye(head: THREE.Object3D, m: LookMaterials, side: number): Eye {
   g.scale.set(1, 1.2, 0.5);
   head.add(g);
   g.add(new THREE.Mesh(new THREE.SphereGeometry(EYE_R, 10, 8), m.eyeWhite));
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 6), m.pupil);
-  pupil.position.z = 0.028;
-  pupil.scale.set(1, 1.08, 1);
+  const pupil = buildIris(m, side);
   g.add(pupil);
   const lid = new THREE.Mesh(new THREE.SphereGeometry(EYE_R * 1.14, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), m.skin);
   g.add(lid);
@@ -51,6 +63,14 @@ function buildEye(head: THREE.Object3D, m: LookMaterials, side: number): Eye {
   brow.position.set(side * EYE_X, BROW_Y, FACE_Z + BROW_FORWARD); // in front of the bangs
   head.add(brow);
   return { lid, pupil, brow, side };
+}
+
+function buildNose(head: THREE.Object3D, m: LookMaterials): void {
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), m.skin);
+  nose.position.set(0, EYE_Y - 0.038, FACE_Z + 0.004);
+  nose.scale.set(0.85, 0.75, 0.95);
+  nose.castShadow = true;
+  head.add(nose);
 }
 
 function buildMouth(head: THREE.Object3D, mat: THREE.Material): void {
@@ -65,6 +85,7 @@ function buildMouth(head: THREE.Object3D, mat: THREE.Material): void {
 
 export function createFace(head: THREE.Object3D, m: LookMaterials): Face {
   const eyes = [buildEye(head, m, 1), buildEye(head, m, -1)];
+  buildNose(head, m);
   const tex = mouthTexture();
   m.mouth.map = tex;
   buildMouth(head, m.mouth);
