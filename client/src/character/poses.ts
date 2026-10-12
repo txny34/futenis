@@ -20,21 +20,23 @@ const BREATH_ROT = 0.03;
 const BREATH_SCALE = 0.02;
 
 // Single run cycle (sprint was folded in): roughly the old run/sprint midpoint.
-const RUN_LEG_AMP = 0.85;
+const RUN_LEG_AMP = 0.9;
 const RUN_KNEE_BASE = 0.25;
-const RUN_KNEE_SWING = 1.4;
-const RUN_ARM_AMP = 1.1;
-const RUN_ELBOW = 0.9;
-const RUN_LEAN = 0.3;
+const RUN_KNEE_SWING = 1.75; // heel kicks up behind
+const RUN_ARM_AMP = 1.25;
+const RUN_ELBOW = 1.15;
+const RUN_ELBOW_PUMP = 0.35; // the forearm closes on the forward swing
+const RUN_LEAN = 0.42;
 const HIP_TWIST = 0.2;
 const CHEST_COUNTER_TWIST = 0.35;
-const RUN_BOUNCE = 0.04;
+const RUN_BOUNCE = 0.055;
 
 const AIR_TUCK_THIGH = 0.7;
 const AIR_TUCK_KNEE = 1.1;
-const AIR_TRAIL_THIGH = 0.2;
-const AIR_TRAIL_KNEE = 0.5;
-const AIR_ARMS_UP = 1.1;
+const AIR_TRAIL_THIGH = 0.35;
+const AIR_TRAIL_KNEE = 0.9;
+const AIR_ARMS_UP = 0.7;
+const AIR_ARMS_FWD = 0.55; // arms up and forward for balance, not a star jump
 const AIR_LEAN = 0.12;
 
 /** Arms slightly out so they never clip the torso (always on). */
@@ -79,8 +81,8 @@ export function applyLocomotion(b: Bones, phase: number, k: number): void {
   b.legR.rotation.x += k * (RUN_KNEE_BASE + knee * Math.max(0, -c));
   b.upperArmL.rotation.x += s * arm;
   b.upperArmR.rotation.x -= s * arm;
-  b.foreArmL.rotation.x -= RUN_ELBOW * k;
-  b.foreArmR.rotation.x -= RUN_ELBOW * k;
+  b.foreArmL.rotation.x -= (RUN_ELBOW - s * RUN_ELBOW_PUMP) * k;
+  b.foreArmR.rotation.x -= (RUN_ELBOW + s * RUN_ELBOW_PUMP) * k;
   b.spine.rotation.x += RUN_LEAN * k;
   b.hips.rotation.y += s * HIP_TWIST * k;
   b.chest.rotation.y -= s * CHEST_COUNTER_TWIST * k;
@@ -96,5 +98,9 @@ export function applyAir(b: Bones, verticalVel: number, k: number): void {
   b.legR.rotation.x += AIR_TRAIL_KNEE * k;
   b.upperArmL.rotation.z += AIR_ARMS_UP * k;
   b.upperArmR.rotation.z -= AIR_ARMS_UP * k;
+  b.upperArmL.rotation.x -= AIR_ARMS_FWD * k;
+  b.upperArmR.rotation.x -= AIR_ARMS_FWD * k;
+  b.foreArmL.rotation.x -= AIR_ARMS_FWD * k;
+  b.foreArmR.rotation.x -= AIR_ARMS_FWD * k;
   b.spine.rotation.x += (verticalVel > 0 ? -AIR_LEAN : AIR_LEAN) * k;
 }
