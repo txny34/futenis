@@ -244,12 +244,8 @@ const (
 	EvPadLeave // the player left (or jumped off) pad Side before starting
 	EvPadStart // the player held pad Side for LobbyHoldTime: start that mode
 
-	// Simple-scoring match point (1v1/2v2), appended after EvPadStart: after
-	// a point, Side would win the match with the next one (one event per team).
+	// Appended (scoring_sets.go): Side wins the match / only the set with the next point.
 	EvMatchPoint
-
-	// Simple scoring with sets (SetsToWin > 1), appended after EvMatchPoint:
-	// Side would win the current set (not yet the match) with the next point.
 	EvSetPoint
 )
 
