@@ -77,7 +77,7 @@ func (h *hub) reportRanked(mode string, r *match.Room, users [sim.MaxPlayers]str
 			return // nothing saved: no RESULT
 		}
 	}
-	peers := r.Peers()
+	peers := r.Audience()
 	for i, p := range peers {
 		if p != nil && users[i] != "" {
 			match.SendTo(p, wire.EncodeResult(ranked.RatingOf(before, users[i]), after[users[i]]))

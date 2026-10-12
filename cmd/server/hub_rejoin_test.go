@@ -173,20 +173,43 @@ func TestRankedHeldSeatKeepsTheAccountBusy(t *testing.T) {
 	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
 }
 
-func TestRankedBothDroppedIsNoContest(t *testing.T) {
+// Both connections lost: whoever dropped first (A, held) loses; B, connected
+// longer, gets the win.
+func TestRankedFirstToDropLoses(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	srv, iss, store := newRankedHub(t)
 	a, b, _ := startRanked(ctx, t, srv, iss, "10.4.2")
 	a.CloseNow()
 	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
-	b.CloseNow() // nobody left to wait: the match ends without a result
-	time.Sleep(100 * time.Millisecond)
-	if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); len(got) != 0 {
-		t.Fatalf("ratings written %v, want none", got)
+	b.CloseNow()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); got[userA] != 0 && got[userA] < got[userB] {
+			again := dialRanked(ctx, t, srv, "10.4.2.3", tokenFor(t, iss, userA)) // the account is free again
+			readMsg(ctx, t, again, wire.MsgWaiting, wire.HeaderLen)
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
-	again := dialRanked(ctx, t, srv, "10.4.2.3", tokenFor(t, iss, userA)) // the account is free again
-	readMsg(ctx, t, again, wire.MsgWaiting, wire.HeaderLen)
+	got, _ := store.Load(ctx, "1v1", []string{userA, userB})
+	t.Fatalf("ratings %v: want A's loss recorded", got)
+}
+
+// The rival drops and never comes back: once the hold runs out the one who
+// stayed connected wins and gets RESULT.
+func TestRankedDropNotBackIsAForfeit(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, iss, store := newRankedHubGrace(t, 50*time.Millisecond)
+	a, b, _ := startRanked(ctx, t, srv, iss, "10.4.4")
+	a.CloseNow()
+	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
+	readMsg(ctx, t, b, wire.MsgResult, wire.HeaderLen+16)
+	readMsg(ctx, t, b, wire.MsgPeerLeft, wire.HeaderLen)
+	if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); got[userB] <= got[userA] {
+		t.Fatalf("ratings %v: want B ahead", got)
+	}
 }
 
 func TestRankedLeavingWhileRivalHeldIsAForfeit(t *testing.T) {
