@@ -136,3 +136,19 @@ func TestTouchLimitByMode(t *testing.T) {
 		}
 	}
 }
+
+// Once the team's shot reached the rival side, the team cannot touch it
+// again: it is no pass, and the point is the team's (the rival let it
+// bounce and come back / the partner touched a winner at the net).
+func TestPass_NoPassAfterTheBallCrossed(t *testing.T) {
+	r := RallyState{LastTeam: 0, LastPlayer: 0, TeamTouches: 1, TouchLimit: maxDoublesTouches}
+	r.BouncesOnSide[1] = 1
+	if winner, decided := judgeEvent(&r, kick(0, 1, 200)); !decided || winner != 0 {
+		t.Fatalf("partner touching a shot that already bounced on the rival side: decided=%v winner=%d, want point for team 0", decided, winner)
+	}
+	s := passState()
+	s.Rally = r
+	if CanTouch(&s, 1) || PassReady(&s, 1) {
+		t.Fatal("CanTouch/PassReady must be false once the shot reached the rival side")
+	}
+}

@@ -39,7 +39,25 @@ func touchesOf(r *RallyState) uint8 {
 // isLegalPass reports whether e, a touch by the team already in possession,
 // is a legal pass instead of a double touch.
 func isLegalPass(r *RallyState, e Event) bool {
-	return !r.ServeBoxPending && e.Player != r.LastPlayer && touchesOf(r) < limitOf(r)
+	return mayTouchAgain(r, e.Player, e.Pos.X)
+}
+
+// mayTouchAgain is the shared rule for another touch by the team in
+// possession: not the serve's flight, not the last toucher, a touch left,
+// and the ball has not reached the rival side (no rival bounce yet, still
+// over the own half) -- after that the shot is the rival's to answer.
+func mayTouchAgain(r *RallyState, player int8, ballX float64) bool {
+	k := r.LastTeam
+	return !r.ServeBoxPending && player != r.LastPlayer && touchesOf(r) < limitOf(r) &&
+		r.BouncesOnSide[1-k] == 0 && onOwnHalf(k, ballX)
+}
+
+// onOwnHalf reports whether x is on team's half (team 0 plays from -X).
+func onOwnHalf(team int8, x float64) bool {
+	if team == 0 {
+		return x <= 0
+	}
+	return x >= 0
 }
 
 // takePass records a legal pass: same possession, one more team touch. The
@@ -68,7 +86,7 @@ func CanTouch(s *State, i int8) bool {
 	if r.LastTeam != s.Players[i].Team {
 		return true
 	}
-	return !r.ServeBoxPending && r.LastPlayer != i && touchesOf(r) < limitOf(r)
+	return mayTouchAgain(r, i, s.Ball.Pos.X)
 }
 
 // PassReady reports whether player i's next touch can be a pass to the
@@ -84,7 +102,7 @@ func PassReady(s *State, i int8) bool {
 	if r.LastTeam != p.Team {
 		return true // first touch of the possession: 2 more after it
 	}
-	return r.LastPlayer != i && touchesOf(r)+1 < limitOf(r)
+	return mayTouchAgain(r, i, s.Ball.Pos.X) && touchesOf(r)+1 < limitOf(r)
 }
 
 // PassMaxCharge splits Globo in 2v2: released below it (a quick tap) the
@@ -117,7 +135,7 @@ func passVelocity(s *State, i int8) Vec3 {
 	// In front of the partner (toward the net): the set comes down where a
 	// step forward meets it with the foot, not on the head or body.
 	toNet := -math.Copysign(1, mate.Pos.X)
-	x := float64(mate.Pos.X + toNet*passLead)
+	x := mate.Pos.X + float64(toNet*passLead)
 	if x*mate.Pos.X <= 0 {
 		x = mate.Pos.X // never over the net
 	}
