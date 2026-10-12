@@ -48,6 +48,8 @@ export class GameLoop {
   onStep: ((n: number, input: Readonly<HumanInput>) => void) | null = null;
   /** Every non-lobby sim event (profile/recorder.ts: perfects, training streak). */
   onGameEvent: ((e: SimEvent) => void) | null = null;
+  /** After each render: the current snapshot and the live dt (0 while paused or frozen). */
+  onFrame: ((snap: Float64Array, dt: number) => void) | null = null;
   private frame: StepResult;
   private acc = 0;
   private last = 0;
@@ -113,6 +115,7 @@ export class GameLoop {
     this.human.showOverlays = live;
     this.human.showLanding = this.state.showLanding;
     this.view.render(this.frame.prev, this.frame.curr, this.acc / TICK_S, live && !frozen ? dt : 0, this.human);
+    this.onFrame?.(this.frame.curr, live && !frozen ? dt : 0);
     this.hud.update(this.frame.curr, now);
     this.hud.setFps(this.fps);
     this.checkMatchOver();

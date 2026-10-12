@@ -1,6 +1,7 @@
 import { EventKind, Quality, SimEvent } from "../snapshot";
 import { Mixer, Volumes } from "./mixer";
 import { arpeggio, noise, NoiseSpec, tone, ToneSpec } from "./voices";
+import { BodyVoice } from "./body-voice";
 
 // Event -> sound mapping. Pure reader of the sim event stream (never decides
 // rules). Camera sits behind team 0 looking +X, so +Z is screen right.
@@ -46,6 +47,7 @@ const JINGLE_RANK: Readonly<Record<number, number | undefined>> = {
 
 export class Sound {
   private readonly mixer = new Mixer();
+  private readonly voice = new BodyVoice(this.mixer);
   private jingle = 0;
   private readonly flushJingle = (): void => {
     arpeggio(this.mixer, JINGLES[this.jingle], JINGLE_STEP_S, JINGLE_GAIN);
@@ -62,9 +64,15 @@ export class Sound {
     noise(this.mixer, { ...ROAR, gain: ROAR.gain * (0.5 + l / 2) });
   }
 
+  /** Per rendered frame (dt 0 while paused): my footsteps. */
+  frame(snap: Float64Array, dt: number): void {
+    this.voice.frame(snap, dt);
+  }
+
   /** Feed every non-lobby sim event in order. */
   onEvent(e: SimEvent): void {
     const pan = (e.z / COURT_HALF_WIDTH) * PAN_SCALE;
+    this.voice.onEvent(e);
     if (this.contact(e, pan)) return;
     this.call(e);
   }
