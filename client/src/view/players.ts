@@ -54,6 +54,7 @@ export class PlayersView {
   private lastNumPlayers = -1;
   private readonly ball = new THREE.Vector3(); // every player keeps an eye on it (character/look.ts)
   private ballDead = false;
+  private readonly lookKeys: string[] = [];
 
   constructor(scene: THREE.Scene) {
     this.slots = [];
@@ -63,7 +64,13 @@ export class PlayersView {
 
   /** Online: the other players' own looks (null entries and null = the bot looks). Slot 0 stays mine. */
   setLooks(looks: Looks | null): void {
-    for (let i = 1; i < MAX_PLAYERS; i++) this.slots[i].character.setStyle(looks?.[i] ?? botStyle(i));
+    for (let i = 1; i < MAX_PLAYERS; i++) {
+      const st = looks?.[i] ?? botStyle(i);
+      const key = JSON.stringify(st);
+      if (key === this.lookKeys[i]) continue; // restyling rebuilds meshes: only seats that changed
+      this.lookKeys[i] = key;
+      this.slots[i].character.setStyle(st);
+    }
   }
 
   /** Starts strike clips from EvKick/EvBodyHit/EvWhiff (a body graze on a dead ball is ignored). */

@@ -1,6 +1,8 @@
 package match
 
 import (
+	"time"
+
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
@@ -9,15 +11,20 @@ import (
 // keeps the latest per seat and relays all of them (STYLES) whenever one
 // changes, so everyone sees everyone's look. Visual only: never reaches the sim.
 
-// SetStyle records slot's look from p (ignored once p was replaced) and tells
-// every seated peer when it changed.
-func (r *Room) SetStyle(slot int, p Peer, st wire.Style) {
+// styleEvery: at most one look change per seat in this time. Each relay
+// makes every client rebuild meshes; looks change in the Estilos modal, rarely.
+const styleEvery = 300 * time.Millisecond
+
+// SetStyle records slot's look from p (ignored once p was replaced, before
+// the match starts: WELCOME comes first, or within styleEvery of the last
+// change) and tells every seated peer.
+func (r *Room) SetStyle(slot int, p Peer, st wire.Style, now time.Time) {
 	r.mu.Lock()
-	if r.closed || r.peers[slot] != p || r.styles[slot] == st {
+	if r.closed || !r.started || r.peers[slot] != p || r.styles[slot] == st || now.Sub(r.styleAt[slot]) < styleEvery {
 		r.mu.Unlock()
 		return
 	}
-	r.styles[slot] = st
+	r.styles[slot], r.styleAt[slot] = st, now
 	msg, peers := wire.EncodeStyles(r.styles), r.peers
 	r.mu.Unlock()
 	sendAll(peers, msg)

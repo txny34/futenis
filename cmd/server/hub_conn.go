@@ -141,7 +141,7 @@ func (h *hub) readLoop(ctx context.Context, code string, slot int, r *match.Room
 			continue
 		}
 		if st, ok := wire.DecodeStyle(b); typ == websocket.MessageBinary && ok {
-			r.SetStyle(slot, p, st)
+			r.SetStyle(slot, p, st, time.Now())
 			continue
 		}
 		in, err := wire.DecodeInput(b)
