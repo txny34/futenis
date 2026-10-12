@@ -3,7 +3,7 @@ import { Mode, Snap } from "./snapshot";
 
 // Scoreboard: points per team (first to 5, win by 2) + server dot, a MATCH
 // POINT glow on the team one point away (sim EvMatchPoint; every EvPoint
-// clears it first, Hud.onEvent), and a rally shot counter ("7 golpes") top-right that pulses on
+// clears it first, Hud.onEvent; after a mid-match rejoin it shows from the next point), and a rally shot counter ("7 golpes") top-right that pulses on
 // every new touch. DOM nodes are built once; text only changes on change.
 const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const;
 const UNSET = -1;

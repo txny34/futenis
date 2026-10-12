@@ -7,7 +7,7 @@ import { t } from "../i18n/t";
 
 // Match intro (backlog "Animación de entrada"): VS card with who plays,
 // camera sweep into the shoulder view, skippable with any game key or click.
-const INTRO_SUBTITLE = t("Un set a 3 juegos", "One set to 3 games");
+const INTRO_SUBTITLE = t("Primero a 5", "First to 5");
 const MS_PER_S = 1000;
 const BOT_LABEL: Readonly<Record<Difficulty, string>> = {
   easy: t("Fácil", "Easy"), normal: "Normal", hard: t("Difícil", "Hard"), pro: "Pro",
