@@ -43,9 +43,11 @@ const (
 	maxButtons = 255
 
 	// StyleLen: a look is [present, hair, headwear, skin, hairColor, hatColor,
-	// headSize, build] bytes. The server only relays them; the client
-	// validates (client/src/net/style-wire.ts). present 0 = bot or empty seat.
-	StyleLen     = 8
+	// headSize, build, shirt number + 1] bytes. The server only relays them;
+	// the client validates (client/src/net/style-wire.ts). present 0 = bot or
+	// empty seat; number 0 = unknown (a v1 client sends the first 8 only).
+	StyleLen     = 9
+	styleLenV1   = 8
 	StyleMsgLen  = HeaderLen + StyleLen
 	StylesMsgLen = HeaderLen + sim.MaxPlayers*StyleLen
 )
@@ -146,8 +148,16 @@ func EncodeInput(vals [InputFloats]float64) []byte {
 
 // DecodeStyle parses a STYLE message; the result is marked present.
 func DecodeStyle(b []byte) (Style, bool) {
+	if len(b) < HeaderLen || b[0] != MsgStyle {
+		return Style{}, false
+	}
+	return styleBody(b)
+}
+
+// styleBody reads a look after the header (v1 8 bytes or v2 9) of any message.
+func styleBody(b []byte) (Style, bool) {
 	var st Style
-	if len(b) != StyleMsgLen || b[0] != MsgStyle || b[1] != Version {
+	if (len(b) != HeaderLen+StyleLen && len(b) != HeaderLen+styleLenV1) || b[1] != Version {
 		return st, false
 	}
 	copy(st[:], b[HeaderLen:])
