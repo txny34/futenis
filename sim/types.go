@@ -229,7 +229,7 @@ const (
 	EvGamePoint  // Side is one point away from winning the current game
 	EvBreakPoint // Side (the non-server team) is one point away from winning the server's game
 	EvGameWon    // Side won the current game (Rally.Games incremented)
-	EvSetWon     // Side won the current set (Rally.Sets incremented)
+	EvSetWon     // Side won the current set (State.Sets incremented)
 	EvAce        // Side's serve was never touched by the receiver and won the point outright
 	EvMatchWon   // Side won the match (Config.SetsToWin sets); replaces EvGameOver for ScoringPadel
 
@@ -244,9 +244,9 @@ const (
 	EvPadLeave // the player left (or jumped off) pad Side before starting
 	EvPadStart // the player held pad Side for LobbyHoldTime: start that mode
 
-	// Simple-scoring match point (1v1/2v2), appended after EvPadStart: after
-	// a point, Side would win the match with the next one (one event per team).
+	// Appended (scoring_sets.go): Side wins the match / only the set with the next point.
 	EvMatchPoint
+	EvSetPoint
 )
 
 // Event is emitted by Step. Side meaning depends on Kind:

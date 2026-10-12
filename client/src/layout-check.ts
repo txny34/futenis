@@ -32,6 +32,7 @@ export function assertLayout(bridge: FutenisBridge, core: CoreLayout): void {
     evPadLeave: EventKind.PadLeave,
     evPadStart: EventKind.PadStart,
     evMatchPoint: EventKind.MatchPoint,
+    evSetPoint: EventKind.SetPoint,
     cfgLobbyHoldTime: LobbyCfg.HoldTime,
     cfgLobbyHalfX: LobbyCfg.HalfX,
     cfgLobbyHalfZ: LobbyCfg.HalfZ,

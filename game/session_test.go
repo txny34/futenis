@@ -120,8 +120,8 @@ func TestConfigureSetsMatchFormatAndAlternatesServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := ss.match.State().Cfg
-	if c.ScoringMode != sim.ScoringSimple || c.PointsToWin != 5 {
-		t.Fatalf("1v1 format: simple scoring to 5, got %+v", c)
+	if c.ScoringMode != sim.ScoringSimple || c.PointsToWin != 5 || c.SetsToWin != matchSetsToWin {
+		t.Fatalf("1v1 format: best of 3 sets to 5, got %+v", c)
 	}
 	first := c.FirstServer
 	_ = ss.configure(int(sim.Mode2v2), 0, 5, 1)

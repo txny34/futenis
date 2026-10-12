@@ -22,6 +22,12 @@
 #score .p1 { color: var(--hud-team1); text-shadow: 0 0 14px var(--hud-team1); }
 #score b.is-mp { display: inline-block; color: var(--hud-gold); animation: score-mp .6s ease-in-out infinite alternate; }
 @keyframes score-mp { from { text-shadow: 0 0 8px var(--hud-gold); } to { text-shadow: 0 0 22px var(--hud-gold), 0 0 4px #fff; transform: scale(1.12); } }
+#score b.is-sp { display: inline-block; color: var(--hud-accent); animation: score-mp .6s ease-in-out infinite alternate; }
+#score .sets {
+  font-family: var(--fx-body, system-ui); font-weight: 700; font-size: calc(14px * var(--hud-scale));
+  min-width: 1.4em; padding: 2px 6px; border-radius: 6px; text-align: center;
+  background: rgba(255, 255, 255, .1); color: var(--hud-text);
+}
 #score .sep { width: 2px; height: calc(26px * var(--hud-scale)); background: var(--hud-border); border-radius: 2px; }
 #score[data-server="0"] .t0, #score[data-server="1"] .t1 { color: var(--hud-text); }
 #score[data-server="0"] .t0::before, #score[data-server="1"] .t1::after {

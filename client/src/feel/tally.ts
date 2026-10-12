@@ -1,8 +1,8 @@
 import { EventKind, SimEvent } from "../snapshot";
 
-/** Final tally of a scored match (reused object). games0/1 hold the points
- * seen in events (simple scoring, first to 5; field names kept for stored
- * history); the result screen reads the exact final score from the snapshot. */
+/** Final tally of a scored match (reused object): the winner; games0/1 are
+ * kept for the stored history's shape and filled with the sets by the result
+ * screen, which reads them from the snapshot. */
 export interface MatchResult { winner: number; games0: number; games1: number }
 
 /** Builds the MatchResult from the event stream. Allocation-free. */
