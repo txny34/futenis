@@ -264,7 +264,7 @@ func writePlayerExtras(s *State, dst []float64) {
 		dst[base+3] = chargeFraction(p, &s.Cfg)
 		dst[base+4] = boolToFloat(p.OnGround)
 		dst[base+5] = float64(p.Buffer)
-		dst[base+6] = playerFlags(p)
+		dst[base+6] = playerFlags(s, int8(i))
 	}
 }
 
@@ -277,12 +277,21 @@ func chargeFraction(p *Player, cfg *Config) float64 {
 	return float64(p.ChargeTicks) / float64(cfg.chargeMaxTicks)
 }
 
-// playerFlags packs ShotType (bit 0) and "stamina locked" (bit 1) per
-// docs/design/contact-v2.md §11.2: Flags = ShotType | (StaminaLock>0)<<1.
-func playerFlags(p *Player) float64 {
+// FlagPassReady is the per-player Flags bit set while that player's next
+// touch can be a 2v2 pass (PassReady): the HUD turns Globo into Pase.
+const FlagPassReady = 1 << 2
+
+// playerFlags packs ShotType (bit 0), "stamina locked" (bit 1) and
+// FlagPassReady (bit 2) per docs/design/contact-v2.md §11.2:
+// Flags = ShotType | (StaminaLock>0)<<1 | PassReady<<2.
+func playerFlags(s *State, i int8) float64 {
+	p := &s.Players[i]
 	flags := uint8(p.ShotType)
 	if p.StaminaLock > 0 {
 		flags |= 1 << 1
+	}
+	if PassReady(s, i) {
+		flags |= FlagPassReady
 	}
 	return float64(flags)
 }

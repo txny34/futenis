@@ -313,6 +313,12 @@ type RallyState struct {
 	// within bodyMergeTicks is the same touch, not a double touch (rules.go).
 	BodyGraze     bool
 	BodyGrazeTick uint32
+	// 2v2 passes (futvóley, rules_pass.go): TeamTouches is how many touches
+	// LastTeam has made in this possession (1 on the touch that took it);
+	// TouchLimit is the per-team cap set by resetForServe/replayServe
+	// (1 in 1v1, maxDoublesTouches in 2v2; 0 reads as 1).
+	TeamTouches uint8
+	TouchLimit  uint8
 }
 
 // serveBoxForScore returns which diagonal service box the server must serve

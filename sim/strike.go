@@ -188,14 +188,17 @@ func strike(s *State, i int8, part BodyPart, u float64, ev []Event) []Event {
 	h := strikeHash(s.Tick, p.Team, s.Ball.Pos)
 
 	shot := p.ShotType
-	// Padel: the serve is struck at/below the waist, there is no lob serve
-	// (the server's Lob latch strikes the regular serve).
-	if shot == ShotLob && (!ps.AllowLob || s.Phase == PhaseServe) {
-		shot = ShotDrive
+	if shot == ShotLob && PassReady(s, i) {
+		s.Ball.Vel = passVelocity(s, i)
+	} else {
+		// Padel: the serve is struck at/below the waist, there is no lob serve
+		// (the server's Lob latch strikes the regular serve).
+		if shot == ShotLob && (!ps.AllowLob || s.Phase == PhaseServe) {
+			shot = ShotDrive
+		}
+		tgt := deviateTarget(cfg, p.BufTarget, s.Ball.Pos, ps, u, h)
+		s.Ball.Vel = launch(s, p, ps, tgt, shot, perfectBoost(s, q), u, h)
 	}
-
-	tgt := deviateTarget(cfg, p.BufTarget, s.Ball.Pos, ps, u, h)
-	s.Ball.Vel = launch(s, p, ps, tgt, shot, perfectBoost(s, q), u, h)
 	s.Ball.Spin = clamp(float64(p.BufSpin), ps.SpinMin, ps.SpinMax)
 	s.Ball.Resting = false
 	s.Ball.Out = false

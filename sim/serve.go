@@ -283,6 +283,7 @@ func replayServe(s *State, server int8, attempt uint8) {
 		ServerPlayer: sp,
 		ServeAttempt: attempt,
 		ServeBox:     box,
+		TouchLimit:   touchLimit(s),
 	}
 	placeServe(s, server)
 }
