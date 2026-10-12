@@ -20,6 +20,8 @@
 #score b { font-weight: 400; font-size: calc(34px * var(--hud-scale)); line-height: 1; min-width: 1.1em; text-align: center; }
 #score .p0 { color: var(--hud-team0); text-shadow: 0 0 14px var(--hud-team0); }
 #score .p1 { color: var(--hud-team1); text-shadow: 0 0 14px var(--hud-team1); }
+#score b.is-mp { display: inline-block; color: var(--hud-gold); animation: score-mp .6s ease-in-out infinite alternate; }
+@keyframes score-mp { from { text-shadow: 0 0 8px var(--hud-gold); } to { text-shadow: 0 0 22px var(--hud-gold), 0 0 4px #fff; transform: scale(1.12); } }
 #score .sep { width: 2px; height: calc(26px * var(--hud-scale)); background: var(--hud-border); border-radius: 2px; }
 #score[data-server="0"] .t0, #score[data-server="1"] .t1 { color: var(--hud-text); }
 #score[data-server="0"] .t0::before, #score[data-server="1"] .t1::after {
@@ -150,7 +152,7 @@
 @keyframes charge-burst-a { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
 @keyframes charge-burst-b { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
 @keyframes act-full { from { filter: brightness(1.1) drop-shadow(0 0 6px var(--act-fill)); } to { filter: brightness(1.4) drop-shadow(0 0 16px var(--hud-ring)); } }
-@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track, .act--lob .act__track, .act__label { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { #crosshair, .charge__arc, .charge__burst, .charge__spin, .act--strike .act__track, .act--lob .act__track, .act__label, #score b { animation: none !important; }
   .act__svg, .charge__track { transition: none; } }
 
 @media (max-width: 640px) {
@@ -160,12 +162,6 @@
   .act__key { display: none; }
 }
 
-/* Padel scoreboard additions: games per team beside the points */
-#score .games {
-  font-family: var(--fx-body, system-ui); font-weight: 600; font-size: calc(15px * var(--hud-scale));
-  min-width: 1.4em; padding: 2px 6px; border-radius: 6px; text-align: center;
-  background: rgba(255, 255, 255, .08); color: var(--hud-text);
-}
 
 /* Rally shot counter, top-right; pulses on each touch */
 #shots {

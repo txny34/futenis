@@ -18,13 +18,6 @@ const maxPointsToWin = 99
 // humanMaskAll is every slot human (no bots).
 const humanMaskAll = 1<<sim.MaxPlayers - 1
 
-// Padel match format applied by configure to 1v1/2v2 (docs/design/
-// contact-v2.md §21): short browser matches, one set to 3 games.
-const (
-	padelGamesPerSet = 3
-	padelSetsToWin   = 1
-)
-
 // aiDriver fills the non-human slots with ai.Bot inputs, tick by tick.
 type aiDriver struct {
 	bots      [sim.MaxPlayers]ai.Bot
@@ -97,18 +90,13 @@ func (ss *session) configure(mode, difficulty, pointsToWin, humanMask int) error
 	return nil
 }
 
-// applyMatchFormat sets the scoring model for cfg.Mode: real padel
-// scoring for 1v1/2v2, the legacy flat tally for the playground/lobby. The first
-// server alternates with the parity of n (the configure call count).
+// applyMatchFormat sets the scoring model: every mode plays the flat point
+// tally (first to PointsToWin, win by 2, capped; sim EvMatchPoint), padel
+// scoring stays in the sim but is no longer used. The first server
+// alternates with the parity of n (the configure call count).
 func applyMatchFormat(cfg *sim.Config, n int) {
 	cfg.FirstServer = int8(n % 2)
-	if cfg.Mode == sim.ModePlayground || cfg.Mode == sim.ModeLobby {
-		cfg.ScoringMode = sim.ScoringSimple
-		return
-	}
-	cfg.ScoringMode = sim.ScoringPadel
-	cfg.GamesPerSet = padelGamesPerSet
-	cfg.SetsToWin = padelSetsToWin
+	cfg.ScoringMode = sim.ScoringSimple
 }
 
 func (ss *session) setHumanMask(mask int) error {

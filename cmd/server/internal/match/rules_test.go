@@ -59,7 +59,7 @@ func TestGameOverWinner(t *testing.T) {
 		t.Fatal("serve phase reported as over")
 	}
 	out[sim.SnapLen+sim.SnapPhase] = float64(sim.PhaseGameOver)
-	out[sim.SnapLen+sim.SnapSets1] = 1
+	out[sim.SnapLen+sim.SnapScore0], out[sim.SnapLen+sim.SnapScore1] = 3, 5
 	if w, over := gameOverWinner(out); !over || w != 1 {
 		t.Fatalf("w=%d over=%v", w, over)
 	}

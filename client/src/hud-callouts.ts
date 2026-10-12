@@ -23,6 +23,7 @@ const SHOT_CALLS: Readonly<Record<number, Callout>> = {
 
 const EVENT_CALLS: Readonly<Record<number, Callout>> = {
   [EventKind.SetWon]: { text: t("¡SET!", "SET!"), prio: 90, tone: "gold" },
+  [EventKind.MatchPoint]: { text: t("MATCH POINT", "MATCH POINT"), prio: 70, tone: "hot" },
   [EventKind.Ace]: { text: t("¡ACE!", "ACE!"), prio: 85, tone: "gold" },
   [EventKind.GameWon]: { text: t("¡JUEGO!", "GAME!"), prio: 80, tone: "gold" },
   [EventKind.BreakPoint]: { text: t("BOLA DE RUPTURA", "BREAK POINT"), prio: 60, tone: "hot" },

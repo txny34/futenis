@@ -243,6 +243,10 @@ const (
 	EvPadEnter // the grounded player stepped onto pad Side
 	EvPadLeave // the player left (or jumped off) pad Side before starting
 	EvPadStart // the player held pad Side for LobbyHoldTime: start that mode
+
+	// Simple-scoring match point (1v1/2v2), appended after EvPadStart: after
+	// a point, Side would win the match with the next one (one event per team).
+	EvMatchPoint
 )
 
 // Event is emitted by Step. Side meaning depends on Kind:

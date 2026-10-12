@@ -112,6 +112,8 @@ export class Hud {
     this.training.onEvent(e, nowMs);
     if (e.kind === EventKind.Dash && e.player === HUMAN_SLOT) this.dashAt = nowMs;
     if (e.kind === EventKind.Kick && e.player === HUMAN_SLOT) this.charge.release(nowMs);
+    if (e.kind === EventKind.Point) this.board.matchPoint(-1); // the sim sends EvMatchPoint after it
+    if (e.kind === EventKind.MatchPoint) this.board.matchPoint(e.side);
   }
 
   /** Crowd moment (feel/hype.ts); Entrenamiento has no rival, so no moments. */

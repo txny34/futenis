@@ -16,4 +16,4 @@ export interface MatchOptions {
   readonly tutorial?: boolean;
 }
 
-export const DEFAULT_POINTS = 11;
+export const DEFAULT_POINTS = 5;

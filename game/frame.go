@@ -154,6 +154,7 @@ func layoutEntries() []layoutEntry {
 		{"evPadEnter", float64(sim.EvPadEnter)},
 		{"evPadLeave", float64(sim.EvPadLeave)},
 		{"evPadStart", float64(sim.EvPadStart)},
+		{"evMatchPoint", float64(sim.EvMatchPoint)},
 		{"cfgLobbyHoldTime", float64(sim.CfgLobbyHoldTime)},
 		{"cfgLobbyHalfX", float64(sim.CfgLobbyHalfX)},
 		{"cfgLobbyHalfZ", float64(sim.CfgLobbyHalfZ)},
