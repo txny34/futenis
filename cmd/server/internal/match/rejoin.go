@@ -110,10 +110,11 @@ func (r *Room) Reattach(slot int, token string, p Peer) bool {
 	}
 	r.away[slot] = nil
 	r.peers[slot] = p
-	others := r.peers
+	others, styles := r.peers, wire.EncodeStyles(r.styles)
 	r.mu.Unlock()
 	SendTo(p, wire.EncodeWelcome(slot))
 	SendTo(p, wire.EncodeSeat(token))
+	SendTo(p, styles) // its own STYLE after WELCOME is unchanged: no relay would follow
 	if old != nil {
 		go old.Close(wire.CloseReplace, "replaced") // the close handshake waits on a peer that may be dead
 	}

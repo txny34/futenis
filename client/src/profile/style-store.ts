@@ -32,6 +32,11 @@ export function saveStyle(style: Readonly<CharacterStyle>): void {
   for (const f of listeners) f(current);
 }
 
-export function onStyleChange(f: (s: Readonly<CharacterStyle>) => void): void {
+/** Calls f after every saveStyle; returns the unsubscribe. */
+export function onStyleChange(f: (s: Readonly<CharacterStyle>) => void): () => void {
   listeners.push(f);
+  return () => {
+    const i = listeners.indexOf(f);
+    if (i >= 0) listeners.splice(i, 1);
+  };
 }

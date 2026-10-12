@@ -63,6 +63,7 @@ type Room struct {
 	holds   int                          // holds used in this room (capped: nobody stalls a match forever)
 	over    bool                         // game over reached: no more holds
 	claims  [sim.MaxPlayers]ranked.Claim // ranked reservation per seat
+	styles  [sim.MaxPlayers]wire.Style   // each seat's look (style.go)
 	release func(c ranked.Claim)         // frees a held seat's ranked account when the room closes (set by announce)
 }
 

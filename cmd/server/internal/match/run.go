@@ -29,8 +29,10 @@ func (r *Room) Leave(slot int, p Peer, dropped bool) bool {
 	r.peers[slot] = nil
 	r.inputs[slot] = sim.PlayerInput{}
 	if r.mode == sim.Mode2v2 && !r.ranked && r.humansLocked() > 0 {
+		msg, peers := r.clearStyleLocked(slot), r.peers
 		r.mu.Unlock()
-		return true // the bot takes the seat (started) or it is free again (waiting)
+		sendAll(peers, msg) // the bot (or the next person) takes the seat with its own look
+		return true
 	}
 	forfeit := r.ranked && r.started && !r.reported && r.onOver != nil && !(dropped && r.anyAwayLocked())
 	r.reported = r.reported || r.ranked // a no-contest is never reported later either
