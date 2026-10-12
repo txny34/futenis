@@ -619,7 +619,7 @@ SnapLen
 ```
 
 `SnapP0Y`/`SnapP1Y` ya existen y pasan a tener valor real. `Charge` = `ChargeTicks/chargeMaxTicks`.
-`Flags` = `ShotType | (StaminaLock>0)<<1 | PassReady<<2` (bit 2 agregado con los pases 2v2, §19.3).
+`Flags` = `ShotType | (StaminaLock>0)<<1 | PassOnRelease<<2` (bit 2 agregado con los pases 2v2, §19.3).
 
 ### 11.3 wasm
 
@@ -869,9 +869,11 @@ recibe `[MaxPlayers]PlayerInput` (los slots no usados se ignoran). `State` sigue
   del lado vale para toda la posesión: un pase no regala otro pique. El tercer toque tiene que cruzar
   (si cae en el propio campo es falta). El saque no se puede pasar (el compañero del sacador que toca el
   saque comete doble toque); el que recibe espera el pique y puede devolver de primera o pasar.
-  Input: **Globo con `PassReady`** (sim, `rules_pass.go`) = levantada suave al compañero (`passVelocity`,
-  sin desvío ni potencia). `Flags` bit 2 = `PassReady` → el HUD muestra "Pase". Los bots rematan el pase
-  del compañero y nunca pasan (v1).
+  Input: **Globo tocado** (soltado con carga < `PassMaxCharge` = 0.3) con `PassReady` = levantada suave
+  que cae 1 m delante del compañero, hacia la red (`passVelocity`, sin desvío ni potencia); **Globo
+  cargado** = globo normal, así el globo defensivo sigue existiendo en cualquier toque. `Flags` bit 2 =
+  "soltar ahora es pase" → el HUD muestra "Pase" y vuelve a "Globo" al cargar. Los bots pasan
+  (`Level.PassChance`), arman A-B-A y el que remata elige siempre el mejor tiro.
 - *(Antes: un toque por equipo por cruce — el compañero que tocaba en el mismo cruce era doble toque.)*
 - `RallyState.LastKicker` → **`RallyState.LastTeam`** (mismo rol, ahora nombrado por equipo) +
   **`RallyState.LastPlayer`** (qué jugador específico, dentro de ese equipo, tocó — informativo /
