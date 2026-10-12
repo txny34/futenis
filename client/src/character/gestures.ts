@@ -31,7 +31,11 @@ export function applyCheer(b: Bones, time: number, k: number): void {
   b.foreArmR.rotation.x -= CHEER_ELBOW * k;
   b.spine.rotation.x -= CHEER_LEAN_BACK * k;
   b.neck.rotation.x -= CHEER_CHIN_UP * k;
-  b.hips.position.y += Math.abs(pump) * CHEER_HOP * k;
+}
+
+/** The cheer's hop height (m): added after the ground snap, which would undo it. */
+export function cheerHop(time: number, k: number): number {
+  return k > 0 ? Math.abs(Math.sin(time * TAU * CHEER_PUMP_HZ)) * CHEER_HOP * k : 0;
 }
 
 /** Dejected: head down, shoulders forward, arms hanging, a slow sway. */

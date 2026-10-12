@@ -90,6 +90,7 @@ export class GameLoop {
     this.shots.reset();
     this.hype.reset();
     this.tally.reset();
+    this.view.players.resetReactions(); // no festejo/bajón carried into the next match
   }
 
   private readonly tick = (now: number): void => {

@@ -105,6 +105,10 @@ export class PlayersView {
     }
   }
 
+  resetReactions(): void {
+    for (const s of this.slots) s.body.reset();
+  }
+
   /** Gold flash on player i (perfect hit). */
   flash(i: number): void {
     if (i >= 0 && i < MAX_PLAYERS) this.slots[i].flash.trigger();
@@ -139,7 +143,7 @@ export class PlayersView {
     p.airborne = curr[e + Extra.OnGround] === 0;
     p.verticalVel = (curr[PLAYER_POS[i] + 1] - prev[PLAYER_POS[i] + 1]) * TICK_RATE;
     p.charge = curr[e + Extra.Charge];
-    s.body.update(p, dt, p.speed);
+    s.body.update(p, dt);
     p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
     p.facing = speed > FACING_MIN_SPEED ? Math.atan2(vx, vz) : teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X;
     this.advanceStrike(s, dt);

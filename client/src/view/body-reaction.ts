@@ -29,13 +29,16 @@ export class BodyReaction {
   private left = 0;
   private total = 0;
 
+  reset(): void { this.left = 0; }
+
   trigger(kind: Kind, seconds: number): void {
     this.kind = kind;
     this.left = this.total = seconds;
   }
 
-  /** Writes pose.cheer / pose.slump for this frame (speed 0..1). */
-  update(pose: CharacterPose, dt: number, speed: number): void {
+  /** Writes pose.cheer / pose.slump for this frame (faded by pose.speed). */
+  update(pose: CharacterPose, dt: number): void {
+    const speed = pose.speed;
     this.left = Math.max(0, this.left - dt);
     const easeIn = Math.min(1, (this.total - this.left) / EASE_S);
     const easeOut = Math.min(1, this.left / EASE_S);

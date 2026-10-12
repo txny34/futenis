@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { StrikeTier } from "./config";
 import { applyContactIk } from "./contact";
-import { applyCheer, applySlump } from "./gestures";
+import { applyCheer, applySlump, cheerHop } from "./gestures";
 import { applyAir, applyIdle, applyLocomotion, applyRest } from "./poses";
 import { BROW_REST_Y, Rig, groundSnap, resetRig } from "./rig";
 import { Side, createSides, sideFromLocalX } from "./sides";
@@ -109,9 +109,8 @@ export function createAnimator(rig: Rig): Animator {
     const charge = THREE.MathUtils.clamp(pose.charge, 0, 1);
     applyLocomotion(rig.bones, phase, k * speed * (1 - air) * (1 - CHARGE_RUN_DAMP * charge));
     applyAir(rig.bones, pose.verticalVel, k * air);
-    const ground = k * (1 - air);
-    applyCheer(rig.bones, time, ground * (pose.cheer ?? 0));
-    applySlump(rig.bones, time, ground * (pose.slump ?? 0));
+    applyCheer(rig.bones, time, k * (pose.cheer ?? 0)); // not gated by air: no snap when jumping mid-cheer
+    applySlump(rig.bones, time, k * (pose.slump ?? 0));
   }
 
   function strikeLayer(pose: CharacterPose, side: Side): void {
@@ -143,7 +142,10 @@ export function createAnimator(rig: Rig): Animator {
     wasAir = pose.airborne;
     land = Math.max(0, land - dt / LAND_S);
     stretch(air - CONTACT_SQUASH * squash - LAND_SQUASH * land * land);
-    if (!pose.airborne) groundSnap(rig);
+    if (!pose.airborne) {
+      groundSnap(rig);
+      rig.bones.hips.position.y += cheerHop(time, pose.cheer ?? 0);
+    }
     if (!active) return;
     headLift(st, hasLocal);
     if (st.contact) applyContactIk(rig, sides[side], st.tier, st.contact, impactBell(st.t));
