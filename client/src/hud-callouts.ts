@@ -25,16 +25,12 @@ const EVENT_CALLS: Readonly<Record<number, Callout>> = {
   [EventKind.SetWon]: { text: t("¡SET!", "SET!"), prio: 90, tone: "gold" },
   [EventKind.MatchPoint]: { text: t("MATCH POINT", "MATCH POINT"), prio: 70, tone: "hot" },
   [EventKind.SetPoint]: { text: t("SET POINT", "SET POINT"), prio: 65, tone: "cyan" },
-  [EventKind.Ace]: { text: t("¡ACE!", "ACE!"), prio: 85, tone: "gold" },
-  [EventKind.GameWon]: { text: t("¡JUEGO!", "GAME!"), prio: 80, tone: "gold" },
-  [EventKind.BreakPoint]: { text: t("BOLA DE RUPTURA", "BREAK POINT"), prio: 60, tone: "hot" },
-  [EventKind.GamePoint]: { text: t("PUNTO DE JUEGO", "GAME POINT"), prio: 60, tone: "cyan" },
   [EventKind.HitNet]: { text: t("¡RED!", "NET!"), prio: 40, tone: "hot" },
 };
 
 const PUNTAZO: Callout = { text: t("¡PUNTAZO!", "WHAT A POINT!"), prio: 55, tone: "gold" };
 const STREAK_TONE = "hot";
-const STREAK_PRIO = 52; // moments sit under PUNTO DE JUEGO / BOLA DE RUPTURA (60): score info wins
+const STREAK_PRIO = 52; // moments sit under SET POINT / MATCH POINT: score info wins
 
 const RIVAL_POINT: Callout = { text: t("PUNTO RIVAL", "OPPONENT'S POINT"), prio: 20, tone: "hot" };
 

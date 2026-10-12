@@ -18,7 +18,7 @@ export class MatchTally {
   onEvent(e: SimEvent): void {
     const side = e.side === 1 ? 1 : 0;
     if (e.kind === EventKind.Point) this.points[side]++;
-    if (e.kind === EventKind.GameOver || e.kind === EventKind.MatchWon) {
+    if (e.kind === EventKind.GameOver) {
       this.result.games0 = this.points[0];
       this.result.games1 = this.points[1];
       this.result.winner = side;

@@ -32,18 +32,16 @@ const ALERT: ToneSpec = { freq: 880, endFreq: 880, dur: 0.18, gain: 0.12, type: 
 const RETURN_OK: ToneSpec = { freq: 660, endFreq: 990, dur: 0.12, gain: 0.14, type: "triangle" };
 const RETURN_FAIL: ToneSpec = { freq: 330, endFreq: 180, dur: 0.22, gain: 0.14, type: "triangle" };
 
-// Ranked: one step can carry Point + GameWon + SetWon + MatchWon; only the
-// biggest jingle of the batch plays (flushed in a microtask).
+// One step can carry Point + SetWon + GameOver; only the biggest jingle of
+// the batch plays (flushed in a microtask).
 const JINGLES: readonly (readonly number[])[] = [
   [],
-  [523, 659], // point / ace
-  [523, 659, 784], // game
+  [523, 659], // point
   [523, 659, 784, 1047], // set
   [392, 523, 659, 784, 1047], // match
 ];
 const JINGLE_RANK: Readonly<Record<number, number | undefined>> = {
-  [EventKind.Point]: 1, [EventKind.Ace]: 1, [EventKind.GameWon]: 2, [EventKind.SetWon]: 3,
-  [EventKind.MatchWon]: 4, [EventKind.GameOver]: 4,
+  [EventKind.Point]: 1, [EventKind.SetWon]: 2, [EventKind.GameOver]: 3,
 };
 
 export class Sound {
@@ -105,8 +103,6 @@ export class Sound {
       case EventKind.Out:
       case EventKind.ServeFault:
       case EventKind.Let: tone(m, WHISTLE); break;
-      case EventKind.GamePoint:
-      case EventKind.BreakPoint:
       case EventKind.MatchPoint:
       case EventKind.SetPoint: tone(m, ALERT); break;
       case EventKind.ReturnOK: tone(m, RETURN_OK); break;
