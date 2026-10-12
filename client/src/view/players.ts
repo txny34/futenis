@@ -6,6 +6,7 @@ import { loadStyle, onStyleChange } from "../profile/style-store";
 import { IMPACT_T } from "../character/strikes";
 import { HitFlash } from "./hit-flash";
 import { moodFor } from "./player-moods";
+import { BodyReaction, reactionFor } from "./body-reaction";
 import {
   EventKind, Extra, MAX_PLAYERS, Mode, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
 } from "../snapshot";
@@ -26,6 +27,7 @@ interface Slot {
   readonly pose: CharacterPose;
   readonly contact: THREE.Vector3;
   readonly flash: HitFlash;
+  readonly body: BodyReaction;
   strikeT: number;
   strikeTier: StrikeTier;
   strikePerfect: boolean;
@@ -45,7 +47,7 @@ function makeSlot(scene: THREE.Scene, i: number): Slot {
   const pose: CharacterPose = {
     speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: FACE_POS_X,
   };
-  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), strikeT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
+  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), body: new BodyReaction(), strikeT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
 }
 
 /** Up to 4 procedural characters posed from the interpolated snapshot. Allocation-free per frame. */
@@ -95,6 +97,8 @@ export class PlayersView {
     for (let i = 0; i < n; i++) {
       const mood = moodFor(e, i, teamOf(i, n));
       if (mood !== null) this.slots[i].character.express(mood.emotion, mood.holdS);
+      const body = reactionFor(e, teamOf(i, n));
+      if (body !== null) this.slots[i].body.trigger(body.kind, body.seconds);
     }
   }
 
@@ -113,6 +117,10 @@ export class PlayersView {
         this.ballDead = false;
         break;
     }
+  }
+
+  resetReactions(): void {
+    for (const s of this.slots) s.body.reset();
   }
 
   /** Gold flash on player i (perfect hit). */
@@ -149,6 +157,7 @@ export class PlayersView {
     p.airborne = curr[e + Extra.OnGround] === 0;
     p.verticalVel = (curr[PLAYER_POS[i] + 1] - prev[PLAYER_POS[i] + 1]) * TICK_RATE;
     p.charge = curr[e + Extra.Charge];
+    s.body.update(p, dt);
     p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
     p.facing = speed > FACING_MIN_SPEED ? Math.atan2(vx, vz) : teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X;
     this.advanceStrike(s, dt);

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { StrikeTier } from "./config";
 import { applyContactIk } from "./contact";
+import { applyCheer, applySlump, cheerHop } from "./gestures";
 import { applyAir, applyIdle, applyLocomotion, applyRest } from "./poses";
 import { BROW_REST_Y, Rig, groundSnap, resetRig } from "./rig";
 import { Side, createSides, sideFromLocalX } from "./sides";
@@ -37,6 +38,9 @@ export interface CharacterPose {
   facing: number;
   /** World point to keep an eye on (the ball), or null/omitted to look ahead. */
   lookAt?: THREE.Vector3 | null;
+  /** Reaction weights 0..1 (gestures.ts): festejo after winning a set/match, bajón after losing. */
+  cheer?: number;
+  slump?: number;
 }
 
 const TAU = Math.PI * 2;
@@ -99,11 +103,14 @@ export function createAnimator(rig: Rig): Animator {
     const air = pose.airborne ? 1 : 0;
     const speed = THREE.MathUtils.clamp(pose.speed, 0, 1);
     applyRest(rig.bones);
-    applyIdle(rig.bones, time, k * (1 - speed) * (1 - air));
+    const gesture = Math.max(pose.cheer ?? 0, pose.slump ?? 0); // a reaction replaces the ready stance
+    applyIdle(rig.bones, time, k * (1 - speed) * (1 - air) * (1 - gesture));
     // A charged kick takes over the legs: the run fades so the cocked heel never folds through the thigh.
     const charge = THREE.MathUtils.clamp(pose.charge, 0, 1);
     applyLocomotion(rig.bones, phase, k * speed * (1 - air) * (1 - CHARGE_RUN_DAMP * charge));
     applyAir(rig.bones, pose.verticalVel, k * air);
+    applyCheer(rig.bones, time, k * (pose.cheer ?? 0)); // not gated by air: no snap when jumping mid-cheer
+    applySlump(rig.bones, time, k * (pose.slump ?? 0));
   }
 
   function strikeLayer(pose: CharacterPose, side: Side): void {
@@ -135,7 +142,10 @@ export function createAnimator(rig: Rig): Animator {
     wasAir = pose.airborne;
     land = Math.max(0, land - dt / LAND_S);
     stretch(air - CONTACT_SQUASH * squash - LAND_SQUASH * land * land);
-    if (!pose.airborne) groundSnap(rig);
+    if (!pose.airborne) {
+      groundSnap(rig);
+      rig.bones.hips.position.y += cheerHop(time, pose.cheer ?? 0);
+    }
     if (!active) return;
     headLift(st, hasLocal);
     if (st.contact) applyContactIk(rig, sides[side], st.tier, st.contact, impactBell(st.t));
