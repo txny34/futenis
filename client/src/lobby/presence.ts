@@ -23,6 +23,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const MIN_FACING_SPEED = 0.2;
 const HEADER = 8;
+const LOOK_EVERY_MS = 2100; // just over the server's lookEvery (lobby/look.go)
 
 /** Lobby actions that need the socket (moderation, emotes). */
 export interface Presence { report(id: number): void; emote(kind: number): void }
@@ -33,6 +34,7 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
   let backoff = RETRY_MIN_MS;
   let sentName = "";
   let sentLook = "";
+  let lookAt = -Infinity;
   let facing = 0;
   const buf = new Uint8Array(PRESENCE_LEN);
   const view = new DataView(buf.buffer);
@@ -67,7 +69,9 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
   const sendLook = (s: WebSocket): void => { // my look, again whenever Estilos changed it
     const st = loadStyle();
     const key = JSON.stringify(st);
-    if (key === sentLook) return;
+    const now = performance.now();
+    if (key === sentLook || now - lookAt < LOOK_EVERY_MS) return; // the server drops faster changes: send the latest later
+    lookAt = now;
     s.send(encodeStyle(st, LobbyMsg.Style));
     sentLook = key;
   };

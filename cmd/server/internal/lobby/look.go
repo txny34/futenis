@@ -12,7 +12,7 @@ import (
 // play an animation.
 
 const (
-	lookEvery  = 300 * time.Millisecond
+	lookEvery  = 2 * time.Second // clients send the latest after it (presence.ts)
 	emoteEvery = time.Second
 )
 

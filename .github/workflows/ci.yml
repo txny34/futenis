@@ -28,6 +28,9 @@ jobs:
         run: bash scripts/ci/coverage-check.sh
       - name: build wasm + TS bundle
         run: go run ./cmd/dev -check
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
       - name: TS unit tests (esbuild Go API + node --test)
         run: go run ./scripts/ci/tstest
       - name: staticcheck

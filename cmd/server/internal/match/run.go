@@ -15,10 +15,10 @@ import (
 // the seat is freed: a waiting room keeps waiting, a started one goes on with
 // the bot in that seat; the room ends when no person is left. Leaving a
 // started ranked match is a forfeit: the leaver's team loses and the match
-// ends (no bot ever plays ranked). A real disconnect counts too: whoever
-// dropped first loses. dropped: p's connection was lost (no hold possible);
-// with a rival seat already held, that held player dropped first and loses,
-// so the one who stayed connected longest gets the win.
+// ends (no bot ever plays ranked). A real disconnect counts too: a dropped
+// seat is held (rejoin.go) and whoever is still away when the hold runs out
+// loses, so with everyone dropped the first to drop loses. dropped: p's
+// connection was lost and no hold was possible (holds used up): p forfeits.
 func (r *Room) Leave(slot int, p Peer, dropped bool) bool {
 	r.mu.Lock()
 	if r.closed || (p != nil && r.peers[slot] != p) {
@@ -35,7 +35,7 @@ func (r *Room) Leave(slot int, p Peer, dropped bool) bool {
 	}
 	forfeit := r.ranked && r.started && !r.reported && r.onOver != nil
 	r.reported = r.reported || r.ranked
-	winner, users, onOver := 1-r.loserTeamLocked(slot, dropped), r.users, r.onOver
+	winner, users, onOver := 1-r.TeamOf(slot), r.users, r.onOver
 	r.closed = true
 	gone, release := r.stopHoldsLocked(), r.release
 	others := r.peers
@@ -148,20 +148,4 @@ func boolTeam(b bool) int {
 		return 1
 	}
 	return 0
-}
-
-// loserTeamLocked is the team that forfeits when slot leaves: slot's own, or
-// the rival team when slot's connection dropped while a rival seat was already
-// held (that rival dropped first).
-func (r *Room) loserTeamLocked(slot int, dropped bool) int {
-	team := r.TeamOf(slot)
-	if !dropped {
-		return team
-	}
-	for i, t := range r.away {
-		if t != nil && r.TeamOf(i) != team {
-			return r.TeamOf(i)
-		}
-	}
-	return team
 }

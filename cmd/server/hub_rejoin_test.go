@@ -11,6 +11,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/txny34/futenis/cmd/server/internal/auth/authtest"
 	"github.com/txny34/futenis/cmd/server/internal/match"
+	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
 )
 
@@ -173,27 +174,46 @@ func TestRankedHeldSeatKeepsTheAccountBusy(t *testing.T) {
 	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
 }
 
-// Both connections lost: whoever dropped first (A, held) loses; B, connected
-// longer, gets the win.
+// Both connections lost: both seats are held; A (first to drop) runs out of
+// time first and loses.
 func TestRankedFirstToDropLoses(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	srv, iss, store := newRankedHub(t)
+	srv, iss, store := newRankedHubGrace(t, 300*time.Millisecond)
 	a, b, _ := startRanked(ctx, t, srv, iss, "10.4.2")
 	a.CloseNow()
 	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
+	time.Sleep(50 * time.Millisecond)
 	b.CloseNow()
-	deadline := time.Now().Add(2 * time.Second)
+	waitRatings(ctx, t, store, func(got map[string]int) bool { return got[userA] != 0 && got[userA] < got[userB] })
+}
+
+// A drops, then B drops on purpose to dodge the loss... and A comes back:
+// B stayed away and loses.
+func TestRankedRejoinerWinsOverTheOneStillAway(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv, iss, store := newRankedHubGrace(t, 400*time.Millisecond)
+	a, b, tokenA := startRanked(ctx, t, srv, iss, "10.4.5")
+	a.CloseNow()
+	readMsg(ctx, t, b, wire.MsgPeerAway, wire.HeaderLen+8)
+	b.CloseNow()
+	back := dialRejoin(ctx, t, srv, tokenA)
+	readMsg(ctx, t, back, wire.MsgWelcome, wire.WelcomeLen)
+	waitRatings(ctx, t, store, func(got map[string]int) bool { return got[userB] != 0 && got[userB] < got[userA] })
+}
+
+func waitRatings(ctx context.Context, t *testing.T, store *ranked.Mem, ok func(map[string]int) bool) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); got[userA] != 0 && got[userA] < got[userB] {
-			again := dialRanked(ctx, t, srv, "10.4.2.3", tokenFor(t, iss, userA)) // the account is free again
-			readMsg(ctx, t, again, wire.MsgWaiting, wire.HeaderLen)
+		if got, _ := store.Load(ctx, "1v1", []string{userA, userB}); ok(got) {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	got, _ := store.Load(ctx, "1v1", []string{userA, userB})
-	t.Fatalf("ratings %v: want A's loss recorded", got)
+	t.Fatalf("ratings %v", got)
 }
 
 // The rival drops and never comes back: once the hold runs out the one who

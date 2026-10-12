@@ -111,7 +111,9 @@ export class RemotePlayers {
     this.active.pop();
     r.ch.root.visible = r.tag.visible = false;
     r.body.reset();
-    r.ch.setStyle(styleFromSeed(301 + this.free.length * 7)); // the next one starts anonymous
+    const anon = styleFromSeed(301 + this.free.length * 7); // the next one starts anonymous
+    r.ch.setStyle(anon);
+    r.ch.setJersey(anon.number, "");
     this.free.push(r);
   }
 

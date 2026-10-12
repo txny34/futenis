@@ -12,8 +12,9 @@ const EMOTE_EVERY_MS = 1000;
 export function bindEmotes(app: App, presence: Presence): void {
   let last = -Infinity;
   window.addEventListener("keydown", (e) => {
-    const kind = Number(e.key) - 1;
-    if (!(kind >= 0 && kind < EMOTES.length) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const kind = emoteOf(e.code); // by position: AZERTY's unshifted digits are symbols
+    if (kind < 0 || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (Object.values(app.menu.settings.controls.keys).includes(e.code)) return; // bound to a move: that wins
     if (!app.inLobby || app.menu.isOpen || app.play.isOpen || extraOverlayOpen()) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     const now = performance.now();
@@ -22,4 +23,11 @@ export function bindEmotes(app: App, presence: Presence): void {
     app.view.players.emote(EMOTES[kind]);
     presence.emote(kind);
   });
+}
+
+/** Emote index for Digit1-4 / Numpad1-4, else -1. */
+function emoteOf(code: string): number {
+  const m = /^(?:Digit|Numpad)([1-9])$/.exec(code);
+  const k = m ? Number(m[1]) - 1 : -1;
+  return k < EMOTES.length ? k : -1;
 }
