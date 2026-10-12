@@ -111,7 +111,8 @@ export function createAnimator(rig: Rig): Animator {
     const gesture = Math.max(pose.cheer ?? 0, pose.slump ?? 0); // a reaction replaces the ready stance
     const still = k * (1 - speed) * (1 - air) * (1 - gesture);
     applyIdle(rig.bones, time, still);
-    if (feet.fidgetU > 0) applyFidget(rig.bones, feet.fidget, feet.fidgetU, still);
+    // Looking around would fight the eyes on the ball (look.ts): with a ball only the stretch plays.
+    if (feet.fidget === "stretch" || !pose.lookAt) applyFidget(rig.bones, feet.fidget, feet.fidgetU, still * feet.fidgetW);
     // A charged kick takes over the legs: the run fades so the cocked heel never folds through the thigh.
     const charge = THREE.MathUtils.clamp(pose.charge, 0, 1);
     const move = k * speed * (1 - air) * (1 - CHARGE_RUN_DAMP * charge);
