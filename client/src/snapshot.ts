@@ -12,7 +12,8 @@ export const Snap = {
   // Dash addition (docs/design/contact-v2.md "Dash"): appended at the end,
   // nothing above this line moves. One DashActive flag per player.
   P0Dash: 53, P1Dash: 54, P2Dash: 55, P3Dash: 56,
-  // Padel scoring (contact-v2 §20.8/§21). Points0/1 are display codes 0..4.
+  // Scoring (contact-v2 §20.8/§21). The client reads Score0/1 (points of the set) and Sets0/1;
+  // Points0/1 (0/15/30/40 codes) and Games0/1 are padel-only and stay for the frozen layout.
   Points0: 57, Points1: 58, Games0: 59, Games1: 60, Sets0: 61, Sets1: 62,
   ServerPlayer: 63, RallyShots: 64,
   // Prediction (contact-v2 §20.9/§22): ball's next floor contact...
@@ -24,7 +25,7 @@ export const Snap = {
   Streak: 85, BestStreak: 86, FeedCount: 87, FeedIn: 88, MachineX: 89, MachineZ: 90,
   // Lobby (docs/design/lobby.md §5): active pad (-1 none, 0..2) and hold progress 0..1.
   LobbyPad: 91, LobbyHold: 92,
-  // Tiebreak flag (contact-v2 §20.11): 1 = show Score0/1 raw instead of 0/15/30/40.
+  // Tiebreak flag (contact-v2 §20.11): padel-only, unused by the client; frozen layout.
   Tiebreak: 93,
 } as const;
 
@@ -45,9 +46,6 @@ export const PLAYER_DASH: readonly number[] = [Snap.P0Dash, Snap.P1Dash, Snap.P2
 export const Contact = { Ticks: 0, Part: 1, Quality: 2, Ok: 3 } as const;
 /** Snapshot index of player i's predicted-contact block. */
 export const PLAYER_CONTACT: readonly number[] = [Snap.P0Contact, Snap.P1Contact, Snap.P2Contact, Snap.P3Contact];
-
-/** Display labels for Snap.Points0/1 codes (sim pointDisplayCode). */
-export const POINT_LABELS = ["0", "15", "30", "40", "AD"] as const;
 
 export const FLAG_LOB = 1;
 export const FLAG_STAMINA_LOCK = 2;
@@ -71,7 +69,8 @@ export const EventKind = {
   Whiff: 8, Jump: 9, BodyHit: 10, Toss: 11, ServeFault: 12, Let: 13,
   // Dash addition (docs/design/contact-v2.md "Dash"), appended after Let.
   Dash: 14,
-  // Padel scoring (contact-v2 §20.8), only with ScoringPadel.
+  // Scoring (contact-v2 §20.8). SetWon is used; the rest are padel-only (ScoringPadel):
+  // frozen ids, the client ignores them.
   GamePoint: 15, BreakPoint: 16, GameWon: 17, SetWon: 18, Ace: 19, MatchWon: 20,
   // Entrenamiento (training.md §2), only in Mode.Playground.
   Feed: 21, ReturnOK: 22, ReturnFail: 23,

@@ -24,8 +24,7 @@ export function moodFor(e: SimEvent, player: number, team: number): Mood | null 
   switch (e.kind) {
     case EventKind.Point: return mine ? POINT_WIN : POINT_LOSS;
     case EventKind.SetWon: return mine ? SET_WIN : SET_LOSS;
-    case EventKind.GameOver:
-    case EventKind.MatchWon: return mine ? MATCH_WIN : MATCH_LOSS;
+    case EventKind.GameOver: return mine ? MATCH_WIN : MATCH_LOSS;
     case EventKind.SetPoint:
     case EventKind.MatchPoint: return mine ? ON_POINT : null;
     case EventKind.Kick: return e.player === player && e.quality === Quality.Perfect ? PERFECT : null;

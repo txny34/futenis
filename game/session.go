@@ -144,8 +144,9 @@ func (ss *session) writeConfig(dst []byte, scratch []float64) {
 	encodeFloats(dst, scratch)
 }
 
-// readConfig decodes src and applies it between frames. Mode and
-// PointsToWin stay as configured (they need configure, not live tuning).
+// readConfig decodes src and applies it between frames. Mode, PointsToWin
+// and the match format (scoring model, sets, first server) stay as configured:
+// they need configure, not live tuning, and the client only plays sets.
 func (ss *session) readConfig(src []byte, scratch []float64) error {
 	for i := range scratch {
 		f := math.Float64frombits(binary.LittleEndian.Uint64(src[i*8:]))
@@ -156,6 +157,7 @@ func (ss *session) readConfig(src []byte, scratch []float64) error {
 	}
 	cfg := sim.ReadConfig(scratch)
 	cfg.Mode, cfg.PointsToWin = ss.cfg.Mode, ss.cfg.PointsToWin
+	cfg.ScoringMode, cfg.SetsToWin, cfg.FirstServer = ss.cfg.ScoringMode, ss.cfg.SetsToWin, ss.cfg.FirstServer
 	ss.cfg = cfg
 	st := ss.match.State()
 	st.Cfg = cfg
