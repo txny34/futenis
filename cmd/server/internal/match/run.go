@@ -134,7 +134,7 @@ func gameOverWinner(out []float64) (int, bool) {
 	if int(cur[sim.SnapPhase]) != int(sim.PhaseGameOver) {
 		return 0, false
 	}
-	if cur[sim.SnapSets1] > cur[sim.SnapSets0] {
+	if cur[sim.SnapScore1] > cur[sim.SnapScore0] {
 		return 1, true
 	}
 	return 0, true

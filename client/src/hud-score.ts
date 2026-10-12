@@ -1,12 +1,14 @@
 import { t } from "./i18n/t";
-import { Mode, POINT_LABELS, Snap } from "./snapshot";
+import { Mode, Snap } from "./snapshot";
 
-// Padel scoreboard (contact-v2 §21): 0/15/30/40/AD per team + games won +
-// server dot, and a rally shot counter ("7 golpes") top-right that pulses on
+// Scoreboard: points per team (first to 5, win by 2) + server dot, a MATCH
+// POINT glow on the team one point away (sim EvMatchPoint; every EvPoint
+// clears it first, Hud.onEvent), and a rally shot counter ("7 golpes") top-right that pulses on
 // every new touch. DOM nodes are built once; text only changes on change.
 const NAMES = [t("Local", "Home"), t("Visita", "Away")] as const;
 const UNSET = -1;
 const PULSE_CLASS = "is-pulse";
+const MP_CLASS = "is-mp";
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = ""): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -19,8 +21,7 @@ export class Scoreboard {
   readonly score = node("div", "");
   readonly shots = node("div", "");
   private readonly points = [node("b", "p0"), node("b", "p1")] as const;
-  private readonly games = [node("span", "games g0"), node("span", "games g1")] as const;
-  private readonly key = new Float64Array(10).fill(UNSET);
+  private readonly key = new Float64Array(4).fill(UNSET);
   private lastShots = UNSET;
 
   constructor() {
@@ -28,29 +29,32 @@ export class Scoreboard {
     this.shots.id = "shots";
     this.shots.hidden = true;
     this.score.append(
-      node("span", "team t0", NAMES[0]), this.games[0], this.points[0], node("i", "sep"),
-      this.points[1], this.games[1], node("span", "team t1", NAMES[1]),
+      node("span", "team t0", NAMES[0]), this.points[0], node("i", "sep"),
+      this.points[1], node("span", "team t1", NAMES[1]),
     );
   }
 
   update(snap: Float64Array): void {
     this.updateShots(snap);
     const k = this.key;
-    const v0 = snap[Snap.Points0], v1 = snap[Snap.Points1], g0 = snap[Snap.Games0], g1 = snap[Snap.Games1];
-    const server = snap[Snap.Server], mode = snap[Snap.Mode], sets = snap[Snap.Sets0] + snap[Snap.Sets1];
-    const tb = snap[Snap.Tiebreak], score0 = snap[Snap.Score0], score1 = snap[Snap.Score1];
-    if (
-      k[0] === v0 && k[1] === v1 && k[2] === g0 && k[3] === g1 && k[4] === server && k[5] === mode &&
-      k[6] === sets && k[7] === tb && k[8] === score0 && k[9] === score1
-    ) return;
-    k[0] = v0; k[1] = v1; k[2] = g0; k[3] = g1; k[4] = server; k[5] = mode; k[6] = sets;
-    k[7] = tb; k[8] = score0; k[9] = score1;
+    const score0 = snap[Snap.Score0], score1 = snap[Snap.Score1], server = snap[Snap.Server], mode = snap[Snap.Mode];
+    if (k[0] === score0 && k[1] === score1 && k[2] === server && k[3] === mode) return;
+    if (score0 + score1 === 0) this.matchPoint(-1); // a fresh match
+    k[0] = score0; k[1] = score1; k[2] = server; k[3] = mode;
     this.score.hidden = mode === Mode.Playground;
-    this.points[0].textContent = tb === 1 ? String(score0) : (POINT_LABELS[v0] ?? String(v0));
-    this.points[1].textContent = tb === 1 ? String(score1) : (POINT_LABELS[v1] ?? String(v1));
-    this.games[0].textContent = String(g0);
-    this.games[1].textContent = String(g1);
+    this.points[0].textContent = String(score0);
+    this.points[1].textContent = String(score1);
     this.score.dataset.server = String(server);
+  }
+
+  /** EvMatchPoint for side (or -1 to clear): glows that team's points. */
+  matchPoint(side: number): void {
+    if (side < 0) {
+      this.points[0].classList.remove(MP_CLASS);
+      this.points[1].classList.remove(MP_CLASS);
+      return;
+    }
+    this.points[side === 1 ? 1 : 0].classList.add(MP_CLASS);
   }
 
   private updateShots(snap: Float64Array): void {

@@ -120,13 +120,13 @@ func TestConfigureSetsMatchFormatAndAlternatesServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := ss.match.State().Cfg
-	if c.ScoringMode != sim.ScoringPadel || c.GamesPerSet != padelGamesPerSet || c.SetsToWin != padelSetsToWin {
-		t.Fatalf("1v1 format: %+v", c)
+	if c.ScoringMode != sim.ScoringSimple || c.PointsToWin != 5 {
+		t.Fatalf("1v1 format: simple scoring to 5, got %+v", c)
 	}
 	first := c.FirstServer
 	_ = ss.configure(int(sim.Mode2v2), 0, 5, 1)
-	if got := ss.match.State().Cfg; got.FirstServer == first || got.ScoringMode != sim.ScoringPadel {
-		t.Fatalf("2v2 must be padel and alternate server: first=%d got=%d", first, got.FirstServer)
+	if got := ss.match.State().Cfg; got.FirstServer == first || got.ScoringMode != sim.ScoringSimple {
+		t.Fatalf("2v2 must use simple scoring and alternate server: first=%d got=%d", first, got.FirstServer)
 	}
 	_ = ss.configure(int(sim.ModePlayground), 0, 5, 0b11)
 	if ss.match.State().Cfg.ScoringMode != sim.ScoringSimple {

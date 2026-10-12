@@ -272,6 +272,20 @@ func awardPointSimple(s *State, winner int8, ev []Event) []Event {
 	s.Phase = PhasePoint
 	s.Server = winner
 	s.Rally.PauseTicks = PointPauseTicks
+	return appendMatchPoints(s, ev)
+}
+
+// appendMatchPoints emits EvMatchPoint for each team one point away from the
+// match (1v1/2v2 only: the lobby and the playground have no match to win).
+func appendMatchPoints(s *State, ev []Event) []Event {
+	if s.Cfg.Mode != Mode1v1 && s.Cfg.Mode != Mode2v2 {
+		return ev
+	}
+	for t := int8(0); t < 2; t++ {
+		if hasWonGame(s.Score[t]+1, s.Score[1-t], s.Cfg.PointsToWin) {
+			ev = append(ev, Event{Kind: EvMatchPoint, Tick: s.Tick, Side: t, Player: -1})
+		}
+	}
 	return ev
 }
 

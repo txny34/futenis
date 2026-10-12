@@ -106,7 +106,8 @@ export class Sound {
       case EventKind.ServeFault:
       case EventKind.Let: tone(m, WHISTLE); break;
       case EventKind.GamePoint:
-      case EventKind.BreakPoint: tone(m, ALERT); break;
+      case EventKind.BreakPoint:
+      case EventKind.MatchPoint: tone(m, ALERT); break;
       case EventKind.ReturnOK: tone(m, RETURN_OK); break;
       case EventKind.ReturnFail: tone(m, RETURN_FAIL); break;
       default: break;

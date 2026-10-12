@@ -75,6 +75,8 @@ export const EventKind = {
   Feed: 21, ReturnOK: 22, ReturnFail: 23,
   // Lobby (lobby.md §4), only in Mode.Lobby: side = pad index, pos = pad center.
   PadEnter: 24, PadLeave: 25, PadStart: 26,
+  // Simple scoring (1v1/2v2): side would win the match with the next point.
+  MatchPoint: 27,
 } as const;
 
 // Mirrors sim.BodyPart. Index 0 = PartNone.
