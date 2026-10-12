@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { BODY } from "./config";
+import { Face, createFace } from "./face";
+import { buildHairGroup } from "./hair";
+import { HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_Y } from "./head";
 import { LookMaterials } from "./materials";
+import { CharacterStyle, DEFAULT_STYLE } from "./style";
 import { Rig } from "./rig";
 import * as S from "./shapes";
 
@@ -9,20 +13,7 @@ import * as S from "./shapes";
 // segmented toy look hides joints behind rounded caps.
 
 const TORSO_DEPTH = 0.62;
-const PELVIS_DEPTH = 0.78;
-// Visual-only head scale (toy look). Widens/deepens; height is capped by the
-// 1.80 m hitbox, so BODY heights stay untouched.
-const HEAD_SCALE_XZ = 1.15;
-const HEAD_SCALE_Y = 1.0;
-const HEAD_Y = BODY.headCenter - BODY.headBase;
-const FACE_Z = BODY.headRadius * HEAD_SCALE_XZ * 0.93;
-const EYE_X = 0.055;
-const EYE_Y = HEAD_Y + 0.015;
-const PUPIL_FORWARD = 0.014;
-const BROW_Y = EYE_Y + 0.045;
-const BROW_TILT = 0.25;
-const MOUTH_Y = HEAD_Y - 0.055;
-
+const PELVIS_DEPTH = 0.7;
 function add(
   parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material,
   x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1,
@@ -35,77 +26,102 @@ function add(
   return mesh;
 }
 
-function dressTorso(rig: Rig, m: LookMaterials): void {
+function dressTorso(rig: Rig, m: LookMaterials): THREE.Mesh[] {
   const b = rig.bones;
   add(b.hips, S.profileLathe(S.PELVIS_PROFILE), m.shorts, 0, 0, 0, 1, 1, PELVIS_DEPTH);
-  add(b.spine, S.profileLathe(S.LOWER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH);
-  add(b.chest, S.profileLathe(S.UPPER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH);
-  add(b.neck, S.taperCapsule(0.055, 0.065, 0.08), m.skin, 0, 0.07, 0);
+  add(b.neck, S.taperCapsule(0.06, 0.07, 0.07), m.skin, 0, 0.05, 0);
+  const collar = add(b.neck, new THREE.TorusGeometry(0.075, 0.017, 6, 16), m.shorts, 0, -0.005, 0.005, 1, 1, 0.85);
+  collar.rotation.x = Math.PI / 2 + 0.25; // the trim sits lower at the front, like a crew neck
+  return [
+    add(b.spine, S.profileLathe(S.LOWER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH),
+    add(b.chest, S.profileLathe(S.UPPER_TORSO_PROFILE), m.shirt, 0, 0, 0, 1, 1, TORSO_DEPTH),
+  ];
 }
 
-function dressHair(head: THREE.Object3D, m: LookMaterials): void {
-  const r = BODY.headRadius * 1.04;
-  const cap = add(head, S.cap(r, 0.55), m.hair, 0, HEAD_Y + 0.005, -0.008, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_SCALE_XZ);
-  cap.rotation.x = -0.55;
-  const tuft = S.ball(0.05, 8, 6);
-  add(head, tuft, m.hair, 0.03, HEAD_Y + 0.13, -0.02, 1.4, 0.7, 1.2).rotation.z = 0.4;
-  add(head, tuft, m.hair, -0.04, HEAD_Y + 0.12, 0.03, 1.3, 0.6, 1.1).rotation.z = -0.3;
+/** The parts a style changes after the build (see restyle). */
+export interface Dressing {
+  readonly face: Face;
+  /** Everything on the head, scaled around the head center by style.headSize. */
+  readonly headDress: THREE.Group;
+  /** Torso shells widened by style.build. */
+  readonly torso: readonly THREE.Mesh[];
+  hair: THREE.Group;
+  /** Shape the current hair group was built for (rebuilt only when it changes). */
+  hairKey: string;
 }
 
-function dressFace(head: THREE.Object3D, m: LookMaterials): void {
-  const eye = S.ball(0.03, 10, 8);
-  const pupil = S.ball(0.017, 8, 6);
-  const brow = new THREE.BoxGeometry(0.05, 0.012, 0.015);
-  const mouth = new THREE.BoxGeometry(0.045, 0.01, 0.012);
-  for (const side of [1, -1]) {
-    add(head, eye, m.eyeWhite, side * EYE_X, EYE_Y, FACE_Z - 0.01, 1, 1.2, 0.5);
-    add(head, pupil, m.pupil, side * EYE_X, EYE_Y, FACE_Z + PUPIL_FORWARD - 0.01, 1, 1.3, 0.5);
-    const b = add(head, brow, m.hair, side * EYE_X, BROW_Y, FACE_Z - 0.012);
-    b.rotation.z = -side * BROW_TILT;
-  }
-  add(head, mouth, m.pupil, 0, MOUTH_Y, FACE_Z - 0.022);
-}
+const hairKeyOf = (s: Readonly<CharacterStyle>): string => `${s.hair}/${s.headwear}`;
 
-function dressHead(rig: Rig, m: LookMaterials): void {
-  const head = rig.bones.head;
-  add(head, S.ball(BODY.headRadius, 16, 12), m.skin, 0, HEAD_Y, 0, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_SCALE_XZ);
+function dressHead(rig: Rig, m: LookMaterials): Omit<Dressing, "torso"> {
+  const headDress = new THREE.Group();
+  rig.bones.head.add(headDress);
+  add(headDress, S.ball(BODY.headRadius, 16, 12), m.skin, 0, HEAD_Y, 0, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_SCALE_XZ);
   const ear = S.ball(0.034, 8, 6);
   const earX = BODY.headRadius * HEAD_SCALE_XZ * 0.97;
-  add(head, ear, m.skin, earX, HEAD_Y, 0);
-  add(head, ear, m.skin, -earX, HEAD_Y, 0);
-  dressHair(head, m);
-  dressFace(head, m);
+  add(headDress, ear, m.skin, earX, HEAD_Y, 0);
+  add(headDress, ear, m.skin, -earX, HEAD_Y, 0);
+  const hair = buildHairGroup(DEFAULT_STYLE, m);
+  headDress.add(hair);
+  return { face: createFace(headDress, m), headDress, hair, hairKey: hairKeyOf(DEFAULT_STYLE) };
+}
+
+/** Applies the shape side of a style: head size, build and the hair/headwear group. */
+export function restyle(d: Dressing, style: Readonly<CharacterStyle>, m: LookMaterials): void {
+  const s = style.headSize;
+  d.headDress.scale.setScalar(s);
+  d.headDress.position.y = HEAD_Y * (1 - s); // pivot on the head center
+  for (const mesh of d.torso) mesh.scale.x = style.build;
+  const key = hairKeyOf(style);
+  if (key === d.hairKey) return; // size/build/colors only: no geometry rebuild
+  d.hairKey = key;
+  d.headDress.remove(d.hair);
+  d.hair.traverse((o) => { if (o instanceof THREE.Mesh) (o.geometry as THREE.BufferGeometry).dispose(); });
+  d.hair = buildHairGroup(style, m);
+  d.headDress.add(d.hair);
 }
 
 function dressArm(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
   const b = rig.bones;
-  add(b[`upperArm${s}` as const], S.ball(0.078, 10, 8), m.shirt, 0, -0.01, 0);
-  add(b[`upperArm${s}` as const], S.taperCapsule(0.07, 0.062, 0.1), m.shirt);
-  add(b[`upperArm${s}` as const], S.taperCapsule(0.053, 0.046, BODY.upperArm), m.skin);
-  add(b[`foreArm${s}` as const], S.taperCapsule(0.047, 0.04, BODY.foreArm), m.skin);
-  add(b[`hand${s}` as const], S.ball(0.06, 10, 8), m.skin, 0, -0.04, 0.005, 0.8, 1, 1);
+  const inward = s === "L" ? -1 : 1; // the body's center is -X for the left arm
+  add(b[`upperArm${s}` as const], S.taperCapsule(0.066, 0.058, 0.1), m.shirt); // short sleeve over the joint
+  add(b[`upperArm${s}` as const], S.taperCapsule(0.05, 0.043, BODY.upperArm), m.skin);
+  add(b[`foreArm${s}` as const], S.taperCapsule(0.045, 0.034, BODY.foreArm), m.skin);
+  // Mitten hand: a flat palm and a thumb pointing forward-inward.
+  add(b[`hand${s}` as const], S.ball(0.046, 10, 8), m.skin, 0, -0.045, 0.004, 0.72, 1.18, 0.62);
+  const thumb = add(b[`hand${s}` as const], S.ball(0.018, 8, 6), m.skin, inward * 0.022, -0.03, 0.026, 1, 1.6, 1);
+  thumb.rotation.z = inward * 0.5;
 }
 
 function dressLeg(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
   const b = rig.bones;
   const thigh = BODY.hip - BODY.knee;
   const shin = BODY.knee - BODY.ankle;
-  add(b[`upLeg${s}` as const], S.taperCapsule(0.1, 0.09, 0.2), m.shorts);
-  add(b[`upLeg${s}` as const], S.taperCapsule(0.09, 0.064, thigh), m.skin);
-  add(b[`leg${s}` as const], S.taperCapsule(0.06, 0.045, shin), m.skin);
-  add(b[`leg${s}` as const], S.taperCapsule(0.05, 0.05, 0.1), m.shorts, 0, -shin + 0.13, 0);
-  add(b[`foot${s}` as const], S.bootShape(0.058, 0.13), m.boots, 0, -0.04, 0.055, 1.1, 0.85, 1);
-  add(b[`toe${s}` as const], S.ball(0.06, 10, 6), m.boots, 0, 0.015, -0.01, 1.05, 0.75, 1.1);
+  add(b[`upLeg${s}` as const], S.taperCapsule(0.102, 0.098, 0.16), m.shorts); // football shorts leg, above the knee
+  add(b[`upLeg${s}` as const], S.taperCapsule(0.094, 0.068, thigh), m.skin);
+  add(b[`leg${s}` as const], S.taperCapsule(0.07, 0.046, shin), m.skin); // calf taper
+  add(b[`leg${s}` as const], S.taperCapsule(0.058, 0.052, 0.17), m.shorts, 0, -shin + 0.2, 0); // tall sock over the calf
+  dressShoe(rig, m, s);
 }
 
-/** Builds all body meshes onto the rig. */
-export function dressRig(rig: Rig, m: LookMaterials): void {
-  dressTorso(rig, m);
-  dressHead(rig, m);
+/** Sneaker: colored upper, white sole slab, a lace stripe on top. */
+function dressShoe(rig: Rig, m: LookMaterials, s: "L" | "R"): void {
+  const b = rig.bones;
+  add(b[`foot${s}` as const], S.bootShape(0.056, 0.13), m.boots, 0, -0.035, 0.055, 1.08, 0.8, 1);
+  add(b[`toe${s}` as const], S.ball(0.058, 10, 6), m.boots, 0, 0.012, -0.01, 1.04, 0.72, 1.12);
+  add(b[`foot${s}` as const], S.bootShape(0.058, 0.17), m.sole, 0, -0.078, 0.07, 1.12, 0.3, 1.06);
+  const laces = add(b[`foot${s}` as const], new THREE.BoxGeometry(0.04, 0.008, 0.07), m.sole, 0, 0.012, 0.075);
+  laces.rotation.x = -0.35;
+}
+
+/** Builds all body meshes onto the rig; returns what a style can change later. */
+export function dressRig(rig: Rig, m: LookMaterials): Dressing {
+  const torso = dressTorso(rig, m);
+  const head = dressHead(rig, m);
   dressArm(rig, m, "L");
   dressArm(rig, m, "R");
   dressLeg(rig, m, "L");
   dressLeg(rig, m, "R");
+  return { ...head, torso };
 }
 
 /** Triangle count of everything under root (for the §6 budget). */

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Character, CharacterPose, createCharacter } from "../../character/character";
+import { Character, CharacterPose, createCharacter, styleFromSeed } from "../../character/character";
 import { THEME } from "../../env/theme";
 
 // Decorative lobby NPCs (no collision, no sim): some stroll on ellipses, some
@@ -38,6 +38,7 @@ export class Npcs {
         shirt: D.npcShirts[i % D.npcShirts.length], shorts: THEME.crowdBody[i % THEME.crowdBody.length],
         skin: THEME.crowdSkin[i % THEME.crowdSkin.length], hair: THEME.crowdBody[(i + 3) % THEME.crowdBody.length], boots: D.neon[i % D.neon.length],
       });
+      ch.setStyle(styleFromSeed(101 + i * 13)); // a crowd of different faces and hairdos
       this.group.add(ch.root);
       this.npcs.push({ ch, spec, lastY: 0, pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike: null, facing: 0 } });
     });

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CharacterPose, DEFAULT_LOOK, createCharacter } from "../../character/character";
+import { loadStyle, onStyleChange } from "../../profile/style-store";
 import { THEME } from "../../env/theme";
 import { FONT_STACK, canvasTexture } from "../decor/util";
 import { t } from "../../i18n/t";
@@ -52,6 +53,8 @@ export class Podium {
     const body = new THREE.MeshStandardMaterial({ color: H_.podium, roughness: 0.45, metalness: 0.5 });
     for (let i = 0; i < 3; i++) this.buildBlock(i, body);
     const ch = createCharacter(DEFAULT_LOOK); // the player's own look (view/players.ts)
+    ch.setStyle(loadStyle());
+    onStyleChange((st) => ch.setStyle(st)); // Estilos edits show on the statue too
     const pose: CharacterPose = { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike: null, facing: Math.PI };
     for (let i = 0; i < POSE_STEPS; i++) ch.update(pose, POSE_DT); // settle into idle, then freeze
     this.statue = ch.root;

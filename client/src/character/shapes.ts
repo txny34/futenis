@@ -3,7 +3,7 @@ import * as THREE from "three";
 // Low-poly generated shapes. All limb shapes hang from their bone origin
 // downwards (-Y) so they can be parented directly to a rig bone.
 
-const RADIAL = 10;
+const RADIAL = 14;
 const CAP_STEPS = 3;
 const HALF_PI = Math.PI / 2;
 

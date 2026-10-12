@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Character, CharacterPose, StrikePose, createCharacter } from "../../character/character";
+import { Character, CharacterPose, StrikePose, createCharacter, styleFromSeed } from "../../character/character";
 import { IMPACT_T } from "../../character/timing";
 import { buildCourt } from "../../court";
 import { buildEnclosure } from "../../env/enclosure";
@@ -36,6 +36,7 @@ interface Athlete { readonly ch: Character; readonly pose: CharacterPose; readon
 
 function athlete(shirt: number, side: 1 | -1): Athlete {
   const ch = createCharacter({ shirt, shorts: THEME.crowdBody[0], skin: THEME.crowdSkin[side > 0 ? 1 : 0], hair: THEME.crowdBody[3], boots: THEME.lobbyDecor.neon[1] });
+  ch.setStyle(styleFromSeed(side > 0 ? 7 : 11));
   const strike: StrikePose = { tier: "low", t: 0, contact: null };
   return { ch, strike, side, z: 0, pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: side * Math.PI / 2 } };
 }

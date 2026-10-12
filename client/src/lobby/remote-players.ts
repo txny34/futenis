@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Character, CharacterPose, createCharacter } from "../character/character";
+import { Character, CharacterPose, createCharacter, styleFromSeed } from "../character/character";
 import { THEME } from "../env/theme";
 import { canvasTexture, FONT_STACK } from "./decor/util";
 
@@ -121,6 +121,7 @@ export class RemotePlayers {
       shirt: D.npcShirts[(i + 2) % D.npcShirts.length], shorts: THEME.crowdBody[i % THEME.crowdBody.length],
       skin: THEME.crowdSkin[i % THEME.crowdSkin.length], hair: THEME.crowdBody[(i + 3) % THEME.crowdBody.length], boots: D.neon[i % D.neon.length],
     });
+    ch.setStyle(styleFromSeed(301 + i * 7)); // other players' own styles are not sent yet: a varied look per pool slot
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
     tag.scale.set(TAG_W, (TAG_W * TAG_PX_H) / TAG_PX_W, 1);
     this.group.add(ch.root, tag);
