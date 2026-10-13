@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { BODY } from "./config";
-import { BROW_Y, HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_Y } from "./head";
+import { HEAD_SCALE_XZ, HEAD_SCALE_Y, HEAD_Y } from "./head";
 import * as S from "./shapes";
+import { beanie, cap, headband } from "./headwear";
 import { CharacterStyle, HairStyle } from "./style";
 
 // Hair and headwear as swappable groups (Schedule I's hair/hat meshes): built
 // once per style change, never per frame. A cap hides the hair under it
-// (except what sticks out: ponytail); a headband sits over any hair.
+// (except what sticks out: ponytail); a headband sits
+// over any hair. Headwear shapes live in headwear.ts.
 
 const R = BODY.headRadius;
 const BACK_TILT = -0.78; // hairline tilted back so the brows show
@@ -53,18 +55,6 @@ const HAIR: Readonly<Record<HairStyle, (g: THREE.Object3D, mat: THREE.Material) 
   },
 };
 
-function cap(g: THREE.Object3D, mat: THREE.Material): void {
-  skullCap(g, mat, R * 1.09, 0.42, -0.35);
-  const visor = put(g, new THREE.CylinderGeometry(0.11, 0.11, 0.012, 14, 1, false, -Math.PI / 2, Math.PI), mat, 0, BROW_Y + 0.045, R * 0.95);
-  visor.rotation.x = 0.12;
-  visor.rotation.y = Math.PI / 2;
-}
-
-function headband(g: THREE.Object3D, mat: THREE.Material): void {
-  const band = put(g, new THREE.TorusGeometry(R * 1.02, 0.016, 6, 20), mat, 0, BROW_Y + 0.04, 0, HEAD_SCALE_XZ, HEAD_SCALE_XZ, 1);
-  band.rotation.x = Math.PI / 2 + 0.12;
-}
-
 /** Hair + headwear for `style`, ready to parent to the head dressing. The group's
  * origin is the skull center, so the secondary-motion swing stays on the head. */
 export function buildHairGroup(style: CharacterStyle, m: HairMats): THREE.Group {
@@ -73,9 +63,10 @@ export function buildHairGroup(style: CharacterStyle, m: HairMats): THREE.Group 
   const g = new THREE.Group();
   g.position.y = -HEAD_Y;
   pivot.add(g);
-  const capped = style.headwear === "cap";
-  if (!capped || style.hair === "ponytail") HAIR[style.hair](g, m.hair);
-  if (capped) cap(g, m.hat);
-  if (style.headwear === "headband") headband(g, m.hat);
+  const covered = style.headwear === "cap" || style.headwear === "capBack" || style.headwear === "beanie";
+  if (!covered || style.hair === "ponytail") HAIR[style.hair](g, m.hair);
+  if (style.headwear === "cap" || style.headwear === "capBack") cap(put, g, m.hat, style.headwear === "capBack");
+  if (style.headwear === "headband") headband(put, g, m.hat);
+  if (style.headwear === "beanie") beanie(put, g, m.hat);
   return pivot;
 }

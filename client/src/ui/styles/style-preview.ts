@@ -2,29 +2,27 @@ import * as THREE from "three";
 import { Character, CharacterPose, CharacterStyle, DEFAULT_LOOK, createCharacter } from "../../character/character";
 import { BODY } from "../../character/config";
 import { THEME } from "../../env/theme";
+import { Turntable } from "./turntable";
 
-// Live 3D preview for the Estilos panel: its own small renderer, the
-// character turning slowly and showing a happy face now and then. Runs only
-// while the panel is open (start/stop) and is disposed with it.
+// Live 3D preview for the Estilos panel: its own small renderer, the whole
+// character head to sneakers, spun 360° by dragging (turntable.ts) and
+// smiling now and then. Runs only while the panel is open (start/stop).
 
-const W = 300;
-const H = 380;
-const TURN_RATE = 0.5; // rad/s
+const W = 340;
+const H = 560;
 const SMILE_EVERY_S = 4;
-const SHOW_BACK_S = 2; // after a shirt number change: turn around to show it
-const TURN_EASE_HZ = 6;
 
 export class StylePreview {
   readonly canvas: HTMLCanvasElement;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(26, W / H, 0.1, 20);
+  private readonly camera = new THREE.PerspectiveCamera(24, W / H, 0.1, 20);
+  private readonly turntable: Turntable;
   private readonly character: Character;
   private readonly pose: CharacterPose = { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike: null, facing: 0 };
   private raf = 0;
   private last = 0;
   private clock = 0;
-  private backUntil = 0;
   private number = -1;
 
   constructor() {
@@ -39,14 +37,15 @@ export class StylePreview {
     this.scene.add(key);
     this.character = createCharacter(DEFAULT_LOOK);
     this.scene.add(this.character.root);
-    this.camera.position.set(0, BODY.height * 0.86, 2.3); // chest up: the face is the point
-    this.camera.lookAt(0, BODY.height * 0.82, 0);
+    this.camera.position.set(0, BODY.height * 0.52, 4.9); // the whole body, feet included
+    this.camera.lookAt(0, BODY.height * 0.49, 0);
+    this.turntable = new Turntable(this.canvas);
   }
 
   setStyle(style: Readonly<CharacterStyle>): void {
     this.character.setStyle(style);
     this.character.setJersey(style.number, "");
-    if (this.number >= 0 && style.number !== this.number) this.backUntil = this.clock + SHOW_BACK_S;
+    if (this.number >= 0 && style.number !== this.number) this.turntable.turnTo(Math.PI); // show the number
     this.number = style.number;
     this.character.express("happy", 1.2);
   }
@@ -58,8 +57,8 @@ export class StylePreview {
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
       this.clock += dt;
-      const target = this.clock < this.backUntil ? Math.PI : Math.sin(this.clock * TURN_RATE) * 0.9;
-      this.pose.facing += (target - this.pose.facing) * Math.min(1, dt * TURN_EASE_HZ);
+      this.turntable.update(dt);
+      this.pose.facing = this.turntable.yaw;
       if (Math.floor(this.clock / SMILE_EVERY_S) !== Math.floor((this.clock - dt) / SMILE_EVERY_S)) this.character.express("cheer", 1);
       this.character.update(this.pose, dt);
       this.renderer.render(this.scene, this.camera);

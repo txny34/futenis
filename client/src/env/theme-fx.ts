@@ -24,6 +24,12 @@ export interface FxTheme {
   readonly skinTones: readonly number[];
   readonly hairColors: readonly number[];
   readonly hatColors: readonly number[];
+  /** Accessories (style.ts): glasses frames, wristbands, sneakers. */
+  readonly eyewearColors: readonly number[];
+  readonly gearColors: readonly number[];
+  readonly bootColors: readonly number[];
+  /** Tinted lenses of the shades. */
+  readonly lens: number;
   /** Character rim light (arena glow on silhouettes), iris, sneaker sole/laces. */
   readonly rim: number;
   readonly iris: number;
@@ -48,6 +54,10 @@ export const FX: FxTheme = {
   skinTones: [0xf6d2b8, 0xe0ac7e, 0xc68a5e, 0x9a6440, 0x6e4529, 0x4a2c1a],
   hairColors: [0x2b1d14, 0x5a3720, 0xa8642f, 0xe0b45a, 0xd8d4cc, 0x1b1e2b],
   hatColors: [0x19e3ff, 0xff4fa3, 0xe6ff1f, 0xffd23f, 0xf2f2f2, 0x1d2438],
+  eyewearColors: [0x15171f, 0xf2f2f2, 0xff4fa3, 0x19e3ff, 0xffd23f, 0xb06a2c],
+  gearColors: [0xf2f2f2, 0x19e3ff, 0xff4fa3, 0xe6ff1f, 0xff5a4e, 0x15171f],
+  bootColors: [0x1f6feb, 0xf2f2f2, 0x15171f, 0xff4fa3, 0xe6ff1f, 0xff5a4e],
+  lens: 0x1b2a4a,
   rim: 0x9fe8ff,
   iris: 0x4a7fd0,
   sole: 0xf4f6fa,

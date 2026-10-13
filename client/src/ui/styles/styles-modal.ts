@@ -1,5 +1,7 @@
 import { CharacterStyle, styleFromSeed } from "../../character/character";
 import { BUILD_RANGE, HAIR_STYLES, HEADWEAR, HEAD_SIZE_RANGE, HairStyle, Headwear, MAX_SHIRT_NUMBER } from "../../character/style";
+import { accessoryRows } from "./accessory-rows";
+import { swatches } from "./swatches";
 import { THEME } from "../../env/theme";
 import { t } from "../../i18n/t";
 import { loadStyle, saveStyle } from "../../profile/style-store";
@@ -16,32 +18,22 @@ const HAIR_LABELS: Readonly<Record<HairStyle, string>> = {
   afro: "Afro", bald: t("Pelado", "Bald"), ponytail: t("Colita", "Ponytail"),
 };
 const HEADWEAR_LABELS: Readonly<Record<Headwear, string>> = {
-  none: t("Nada", "None"), cap: t("Gorra", "Cap"), headband: t("Vincha", "Headband"),
+  none: t("Nada", "None"), cap: t("Gorra", "Cap"), capBack: t("Gorra atrás", "Backwards cap"),
+  headband: t("Vincha", "Headband"), beanie: t("Gorro de lana", "Beanie"),
 };
 const STEP = 0.01;
+type Tab = "head" | "face" | "body";
+const TABS: readonly (readonly [Tab, string])[] = [
+  ["head", t("Cabeza", "Head")], ["face", t("Cara", "Face")], ["body", t("Cuerpo", "Body")],
+];
 const SAVE_DELAY_MS = 250; // a slider drag saves once it settles, not per input event
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
-const hex = (c: number): string => `#${c.toString(16).padStart(6, "0")}`;
-
-function swatches(label: string, colors: readonly number[], value: number, onPick: (i: number) => void): HTMLElement {
-  const row = el("div", "fx-row");
-  const group = el("div", "fx-styles__swatches", "", { role: "radiogroup", "aria-label": label });
-  colors.forEach((c, i) => {
-    const b = el("button", "fx-styles__swatch", "", { type: "button", role: "radio", "aria-checked": String(i === value), "aria-label": `${label} ${i + 1}` });
-    b.style.background = hex(c);
-    b.addEventListener("click", () => {
-      for (const o of group.children) o.setAttribute("aria-checked", String(o === b)); // in place: focus stays
-      onPick(i);
-    });
-    group.append(b);
-  });
-  row.append(el("span", "fx-row__label", label), group);
-  return row;
-}
 
 export class StylesModal {
   private readonly root = el("div", "fx-styles", "", { role: "dialog", "aria-modal": "true", "aria-label": t("Estilos", "Styles") });
   private readonly form = el("div", "fx-styles__form");
+  private readonly tabs = el("div", "fx-styles__tabs", "", { role: "tablist" });
+  private tab: Tab = "head";
   private readonly preview = new StylePreview();
   private readonly openCbs: Array<() => void> = [];
   private style: CharacterStyle = { ...loadStyle() };
@@ -54,8 +46,10 @@ export class StylesModal {
     close.setAttribute("aria-label", t("Cerrar", "Close"));
     const stage = el("div", "fx-styles__stage");
     stage.append(this.preview.canvas);
+    const panel = el("div", "fx-styles__panel");
+    panel.append(this.tabs, this.form);
     const body = el("div", "fx-styles__body");
-    body.append(stage, this.form);
+    body.append(stage, panel);
     const random = button(t("Aleatorio", "Random"), () => this.set(styleFromSeed(Date.now() & 0x7fffffff), true, true), "fx-btn fx-btn--ghost");
     const done = button(t("Listo", "Done"), () => this.close(), "fx-btn fx-btn--hero");
     const foot = el("div", "fx-styles__foot");
@@ -113,22 +107,66 @@ export class StylesModal {
   }
 
   private build(): void {
+    if (this.tabs.childElementCount === 0) this.makeTabs();
+    for (const b of this.tabs.children) {
+      const on = b.getAttribute("data-tab") === this.tab;
+      b.setAttribute("aria-selected", String(on));
+      b.setAttribute("tabindex", on ? "0" : "-1"); // roving focus: arrows move between tabs
+    }
+    this.form.setAttribute("aria-labelledby", `fx-styles-tab-${this.tab}`);
+    this.form.replaceChildren(...this.rows()[this.tab]);
+  }
+
+  /** The tab buttons, once: switching only updates them, so keyboard focus stays put. */
+  private makeTabs(): void {
+    this.form.id = "fx-styles-panel";
+    this.form.setAttribute("role", "tabpanel");
+    const pick = (i: number): void => {
+      this.tab = TABS[(i + TABS.length) % TABS.length][0];
+      this.build();
+      (this.tabs.children[TABS.findIndex(([id]) => id === this.tab)] as HTMLElement).focus();
+    };
+    TABS.forEach(([id, label], i) => {
+      const b = button(label, () => pick(i), "fx-styles__tab");
+      b.id = `fx-styles-tab-${id}`;
+      b.dataset.tab = id;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-controls", "fx-styles-panel");
+      b.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); pick(i + (e.key === "ArrowRight" ? 1 : -1)); }
+      });
+      this.tabs.append(b);
+    });
+  }
+
+  /** The controls of every tab (only the open one is shown). */
+  private rows(): Record<Tab, HTMLElement[]> {
     const s = this.style;
     const fx = THEME.fx;
+    const p = (x: Partial<CharacterStyle>): void => this.patch(x);
     const hair: Choice<HairStyle>[] = HAIR_STYLES.map((v) => ({ value: v, label: HAIR_LABELS[v] }));
     const wear: Choice<Headwear>[] = HEADWEAR.map((v) => ({ value: v, label: HEADWEAR_LABELS[v] }));
-    this.form.replaceChildren(
-      segmented(t("Pelo", "Hair"), hair, s.hair, (v) => this.patch({ hair: v })),
-      swatches(t("Color de pelo", "Hair color"), fx.hairColors, s.hairColor, (i) => this.patch({ hairColor: i })),
-      segmented(t("Cabeza", "Headwear"), wear, s.headwear, (v) => this.patch({ headwear: v })),
-      swatches(t("Color de gorro", "Headwear color"), fx.hatColors, s.hatColor, (i) => this.patch({ hatColor: i })),
-      swatches(t("Piel", "Skin"), fx.skinTones, s.skin, (i) => this.patch({ skin: i })),
-      slider({ label: t("Tamaño de cabeza", "Head size"), min: HEAD_SIZE_RANGE[0], max: HEAD_SIZE_RANGE[1], step: STEP,
-        value: s.headSize, format: pct, onInput: (v) => this.patch({ headSize: v }) }),
-      slider({ label: t("Contextura", "Build"), min: BUILD_RANGE[0], max: BUILD_RANGE[1], step: STEP,
-        value: s.build, format: pct, onInput: (v) => this.patch({ build: v }) }),
-      slider({ label: t("Número de camiseta", "Shirt number"), min: 0, max: MAX_SHIRT_NUMBER, step: 1,
-        value: s.number, format: (v) => String(Math.round(v)), onInput: (v) => this.patch({ number: Math.round(v) }) }),
-    );
+    const [eyewear, eyewearColor, facial, wrist, wristColor, boots] = accessoryRows(s, p);
+    return {
+      head: [
+        segmented(t("Pelo", "Hair"), hair, s.hair, (v) => p({ hair: v })),
+        swatches(t("Color de pelo", "Hair color"), fx.hairColors, s.hairColor, (i) => p({ hairColor: i })),
+        segmented(t("Gorro", "Headwear"), wear, s.headwear, (v) => p({ headwear: v })),
+        swatches(t("Color de gorro", "Headwear color"), fx.hatColors, s.hatColor, (i) => p({ hatColor: i })),
+        slider({ label: t("Tamaño de cabeza", "Head size"), min: HEAD_SIZE_RANGE[0], max: HEAD_SIZE_RANGE[1], step: STEP,
+          value: s.headSize, format: pct, onInput: (v) => p({ headSize: v }) }),
+      ],
+      face: [
+        swatches(t("Piel", "Skin"), fx.skinTones, s.skin, (i) => p({ skin: i })),
+        eyewear, eyewearColor, facial,
+      ],
+      body: [
+        slider({ label: t("Contextura", "Build"), min: BUILD_RANGE[0], max: BUILD_RANGE[1], step: STEP,
+          value: s.build, format: pct, onInput: (v) => p({ build: v }) }),
+        slider({ label: t("Número de camiseta", "Shirt number"), min: 0, max: MAX_SHIRT_NUMBER, step: 1,
+          value: s.number, format: (v) => String(Math.round(v)), onInput: (v) => p({ number: Math.round(v) }) }),
+        wrist, wristColor, boots,
+      ],
+    };
   }
 }

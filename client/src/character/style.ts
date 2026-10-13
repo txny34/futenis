@@ -7,8 +7,12 @@ import { THEME } from "../env/theme";
 
 export const HAIR_STYLES = ["short", "buzz", "mohawk", "afro", "bald", "ponytail"] as const;
 export type HairStyle = (typeof HAIR_STYLES)[number];
-export const HEADWEAR = ["none", "cap", "headband"] as const;
+export const HEADWEAR = ["none", "cap", "headband", "capBack", "beanie"] as const;
 export type Headwear = (typeof HEADWEAR)[number];
+export const EYEWEAR = ["none", "sport", "round", "shades"] as const;
+export type Eyewear = (typeof EYEWEAR)[number];
+export const FACIAL_HAIR = ["none", "stubble", "mustache", "beard"] as const;
+export type FacialHair = (typeof FACIAL_HAIR)[number];
 
 export interface CharacterStyle {
   hair: HairStyle;
@@ -23,6 +27,14 @@ export interface CharacterStyle {
   build: number;
   /** Shirt number 0..99 (printed on the back). */
   number: number;
+  eyewear: Eyewear;
+  facialHair: FacialHair;
+  /** Wristbands on both wrists. */
+  wristbands: boolean;
+  /** Indices into THEME.fx.eyewearColors / gearColors (wristbands) / bootColors (sneakers; -1 keeps the look's, lobby decor). */
+  eyewearColor: number;
+  wristColor: number;
+  bootsColor: number;
 }
 
 export const HEAD_SIZE_RANGE = [0.92, 1.08] as const;
@@ -31,6 +43,7 @@ export const MAX_SHIRT_NUMBER = 99;
 
 export const DEFAULT_STYLE: Readonly<CharacterStyle> = {
   hair: "short", headwear: "none", skin: 1, hairColor: 0, hatColor: 0, headSize: 1, build: 1, number: 10,
+  eyewear: "none", facialHair: "none", wristbands: false, eyewearColor: 0, wristColor: 0, bootsColor: 0,
 };
 
 const clamp = (v: number, [lo, hi]: readonly [number, number]): number => Math.min(hi, Math.max(lo, v));
@@ -49,6 +62,12 @@ export function sanitizeStyle(raw: unknown): CharacterStyle {
     headSize: clamp(Number.isFinite(r.headSize) ? (r.headSize as number) : 1, HEAD_SIZE_RANGE),
     build: clamp(Number.isFinite(r.build) ? (r.build as number) : 1, BUILD_RANGE),
     number: Number.isInteger(r.number) ? clamp(r.number as number, [0, MAX_SHIRT_NUMBER]) : DEFAULT_STYLE.number,
+    eyewear: EYEWEAR.includes(r.eyewear as Eyewear) ? (r.eyewear as Eyewear) : DEFAULT_STYLE.eyewear,
+    facialHair: FACIAL_HAIR.includes(r.facialHair as FacialHair) ? (r.facialHair as FacialHair) : DEFAULT_STYLE.facialHair,
+    wristbands: r.wristbands === true,
+    eyewearColor: index(r.eyewearColor, fx.eyewearColors.length),
+    wristColor: index(r.wristColor, fx.gearColors.length),
+    bootsColor: index(r.bootsColor, fx.bootColors.length),
   };
 }
 
@@ -74,5 +93,11 @@ export function styleFromSeed(seed: number): CharacterStyle {
     headSize: span(HEAD_SIZE_RANGE),
     build: span(BUILD_RANGE),
     number: 1 + next(MAX_SHIRT_NUMBER),
+    eyewear: next(5) === 0 ? EYEWEAR[1 + next(3)] : "none",
+    facialHair: next(4) === 0 ? FACIAL_HAIR[1 + next(3)] : "none",
+    wristbands: next(3) === 0,
+    eyewearColor: next(fx.eyewearColors.length),
+    wristColor: next(fx.gearColors.length),
+    bootsColor: next(fx.bootColors.length),
   };
 }

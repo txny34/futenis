@@ -4,7 +4,10 @@ import { DEFAULT_STYLE, CharacterStyle } from "../src/character/character";
 import { STYLES_MSG_LEN, STYLE_LEN, decodeLook, decodeStyles, encodeStyle } from "../src/net/style-wire";
 import { HEADER } from "../src/net/protocol";
 
-const MINE: CharacterStyle = { ...DEFAULT_STYLE, hair: "afro", headwear: "cap", skin: 3, hairColor: 2, hatColor: 4, number: 23 };
+const MINE: CharacterStyle = {
+  ...DEFAULT_STYLE, hair: "afro", headwear: "beanie", skin: 3, hairColor: 2, hatColor: 4, number: 23,
+  eyewear: "shades", eyewearColor: 2, facialHair: "beard", wristbands: true, wristColor: 3, bootsColor: 4,
+};
 
 function stylesWith(slot: number, look: Uint8Array): Uint8Array {
   const msg = new Uint8Array(STYLES_MSG_LEN);
@@ -16,8 +19,14 @@ test("a look round-trips with its shirt number", () => {
   const look = decodeLook(encodeStyle(MINE), HEADER, 0);
   assert.ok(look);
   assert.equal(look.hair, "afro");
-  assert.equal(look.headwear, "cap");
   assert.equal(look.number, 23);
+  assert.equal(look.headwear, "beanie");
+  assert.equal(look.eyewear, "shades");
+  assert.equal(look.eyewearColor, 2);
+  assert.equal(look.facialHair, "beard");
+  assert.equal(look.wristbands, true);
+  assert.equal(look.wristColor, 3);
+  assert.equal(look.bootsColor, 4);
   assert.ok(Math.abs(look.headSize - MINE.headSize) < 0.01);
 });
 
@@ -45,4 +54,16 @@ test("an old client's look (no number) falls back to the seat number", () => {
   v1[HEADER + 8] = 0;
   assert.equal(decodeLook(v1, HEADER, 9)?.number, 9);
   assert.equal(decodeStyles(new Uint8Array(STYLES_MSG_LEN - 1), STYLES_MSG_LEN - 1, 0), null);
+});
+
+test("a v2 server's STYLES (4 x 9) still decodes, without accessories", () => {
+  const v3 = encodeStyle(MINE);
+  const msg = new Uint8Array(HEADER + 4 * 9);
+  msg.set(v3.subarray(HEADER, HEADER + 9), HEADER + 9); // seat 1
+  const looks = decodeStyles(msg, msg.length, 0);
+  assert.ok(looks);
+  assert.equal(looks[1]?.hair, "afro");
+  assert.equal(looks[1]?.number, 23);
+  assert.equal(looks[1]?.eyewear, "none");
+  assert.equal(looks[0], null);
 });

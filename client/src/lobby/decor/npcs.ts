@@ -39,7 +39,7 @@ export class Npcs {
         trim: THEME.crowdBody[i % THEME.crowdBody.length], ink: THEME.crowdBody[i % THEME.crowdBody.length],
         skin: THEME.crowdSkin[i % THEME.crowdSkin.length], hair: THEME.crowdBody[(i + 3) % THEME.crowdBody.length], boots: D.neon[i % D.neon.length],
       });
-      ch.setStyle(styleFromSeed(101 + i * 13)); // a crowd of different faces and hairdos
+      ch.setStyle({ ...styleFromSeed(101 + i * 13), bootsColor: -1 }); // a crowd of different faces and hairdos, in their neon sneakers
       this.group.add(ch.root);
       this.npcs.push({ ch, spec, lastY: 0, pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike: null, facing: 0 } });
     });
