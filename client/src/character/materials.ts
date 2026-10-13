@@ -60,6 +60,11 @@ export interface LookMaterials {
   readonly mouth: THREE.MeshToonMaterial;
   /** Headwear (cap, headband): colored by the style. */
   readonly hat: THREE.MeshToonMaterial;
+  /** Accessories (accessories.ts): glasses frames, tinted lenses, wristbands, stubble shadow. */
+  readonly eyewear: THREE.MeshToonMaterial;
+  readonly lens: THREE.MeshBasicMaterial;
+  readonly wrist: THREE.MeshToonMaterial;
+  readonly stubble: THREE.MeshToonMaterial;
 }
 
 export function createMaterials(look: CharacterLook): LookMaterials {
@@ -76,6 +81,10 @@ export function createMaterials(look: CharacterLook): LookMaterials {
     sole: toon(THEME.fx.sole),
     mouth: new THREE.MeshToonMaterial({ gradientMap: gradientMap(), alphaTest: 0.5 }),
     hat: toon(THEME.fx.hatColors[0]),
+    eyewear: toon(THEME.fx.eyewearColors[0]),
+    lens: new THREE.MeshBasicMaterial({ color: THEME.fx.lens, transparent: true, opacity: 0.85 }),
+    wrist: toon(THEME.fx.gearColors[0]),
+    stubble: new THREE.MeshToonMaterial({ color: THEME.fx.hairColors[0], gradientMap: gradientMap(), transparent: true, opacity: 0.22 }),
   };
 }
 

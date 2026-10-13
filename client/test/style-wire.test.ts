@@ -4,7 +4,10 @@ import { DEFAULT_STYLE, CharacterStyle } from "../src/character/character";
 import { STYLES_MSG_LEN, STYLE_LEN, decodeLook, decodeStyles, encodeStyle } from "../src/net/style-wire";
 import { HEADER } from "../src/net/protocol";
 
-const MINE: CharacterStyle = { ...DEFAULT_STYLE, hair: "afro", headwear: "cap", skin: 3, hairColor: 2, hatColor: 4, number: 23 };
+const MINE: CharacterStyle = {
+  ...DEFAULT_STYLE, hair: "afro", headwear: "beanie", skin: 3, hairColor: 2, hatColor: 4, number: 23,
+  eyewear: "shades", eyewearColor: 2, facialHair: "beard", wristbands: true, wristColor: 3, bootsColor: 4,
+};
 
 function stylesWith(slot: number, look: Uint8Array): Uint8Array {
   const msg = new Uint8Array(STYLES_MSG_LEN);
@@ -16,8 +19,14 @@ test("a look round-trips with its shirt number", () => {
   const look = decodeLook(encodeStyle(MINE), HEADER, 0);
   assert.ok(look);
   assert.equal(look.hair, "afro");
-  assert.equal(look.headwear, "cap");
   assert.equal(look.number, 23);
+  assert.equal(look.headwear, "beanie");
+  assert.equal(look.eyewear, "shades");
+  assert.equal(look.eyewearColor, 2);
+  assert.equal(look.facialHair, "beard");
+  assert.equal(look.wristbands, true);
+  assert.equal(look.wristColor, 3);
+  assert.equal(look.bootsColor, 4);
   assert.ok(Math.abs(look.headSize - MINE.headSize) < 0.01);
 });
 

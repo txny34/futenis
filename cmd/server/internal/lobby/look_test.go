@@ -62,7 +62,7 @@ func TestDecodeEmoteAndLobbyStyle(t *testing.T) {
 	if _, good := wire.DecodeEmote(bad); good {
 		t.Fatal("unknown emote kind accepted")
 	}
-	for _, n := range []int{8, wire.StyleLen} { // v1 and v2 looks
+	for _, n := range []int{8, 9, wire.StyleLen} { // v1, v2 and v3 looks
 		b := make([]byte, wire.HeaderLen+n)
 		b[0], b[1] = wire.MsgLobbyStyle, wire.Version
 		if st, good := wire.DecodeLobbyStyle(b); !good || st[0] != 1 {

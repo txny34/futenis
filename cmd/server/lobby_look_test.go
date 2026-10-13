@@ -19,7 +19,7 @@ func TestLobbyRelaysLooksAndEmotes(t *testing.T) {
 	b := dialLobby(ctx, t, srv, "10.5.9.2")
 	look := []byte{wire.MsgLobbyStyle, wire.Version, 0, 0, 0, 0, 0, 0, 1, 3, 1, 4, 2, 2, 200, 220, 78}
 	write(ctx, t, a, look)
-	if got := readType(ctx, t, b, wire.MsgLobbyLook); got[wire.HeaderLen+8+1] != 3 || got[len(got)-1] != 78 {
+	if got := readType(ctx, t, b, wire.MsgLobbyLook); got[wire.HeaderLen+8+1] != 3 || got[wire.HeaderLen+8+8] != 78 {
 		t.Fatalf("look %v", got)
 	}
 	write(ctx, t, a, []byte{wire.MsgEmote, wire.Version, 0, 0, 0, 0, 0, 0, 2})

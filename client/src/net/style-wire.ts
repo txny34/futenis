@@ -1,17 +1,19 @@
 import type { CharacterStyle } from "../character/character";
-import { BUILD_RANGE, HAIR_STYLES, HEADWEAR, HEAD_SIZE_RANGE, sanitizeStyle } from "../character/style";
+import { BUILD_RANGE, EYEWEAR, FACIAL_HAIR, HAIR_STYLES, HEADWEAR, HEAD_SIZE_RANGE, sanitizeStyle } from "../character/style";
 import { loadStyle, onStyleChange } from "../profile/style-store";
 import { HEADER, Msg, writeHeader } from "./protocol";
 
 // Online looks (cmd/server/internal/match/style.go): each client sends its
 // own STYLE after WELCOME and on every Estilos edit; the server relays every
 // seat's look (STYLES, server slot order). A look is 9 bytes: [present, hair,
-// headwear, skin, hairColor, hatColor, headSize, build, shirt number + 1]; the
-// sizes are 0..255 over their range, number 0 = unknown (an old client). The
+// headwear, skin, hairColor, hatColor, headSize, build, shirt number + 1,
+// eyewear, eyewearColor, facialHair, wristColor + 1 (0 = no wristbands),
+// bootsColor]; the sizes are 0..255 over their range, number 0 = unknown (an
+// old client: its missing bytes are zero, i.e. no accessories). The
 // lobby relays the same bytes (lobby/presence.ts). Visual only: received
 // bytes are untrusted and sanitized.
 
-export const STYLE_LEN = 9;
+export const STYLE_LEN = 14;
 const SEATS = 4;
 export const STYLE_MSG_LEN = HEADER + STYLE_LEN;
 export const STYLES_MSG_LEN = HEADER + SEATS * STYLE_LEN;
@@ -28,7 +30,8 @@ export function encodeStyle(st: Readonly<CharacterStyle>, type: number = Msg.Sty
   const b = new Uint8Array(STYLE_MSG_LEN);
   writeHeader(new DataView(b.buffer), type);
   b.set([1, HAIR_STYLES.indexOf(st.hair), HEADWEAR.indexOf(st.headwear), st.skin, st.hairColor, st.hatColor,
-    toByte(st.headSize, HEAD_SIZE_RANGE), toByte(st.build, BUILD_RANGE), st.number + 1], HEADER);
+    toByte(st.headSize, HEAD_SIZE_RANGE), toByte(st.build, BUILD_RANGE), st.number + 1,
+    EYEWEAR.indexOf(st.eyewear), st.eyewearColor, FACIAL_HAIR.indexOf(st.facialHair), st.wristbands ? st.wristColor + 1 : 0, st.bootsColor], HEADER);
   return b;
 }
 
@@ -40,6 +43,8 @@ export function decodeLook(msg: Uint8Array, o: number, fallbackNumber: number): 
     hair: HAIR_STYLES[msg[o + 1]], headwear: HEADWEAR[msg[o + 2]], skin: msg[o + 3], hairColor: msg[o + 4],
     hatColor: msg[o + 5], headSize: fromByte(msg[o + 6], HEAD_SIZE_RANGE), build: fromByte(msg[o + 7], BUILD_RANGE),
     number: n > 0 ? n - 1 : fallbackNumber,
+    eyewear: EYEWEAR[msg[o + 9]], eyewearColor: msg[o + 10], facialHair: FACIAL_HAIR[msg[o + 11]],
+    wristbands: msg[o + 12] > 0, wristColor: Math.max(0, msg[o + 12] - 1), bootsColor: msg[o + 13],
   });
 }
 

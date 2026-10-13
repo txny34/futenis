@@ -1,5 +1,7 @@
 import { CharacterStyle, styleFromSeed } from "../../character/character";
 import { BUILD_RANGE, HAIR_STYLES, HEADWEAR, HEAD_SIZE_RANGE, HairStyle, Headwear, MAX_SHIRT_NUMBER } from "../../character/style";
+import { accessoryRows } from "./accessory-rows";
+import { swatches } from "./swatches";
 import { THEME } from "../../env/theme";
 import { t } from "../../i18n/t";
 import { loadStyle, saveStyle } from "../../profile/style-store";
@@ -16,28 +18,12 @@ const HAIR_LABELS: Readonly<Record<HairStyle, string>> = {
   afro: "Afro", bald: t("Pelado", "Bald"), ponytail: t("Colita", "Ponytail"),
 };
 const HEADWEAR_LABELS: Readonly<Record<Headwear, string>> = {
-  none: t("Nada", "None"), cap: t("Gorra", "Cap"), headband: t("Vincha", "Headband"),
+  none: t("Nada", "None"), cap: t("Gorra", "Cap"), capBack: t("Gorra atrás", "Backwards cap"),
+  headband: t("Vincha", "Headband"), beanie: t("Gorro de lana", "Beanie"),
 };
 const STEP = 0.01;
 const SAVE_DELAY_MS = 250; // a slider drag saves once it settles, not per input event
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
-const hex = (c: number): string => `#${c.toString(16).padStart(6, "0")}`;
-
-function swatches(label: string, colors: readonly number[], value: number, onPick: (i: number) => void): HTMLElement {
-  const row = el("div", "fx-row");
-  const group = el("div", "fx-styles__swatches", "", { role: "radiogroup", "aria-label": label });
-  colors.forEach((c, i) => {
-    const b = el("button", "fx-styles__swatch", "", { type: "button", role: "radio", "aria-checked": String(i === value), "aria-label": `${label} ${i + 1}` });
-    b.style.background = hex(c);
-    b.addEventListener("click", () => {
-      for (const o of group.children) o.setAttribute("aria-checked", String(o === b)); // in place: focus stays
-      onPick(i);
-    });
-    group.append(b);
-  });
-  row.append(el("span", "fx-row__label", label), group);
-  return row;
-}
 
 export class StylesModal {
   private readonly root = el("div", "fx-styles", "", { role: "dialog", "aria-modal": "true", "aria-label": t("Estilos", "Styles") });
@@ -123,6 +109,7 @@ export class StylesModal {
       segmented(t("Cabeza", "Headwear"), wear, s.headwear, (v) => this.patch({ headwear: v })),
       swatches(t("Color de gorro", "Headwear color"), fx.hatColors, s.hatColor, (i) => this.patch({ hatColor: i })),
       swatches(t("Piel", "Skin"), fx.skinTones, s.skin, (i) => this.patch({ skin: i })),
+      ...accessoryRows(s, (p) => this.patch(p)),
       slider({ label: t("Tamaño de cabeza", "Head size"), min: HEAD_SIZE_RANGE[0], max: HEAD_SIZE_RANGE[1], step: STEP,
         value: s.headSize, format: pct, onInput: (v) => this.patch({ headSize: v }) }),
       slider({ label: t("Contextura", "Build"), min: BUILD_RANGE[0], max: BUILD_RANGE[1], step: STEP,
