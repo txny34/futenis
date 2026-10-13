@@ -2,6 +2,7 @@
    Colors only from the --fx-* tokens (menu.css :root); swatches paint theme palette entries. */
 .fx-styles {
   position: fixed; inset: 0; z-index: 20; overflow-y: auto;
+  grid-template-columns: minmax(0, 1fr);
   display: grid; grid-template-rows: auto 1fr auto; gap: 16px; padding: 24px 32px;
   font-family: var(--fx-body); color: var(--fx-line);
   background: rgba(3, 10, 26, .82); backdrop-filter: blur(8px);
@@ -14,16 +15,27 @@
 }
 .fx-styles__close:hover, .fx-styles__close:focus-visible { border-color: var(--fx-hot); color: var(--fx-hot); }
 .fx-styles__body {
-  display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 560px); gap: 32px;
-  justify-content: center; align-items: start;
+  display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 640px); gap: 28px;
+  justify-content: center; align-items: start; min-height: 0;
 }
+.fx-styles__panel {
+  display: grid; grid-template-rows: auto 1fr; min-height: 0; border-radius: var(--fx-radius);
+  background: var(--fx-card); border: 2px solid rgba(233, 241, 255, .12); overflow: hidden;
+}
+.fx-styles__tabs { display: flex; border-bottom: 2px solid rgba(233, 241, 255, .1); }
+.fx-styles__tab {
+  flex: 1; padding: 14px 10px; cursor: pointer; border: 0; background: transparent;
+  font: 700 15px var(--fx-body); color: var(--fx-line); opacity: .65; border-bottom: 3px solid transparent;
+}
+.fx-styles__tab:hover, .fx-styles__tab:focus-visible { opacity: 1; }
+.fx-styles__tab[aria-selected="true"] { opacity: 1; color: var(--fx-ball); border-bottom-color: var(--fx-ball); }
 .fx-styles__stage {
-  display: grid; place-items: center; border-radius: var(--fx-radius);
+  display: grid; place-items: center; min-height: 0; height: min(620px, calc(100vh - 190px)); padding: 8px; border-radius: var(--fx-radius);
   background: radial-gradient(circle at 50% 40%, rgba(223, 255, 31, .14), transparent 62%), var(--fx-card);
   border: 2px solid rgba(233, 241, 255, .12);
 }
-.fx-styles__canvas { width: 300px; max-width: 100%; height: auto; aspect-ratio: 300 / 380; }
-.fx-styles__form { display: grid; gap: 14px; padding: 18px; border-radius: var(--fx-radius); background: var(--fx-card); border: 2px solid rgba(233, 241, 255, .12); }
+.fx-styles__canvas { height: 100%; width: auto; max-width: 100%; aspect-ratio: 340 / 560; } /* fills the stage's height */
+.fx-styles__form { display: grid; align-content: start; gap: 6px; padding: 10px 20px 18px; overflow-y: auto; }
 .fx-styles__swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .fx-styles__swatch {
   width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
@@ -37,5 +49,6 @@
 @media (max-width: 760px) {
   .fx-styles { padding: 16px; }
   .fx-styles__body { grid-template-columns: minmax(0, 1fr); }
+  .fx-styles__canvas { width: 220px; }
 }
 @media (prefers-reduced-motion: reduce) { .fx-styles__swatch { transition: none; } }

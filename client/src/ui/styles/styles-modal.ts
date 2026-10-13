@@ -22,12 +22,18 @@ const HEADWEAR_LABELS: Readonly<Record<Headwear, string>> = {
   headband: t("Vincha", "Headband"), beanie: t("Gorro de lana", "Beanie"),
 };
 const STEP = 0.01;
+type Tab = "head" | "face" | "body";
+const TABS: readonly (readonly [Tab, string])[] = [
+  ["head", t("Cabeza", "Head")], ["face", t("Cara", "Face")], ["body", t("Cuerpo", "Body")],
+];
 const SAVE_DELAY_MS = 250; // a slider drag saves once it settles, not per input event
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
 
 export class StylesModal {
   private readonly root = el("div", "fx-styles", "", { role: "dialog", "aria-modal": "true", "aria-label": t("Estilos", "Styles") });
   private readonly form = el("div", "fx-styles__form");
+  private readonly tabs = el("div", "fx-styles__tabs", "", { role: "tablist" });
+  private tab: Tab = "head";
   private readonly preview = new StylePreview();
   private readonly openCbs: Array<() => void> = [];
   private style: CharacterStyle = { ...loadStyle() };
@@ -40,8 +46,10 @@ export class StylesModal {
     close.setAttribute("aria-label", t("Cerrar", "Close"));
     const stage = el("div", "fx-styles__stage");
     stage.append(this.preview.canvas);
+    const panel = el("div", "fx-styles__panel");
+    panel.append(this.tabs, this.form);
     const body = el("div", "fx-styles__body");
-    body.append(stage, this.form);
+    body.append(stage, panel);
     const random = button(t("Aleatorio", "Random"), () => this.set(styleFromSeed(Date.now() & 0x7fffffff), true, true), "fx-btn fx-btn--ghost");
     const done = button(t("Listo", "Done"), () => this.close(), "fx-btn fx-btn--hero");
     const foot = el("div", "fx-styles__foot");
@@ -99,23 +107,43 @@ export class StylesModal {
   }
 
   private build(): void {
+    this.tabs.replaceChildren(...TABS.map(([id, label]) => {
+      const b = button(label, () => { this.tab = id; this.build(); }, "fx-styles__tab");
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", String(id === this.tab));
+      return b;
+    }));
+    this.form.replaceChildren(...this.rows()[this.tab]);
+  }
+
+  /** The controls of every tab (only the open one is shown). */
+  private rows(): Record<Tab, HTMLElement[]> {
     const s = this.style;
     const fx = THEME.fx;
+    const p = (x: Partial<CharacterStyle>): void => this.patch(x);
     const hair: Choice<HairStyle>[] = HAIR_STYLES.map((v) => ({ value: v, label: HAIR_LABELS[v] }));
     const wear: Choice<Headwear>[] = HEADWEAR.map((v) => ({ value: v, label: HEADWEAR_LABELS[v] }));
-    this.form.replaceChildren(
-      segmented(t("Pelo", "Hair"), hair, s.hair, (v) => this.patch({ hair: v })),
-      swatches(t("Color de pelo", "Hair color"), fx.hairColors, s.hairColor, (i) => this.patch({ hairColor: i })),
-      segmented(t("Cabeza", "Headwear"), wear, s.headwear, (v) => this.patch({ headwear: v })),
-      swatches(t("Color de gorro", "Headwear color"), fx.hatColors, s.hatColor, (i) => this.patch({ hatColor: i })),
-      swatches(t("Piel", "Skin"), fx.skinTones, s.skin, (i) => this.patch({ skin: i })),
-      ...accessoryRows(s, (p) => this.patch(p)),
-      slider({ label: t("Tamaño de cabeza", "Head size"), min: HEAD_SIZE_RANGE[0], max: HEAD_SIZE_RANGE[1], step: STEP,
-        value: s.headSize, format: pct, onInput: (v) => this.patch({ headSize: v }) }),
-      slider({ label: t("Contextura", "Build"), min: BUILD_RANGE[0], max: BUILD_RANGE[1], step: STEP,
-        value: s.build, format: pct, onInput: (v) => this.patch({ build: v }) }),
-      slider({ label: t("Número de camiseta", "Shirt number"), min: 0, max: MAX_SHIRT_NUMBER, step: 1,
-        value: s.number, format: (v) => String(Math.round(v)), onInput: (v) => this.patch({ number: Math.round(v) }) }),
-    );
+    const [eyewear, eyewearColor, facial, wrist, wristColor, boots] = accessoryRows(s, p);
+    return {
+      head: [
+        segmented(t("Pelo", "Hair"), hair, s.hair, (v) => p({ hair: v })),
+        swatches(t("Color de pelo", "Hair color"), fx.hairColors, s.hairColor, (i) => p({ hairColor: i })),
+        segmented(t("Gorro", "Headwear"), wear, s.headwear, (v) => p({ headwear: v })),
+        swatches(t("Color de gorro", "Headwear color"), fx.hatColors, s.hatColor, (i) => p({ hatColor: i })),
+        slider({ label: t("Tamaño de cabeza", "Head size"), min: HEAD_SIZE_RANGE[0], max: HEAD_SIZE_RANGE[1], step: STEP,
+          value: s.headSize, format: pct, onInput: (v) => p({ headSize: v }) }),
+      ],
+      face: [
+        swatches(t("Piel", "Skin"), fx.skinTones, s.skin, (i) => p({ skin: i })),
+        eyewear, eyewearColor, facial,
+      ],
+      body: [
+        slider({ label: t("Contextura", "Build"), min: BUILD_RANGE[0], max: BUILD_RANGE[1], step: STEP,
+          value: s.build, format: pct, onInput: (v) => p({ build: v }) }),
+        slider({ label: t("Número de camiseta", "Shirt number"), min: 0, max: MAX_SHIRT_NUMBER, step: 1,
+          value: s.number, format: (v) => String(Math.round(v)), onInput: (v) => p({ number: Math.round(v) }) }),
+        wrist, wristColor, boots,
+      ],
+    };
   }
 }

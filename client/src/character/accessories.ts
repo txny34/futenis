@@ -81,8 +81,10 @@ export function buildAccessories(rig: Rig, headDress: THREE.Object3D, m: LookMat
   const face = new THREE.Group();
   headDress.add(face);
   const band = new THREE.CylinderGeometry(0.044, 0.042, 0.05, 12);
+  const stripe = new THREE.CylinderGeometry(0.0445, 0.0445, 0.01, 12); // a white stripe across the band
   const wrists = (["L", "R"] as const).map((s) => {
     const w = mesh(rig.bones[`foreArm${s}`], band, m.wrist, 0, WRIST_Y, 0);
+    mesh(w, stripe, m.sole, 0, 0, 0);
     w.visible = false;
     return w;
   });

@@ -4,7 +4,7 @@ import { serverBase } from "../net/server-url";
 import { displayName } from "../profile/display-name";
 import { profileStore } from "../profile/store";
 import { loadStyle } from "../profile/style-store";
-import { STYLE_LEN, decodeLook, encodeStyle } from "../net/style-wire";
+import { LOOK_SIZES, decodeLook, encodeStyle } from "../net/style-wire";
 import { Extra, Snap } from "../snapshot";
 import { isOnline } from "./online-state";
 import type { App } from "./flow";
@@ -152,8 +152,9 @@ function receive(remotes: RemotePlayers, v: DataView): void {
       remotes.remove(f(0));
       break;
     case LobbyMsg.Look: {
-      if (v.byteLength !== HEADER + 8 + STYLE_LEN) break;
-      const look = decodeLook(new Uint8Array(v.buffer), HEADER + 8, 0);
+      const size = v.byteLength - HEADER - 8;
+      if (!LOOK_SIZES.includes(size)) break;
+      const look = decodeLook(new Uint8Array(v.buffer), HEADER + 8, 0, size);
       if (look) remotes.look(f(0), look);
       break;
     }

@@ -55,3 +55,15 @@ test("an old client's look (no number) falls back to the seat number", () => {
   assert.equal(decodeLook(v1, HEADER, 9)?.number, 9);
   assert.equal(decodeStyles(new Uint8Array(STYLES_MSG_LEN - 1), STYLES_MSG_LEN - 1, 0), null);
 });
+
+test("a v2 server's STYLES (4 x 9) still decodes, without accessories", () => {
+  const v3 = encodeStyle(MINE);
+  const msg = new Uint8Array(HEADER + 4 * 9);
+  msg.set(v3.subarray(HEADER, HEADER + 9), HEADER + 9); // seat 1
+  const looks = decodeStyles(msg, msg.length, 0);
+  assert.ok(looks);
+  assert.equal(looks[1]?.hair, "afro");
+  assert.equal(looks[1]?.number, 23);
+  assert.equal(looks[1]?.eyewear, "none");
+  assert.equal(looks[0], null);
+});

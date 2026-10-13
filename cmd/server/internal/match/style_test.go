@@ -115,6 +115,10 @@ func TestDecodeStyle(t *testing.T) {
 	if !ok || st != (wire.Style{1, 1, 2, 3, 4, 5, 6, 7}) {
 		t.Fatalf("got %v %v (present must be forced on)", st, ok)
 	}
+	v2 := wire.EncodeStyle(wire.Style{0, 1, 2, 3, 4, 5, 6, 7, 8})[:wire.HeaderLen+9]
+	if st, ok := wire.DecodeStyle(v2); !ok || st[8] != 8 || st[9] != 0 {
+		t.Fatalf("9-byte look: %v %v (tail must be zero)", st, ok)
+	}
 	if _, ok := wire.DecodeStyle(make([]byte, wire.StyleMsgLen+1)); ok {
 		t.Fatal("wrong length accepted")
 	}

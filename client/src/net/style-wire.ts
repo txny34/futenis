@@ -35,9 +35,16 @@ export function encodeStyle(st: Readonly<CharacterStyle>, type: number = Msg.Sty
   return b;
 }
 
-/** The look at msg[o..o+STYLE_LEN), or null when absent; fallbackNumber when it carries none. */
-export function decodeLook(msg: Uint8Array, o: number, fallbackNumber: number): CharacterStyle | null {
-  if (msg[o] === 0) return null;
+/** Look sizes a server may relay: v2 (9 bytes, no accessories) and v3 (STYLE_LEN). */
+export const LOOK_SIZES: readonly number[] = [9, STYLE_LEN];
+
+/** The look at msg[o..o+size), or null when absent; fallbackNumber when it carries none.
+ * Bytes past `size` (an older peer or server) read as 0: no accessories. */
+export function decodeLook(src: Uint8Array, o: number, fallbackNumber: number, size = STYLE_LEN): CharacterStyle | null {
+  if (src[o] === 0) return null;
+  const msg = new Uint8Array(STYLE_LEN);
+  msg.set(src.subarray(o, o + Math.min(size, STYLE_LEN)));
+  o = 0;
   const n = msg[o + 8];
   return sanitizeStyle({
     hair: HAIR_STYLES[msg[o + 1]], headwear: HEADWEAR[msg[o + 2]], skin: msg[o + 3], hairColor: msg[o + 4],
@@ -50,9 +57,10 @@ export function decodeLook(msg: Uint8Array, o: number, fallbackNumber: number): 
 
 /** STYLES in my view order: the client in server slot `me` sees slot s at s ^ me (game/view.go). */
 export function decodeStyles(msg: Uint8Array, len: number, me: number): Looks | null {
-  if (len !== STYLES_MSG_LEN) return null;
+  const size = (len - HEADER) / SEATS;
+  if (!LOOK_SIZES.includes(size)) return null;
   const looks: (CharacterStyle | null)[] = [null, null, null, null];
-  for (let s = 0; s < SEATS; s++) looks[s ^ me] = decodeLook(msg, HEADER + s * STYLE_LEN, SEAT_NUMBERS[s]);
+  for (let s = 0; s < SEATS; s++) looks[s ^ me] = decodeLook(msg, HEADER + s * size, SEAT_NUMBERS[s], size);
   return looks;
 }
 

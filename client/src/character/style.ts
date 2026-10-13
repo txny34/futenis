@@ -31,7 +31,7 @@ export interface CharacterStyle {
   facialHair: FacialHair;
   /** Wristbands on both wrists. */
   wristbands: boolean;
-  /** Indices into THEME.fx.eyewearColors / gearColors (wristbands) / bootColors (sneakers). */
+  /** Indices into THEME.fx.eyewearColors / gearColors (wristbands) / bootColors (sneakers; -1 keeps the look's, lobby decor). */
   eyewearColor: number;
   wristColor: number;
   bootsColor: number;

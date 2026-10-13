@@ -36,7 +36,7 @@ interface Athlete { readonly ch: Character; readonly pose: CharacterPose; readon
 
 function athlete(shirt: number, side: 1 | -1): Athlete {
   const ch = createCharacter({ shirt, shorts: THEME.crowdBody[0], trim: THEME.crowdBody[0], ink: THEME.crowdBody[0], skin: THEME.crowdSkin[side > 0 ? 1 : 0], hair: THEME.crowdBody[3], boots: THEME.lobbyDecor.neon[1] });
-  ch.setStyle(styleFromSeed(side > 0 ? 7 : 11));
+  ch.setStyle({ ...styleFromSeed(side > 0 ? 7 : 11), bootsColor: -1 }); // neon sneakers from the look
   const strike: StrikePose = { tier: "low", t: 0, contact: null };
   return { ch, strike, side, z: 0, pose: { speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: side * Math.PI / 2 } };
 }
