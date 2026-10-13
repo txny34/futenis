@@ -50,6 +50,7 @@ export function createCharacter(look: CharacterLook = DEFAULT_LOOK): Character {
     materials.hat.color.setHex(fx.hatColors[style.hatColor] ?? fx.hatColors[0]);
     materials.eyewear.color.setHex(fx.eyewearColors[style.eyewearColor] ?? fx.eyewearColors[0]);
     materials.wrist.color.setHex(fx.gearColors[style.wristColor] ?? fx.gearColors[0]);
+    // bootsColor -1 is only set in code (lobby decor via setStyle, never sanitized or sent): keep the look's sneakers.
     if (style.bootsColor >= 0) materials.boots.color.setHex(fx.bootColors[style.bootsColor] ?? fx.bootColors[0]); // < 0: keep the look's
     materials.stubble.color.setHex(fx.hairColors[style.hairColor] ?? fx.hairColors[0]);
   };

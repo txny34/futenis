@@ -107,13 +107,36 @@ export class StylesModal {
   }
 
   private build(): void {
-    this.tabs.replaceChildren(...TABS.map(([id, label]) => {
-      const b = button(label, () => { this.tab = id; this.build(); }, "fx-styles__tab");
-      b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", String(id === this.tab));
-      return b;
-    }));
+    if (this.tabs.childElementCount === 0) this.makeTabs();
+    for (const b of this.tabs.children) {
+      const on = b.getAttribute("data-tab") === this.tab;
+      b.setAttribute("aria-selected", String(on));
+      b.setAttribute("tabindex", on ? "0" : "-1"); // roving focus: arrows move between tabs
+    }
+    this.form.setAttribute("aria-labelledby", `fx-styles-tab-${this.tab}`);
     this.form.replaceChildren(...this.rows()[this.tab]);
+  }
+
+  /** The tab buttons, once: switching only updates them, so keyboard focus stays put. */
+  private makeTabs(): void {
+    this.form.id = "fx-styles-panel";
+    this.form.setAttribute("role", "tabpanel");
+    const pick = (i: number): void => {
+      this.tab = TABS[(i + TABS.length) % TABS.length][0];
+      this.build();
+      (this.tabs.children[TABS.findIndex(([id]) => id === this.tab)] as HTMLElement).focus();
+    };
+    TABS.forEach(([id, label], i) => {
+      const b = button(label, () => pick(i), "fx-styles__tab");
+      b.id = `fx-styles-tab-${id}`;
+      b.dataset.tab = id;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-controls", "fx-styles-panel");
+      b.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); pick(i + (e.key === "ArrowRight" ? 1 : -1)); }
+      });
+      this.tabs.append(b);
+    });
   }
 
   /** The controls of every tab (only the open one is shown). */

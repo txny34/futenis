@@ -49,6 +49,6 @@
 @media (max-width: 760px) {
   .fx-styles { padding: 16px; }
   .fx-styles__body { grid-template-columns: minmax(0, 1fr); }
-  .fx-styles__canvas { width: 220px; }
+  .fx-styles__stage { height: min(300px, 42vh); } /* the tabs stay in view below */
 }
 @media (prefers-reduced-motion: reduce) { .fx-styles__swatch { transition: none; } }
