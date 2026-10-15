@@ -3,7 +3,8 @@ import { Mode, Phase, SNAP_LEN, Snap } from "../snapshot";
 import { recentErrors } from "./errors";
 
 // Plain-text bug report: what the player wrote + enough context to reproduce.
-// No personal data: no profile name, no room code (URL query is dropped).
+// No profile name or room code (URL query is dropped); a sent report is
+// linked to the signed-in account by the database.
 export interface ReportContext {
   note: string;
   /** Latest snapshot (curr), or null before wasm loads. */
