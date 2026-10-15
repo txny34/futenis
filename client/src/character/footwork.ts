@@ -63,3 +63,18 @@ export function applyFidget(b: Bones, kind: Fidget, u: number, k: number): void 
   b.upperArmR.rotation.z -= STRETCH_ARM * bump;
   b.spine.rotation.x -= STRETCH_LEAN * bump;
 }
+
+const DASH_LEAN = 0.5;
+const DASH_ARMS_BACK = 0.9;
+const DASH_LEAD_THIGH = 0.6;
+const DASH_TRAIL_THIGH = 0.4;
+
+/** Dash burst (sprinter's drive): chest forward, arms thrown back, legs split; weight k. */
+export function applyDash(b: Bones, k: number): void {
+  if (k <= 0) return;
+  b.spine.rotation.x += DASH_LEAN * k;
+  b.upperArmL.rotation.x += DASH_ARMS_BACK * k;
+  b.upperArmR.rotation.x += DASH_ARMS_BACK * k;
+  b.upLegR.rotation.x -= DASH_LEAD_THIGH * k;
+  b.upLegL.rotation.x += DASH_TRAIL_THIGH * k;
+}

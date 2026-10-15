@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { StrikeTier } from "./config";
 import { applyContactIk } from "./contact";
 import { applyCheer, applyDance, applySlump, applyWave, cheerHop } from "./gestures";
-import { applyFidget, applyShuffle, applySkid } from "./footwork";
+import { applyDash, applyFidget, applyShuffle, applySkid } from "./footwork";
 import { FootworkClock } from "./footwork-clock";
 import { applyAir, applyIdle, applyLocomotion, applyRest } from "./poses";
 import { BROW_REST_Y, Rig, groundSnap, resetRig } from "./rig";
@@ -48,6 +48,8 @@ export interface CharacterPose {
   dance?: number;
   /** Side shuffle -1..1 (footwork.ts): + steps to the body's left; 0 = run facing the move. */
   strafe?: number;
+  /** Dash burst 0..1 (a bell over the burst, view/players.ts). */
+  dash?: number;
 }
 
 const TAU = Math.PI * 2;
@@ -63,6 +65,7 @@ const MIN_HEAD_HOP = 0.08;
 const CHARGE_RUN_DAMP = 0.75;
 const LAND_SQUASH = 0.09; // touchdown absorb after a jump
 const LAND_S = 0.18;
+const DASH_STRETCH = 0.05; // the body lengthens into the burst
 /** Covers the contact squash and spine flex so the brow chain stays in reach. */
 const HEAD_LIFT_MARGIN = 0.14; // + the header's bent knees lowering the brow at contact
 
@@ -123,6 +126,7 @@ export function createAnimator(rig: Rig): Animator {
     applyLocomotion(rig.bones, phase, move * (1 - Math.abs(strafe)));
     applyShuffle(rig.bones, phase, Math.sign(strafe), move * Math.abs(strafe));
     applySkid(rig.bones, k * (1 - air) * feet.skid);
+    applyDash(rig.bones, k * (pose.dash ?? 0));
     applyAir(rig.bones, pose.verticalVel, k * air);
     applyCheer(rig.bones, time, k * (pose.cheer ?? 0)); // not gated by air: no snap when jumping mid-cheer
     applySlump(rig.bones, time, k * (pose.slump ?? 0));
@@ -159,7 +163,7 @@ export function createAnimator(rig: Rig): Animator {
     if (wasAir && !pose.airborne) land = 1;
     wasAir = pose.airborne;
     land = Math.max(0, land - dt / LAND_S);
-    stretch(air - CONTACT_SQUASH * squash - LAND_SQUASH * land * land);
+    stretch(air + DASH_STRETCH * (pose.dash ?? 0) - CONTACT_SQUASH * squash - LAND_SQUASH * land * land);
     if (!pose.airborne) {
       groundSnap(rig);
       rig.bones.hips.position.y += cheerHop(time, pose.cheer ?? 0);
