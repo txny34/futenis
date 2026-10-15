@@ -127,6 +127,15 @@ function onVisibility(): void {
   if (Date.now() - lastPull > PULL_EVERY_MS) queueSync(u.id);
 }
 
+/** A deleted account: this browser's progress becomes plain guest progress
+ * (no owner, nothing set aside for an account that will never sign in again). */
+export function forgetCloudAccount(id: string): void {
+  try {
+    if (localStorage.getItem(OWNER_KEY) === id) localStorage.removeItem(OWNER_KEY);
+    localStorage.removeItem(PENDING_PREFIX + id);
+  } catch { /* blocked storage: nothing was kept */ }
+}
+
 /** Wires the sync once at boot (before initAuth resolves). Unpushed changes
  * survive sign-out: the browser keeps them under the owner and the next sign-in
  * of that account merges them. */
