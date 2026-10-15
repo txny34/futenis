@@ -1,5 +1,7 @@
 // Online wire protocol v1 (docs/design/online-spike.md §4; server: cmd/server/internal/wire). LE, 8-byte header.
 export const PROTO_VERSION = 1;
+/** Sent on every connection: the server closes other versions with 4010 (wire.CloseOutdated). */
+export const PROTO_QUERY = `proto=${PROTO_VERSION}`;
 export const HEADER = 8;
 export const Msg = {
   Input: 0x01, Ping: 0x02, Auth: 0x03, Style: 0x04, Welcome: 0x81, Waiting: 0x82, Frame: 0x83, Pong: 0x84, PeerLeft: 0x85, Result: 0x86,

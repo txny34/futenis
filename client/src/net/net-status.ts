@@ -1,4 +1,4 @@
-import { HEADER, Msg, writeHeader } from "./protocol";
+import { HEADER, Msg, PROTO_VERSION, writeHeader } from "./protocol";
 
 // Online session states and the server's close codes (cmd/server/internal/wire/close.go).
 export type NetStatus =
@@ -23,11 +23,15 @@ export function authMessage(token: string): Uint8Array<ArrayBuffer> {
   return msg;
 }
 
+/** cmd/server CloseOutdated: this page speaks another protocol version. */
+export const CLOSE_OUTDATED = 4010;
+
 export const CLOSE_STATUS: Readonly<Record<number, NetStatus | undefined>> = {
   4003: "desconectado por inactividad",
   4004: "demasiados mensajes",
   4005: "nadie se unió a la sala",
   4006: "iniciá sesión",
+  [CLOSE_OUTDATED]: "versión distinta, recargá",
 };
 
 /** cmd/server closeGone: the held seat is gone (match over or the hold ran out). */
@@ -38,7 +42,7 @@ export const CLOSE_REQUEUE = 4009;
 /** Same server, ?rejoin=TOKEN instead of the room/queue (cmd/server/hub_rejoin.go). */
 export function rejoinUrl(url: string, token: string): string {
   const u = new URL(url);
-  u.search = new URLSearchParams({ rejoin: token }).toString();
+  u.search = new URLSearchParams({ rejoin: token, proto: String(PROTO_VERSION) }).toString();
   return u.toString();
 }
 

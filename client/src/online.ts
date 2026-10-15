@@ -4,6 +4,7 @@ import { LANG, t } from "./i18n/t";
 import { Controls } from "./input";
 import { GameLoop, LoopState } from "./loop";
 import { NetStatus, RemoteEngine } from "./net/remote-engine";
+import { PROTO_QUERY } from "./net/protocol";
 import { serverBase } from "./net/server-url";
 import { CourtView } from "./render";
 
@@ -68,7 +69,7 @@ function boot(): void {
   controls.onZoom = (d) => view.rig.zoom(d);
   controls.onLockChange = (locked) => hud.setCrosshair(locked);
   const state: LoopState = { running: true, paused: false, fpsCap: 0, cameraShake: true, holdUntil: 0, showLanding: true };
-  const engine = new RemoteEngine(`${serverBase()}/ws?room=${room}`, lag);
+  const engine = new RemoteEngine(`${serverBase()}/ws?room=${room}&${PROTO_QUERY}`, lag);
   const lagText = lag > 0 ? ` · ${t("lag simulado", "simulated lag")} ${lag} ms` : "";
   engine.onStatus = (s, ping) => {
     net.textContent = `${t("Sala", "Room")} ${room} · ${statusText(s)}${s === "jugando" ? ` · ${ping} ms` : ""}${lagText}`;
