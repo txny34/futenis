@@ -31,6 +31,10 @@ func (h *hub) ServeLobby(w http.ResponseWriter, req *http.Request) {
 	}
 	defer c.CloseNow()
 	c.SetReadLimit(readLimit)
+	if !wire.ClientProtoOK(req.URL.Query().Get("proto")) {
+		_ = c.Close(websocket.StatusCode(wire.CloseOutdated), "reload the game")
+		return
+	}
 	p := wsPeer{c}
 	l, id, ok := h.joinLobby(p)
 	if !ok {

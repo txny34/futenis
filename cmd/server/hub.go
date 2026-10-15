@@ -15,6 +15,7 @@ import (
 	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/netlimit"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
+	"github.com/txny34/futenis/cmd/server/internal/wire"
 	"github.com/txny34/futenis/sim"
 )
 
@@ -158,6 +159,10 @@ func (h *hub) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return // Accept already wrote the HTTP error
 	}
 	c.SetReadLimit(readLimit)
+	if !wire.ClientProtoOK(q.Get("proto")) {
+		_ = c.Close(websocket.StatusCode(wire.CloseOutdated), "reload the game")
+		return
+	}
 	if rejoin != "" {
 		h.serveRejoin(req.Context(), rejoin, c)
 		return
