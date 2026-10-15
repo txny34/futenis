@@ -86,3 +86,21 @@ export function applyDash(b: Bones, k: number): void {
   b.upLegL.rotation.x += DASH_TRAIL_THIGH * k;
   b.legL.rotation.x += DASH_TRAIL_KNEE * k;
 }
+
+const RITUAL_HZ = 1.6;
+const RITUAL_THIGH = 0.12;
+const RITUAL_KNEE = 0.28;
+const RITUAL_SHOULDER = 0.12;
+
+/** Pre-serve ritual: bounce on the knees and loosen the shoulders before the drop; weight k. */
+export function applyRitual(b: Bones, time: number, k: number): void {
+  if (k <= 0) return;
+  const bob = (1 - Math.cos(time * Math.PI * 2 * RITUAL_HZ)) / 2 * k;
+  const roll = Math.sin(time * Math.PI * RITUAL_HZ) * k;
+  b.upLegL.rotation.x -= RITUAL_THIGH * bob;
+  b.upLegR.rotation.x -= RITUAL_THIGH * bob;
+  b.legL.rotation.x += RITUAL_KNEE * bob;
+  b.legR.rotation.x += RITUAL_KNEE * bob;
+  b.upperArmL.rotation.z += RITUAL_SHOULDER * roll;
+  b.upperArmR.rotation.z -= RITUAL_SHOULDER * roll; // mirrored: a symmetric shoulder roll
+}

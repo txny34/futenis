@@ -5,10 +5,10 @@ import { SIM_ZONES, StrikeTier } from "./config";
 // Drives a CharacterPose for the preview from a selected demo state. Writes
 // into one preallocated pose / contact vector each frame.
 
-export type DemoState = "idle" | "run" | "jump" | "charge" | "perfect" | "cheer" | "slump" | "shuffle" | "dash" | StrikeTier;
+export type DemoState = "idle" | "run" | "jump" | "charge" | "perfect" | "cheer" | "slump" | "shuffle" | "dash" | "ritual" | StrikeTier;
 
 export const DEMO_STATES: readonly DemoState[] = [
-  "idle", "run", "jump", "charge", "low", "mid", "high", "perfect", "cheer", "slump", "shuffle", "dash",
+  "idle", "run", "jump", "charge", "low", "mid", "high", "perfect", "cheer", "slump", "shuffle", "dash", "ritual",
 ];
 
 const GRAVITY = 9.81;
@@ -73,7 +73,7 @@ export function createDriver(): { frame: DemoFrame; step(state: DemoState, speed
 
   function step(state: DemoState, speed: number, time: number, scrub: number | null, side: SideMode): void {
     pose.speed = 0; pose.airborne = false;
-    pose.verticalVel = 0; pose.charge = 0; pose.strike = null; pose.cheer = 0; pose.slump = 0; pose.strafe = 0; pose.dash = 0;
+    pose.verticalVel = 0; pose.charge = 0; pose.strike = null; pose.cheer = 0; pose.slump = 0; pose.strafe = 0; pose.dash = 0; pose.ritual = 0;
     frame.rootY = 0; frame.ballVisible = false;
     switch (state) {
       case "idle": return;
@@ -81,6 +81,7 @@ export function createDriver(): { frame: DemoFrame; step(state: DemoState, speed
       case "cheer": pose.cheer = 1; return;
       case "shuffle": pose.speed = 0.45; pose.strafe = Math.sin(time * 0.8) > 0 ? 1 : -1; return;
       case "slump": pose.slump = 1; return;
+      case "ritual": pose.ritual = 1; return;
       case "dash": { // a burst every DASH_PERIOD while running; the t slider holds a point of the bell
         const u = scrub ?? Math.min(1, (time % DASH_PERIOD) / DASH_S);
         pose.speed = 1;
