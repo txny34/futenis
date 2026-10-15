@@ -1,9 +1,9 @@
 // Ring of the last uncaught errors / rejections, attached to bug reports.
-// Kept local: nothing is sent anywhere (no backend yet).
+// Sent only inside a bug report the player chooses to send.
 const MAX_ERRORS = 20;
 const MAX_LEN = 300;
 
-const QUERY = /\?[^\s'"]*/g; // URL queries can carry room codes
+const QUERY = /[?#][^\s'"]*/g; // URL queries and fragments can carry room codes
 
 const log: string[] = [];
 let installed = false;
