@@ -1,9 +1,11 @@
 import { authUser, initAuth, logout, onAuthChange } from "../auth/auth";
 import { syncRatings } from "../auth/ratings";
+import { deleteAccount } from "../auth/delete-account";
 import { guestChosen } from "../auth/session";
 import { t } from "../i18n/t";
 import { startCloudSync } from "../profile/cloud";
 import { profileWriter } from "../profile/store";
+import { deleteAccountView } from "../ui/delete-account";
 import { LoginModal } from "../ui/login-modal";
 import { lobbyPlayersView } from "../ui/lobby-players";
 import { extraOverlayOpen, registerOverlay } from "../ui/overlays";
@@ -22,6 +24,8 @@ export interface Account {
   menuItem(): { label: string; run: () => void };
   /** Esc lobby menu entry: who is in the shared lobby (hide / report). */
   playersItem(): { label: string; run: () => void };
+  /** Esc lobby menu entries only for a signed-in player (delete account). */
+  accountItems(): Array<{ label: string; run: () => void }>;
 }
 
 const SIGN_IN_FAILED = t("No se pudo iniciar sesión. Probá de nuevo.", "Could not sign in. Please try again.");
@@ -58,6 +62,10 @@ export function setupAccount(app: App): Account {
         list: () => remotes.list(), setHidden: (id, on) => remotes.setHidden(id, on), report: (id) => presence.report(id),
       }, back)),
     }),
+    accountItems: () => authUser() ? [{
+      label: t("Borrar cuenta", "Delete account"),
+      run: () => app.menu.openPanel((back) => deleteAccountView(deleteAccount, () => { app.menu.hide(); login.open("", true); }, back)),
+    }] : [],
     menuItem: () => authUser()
       ? { label: t("Cerrar sesión", "Sign out"), run: () => { app.menu.hide(); void logout().then(() => login.open("", true)); } }
       : { label: t("Iniciar sesión", "Sign in"), run: () => { app.menu.hide(); login.open(); } },
