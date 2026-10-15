@@ -23,16 +23,16 @@ export function authMessage(token: string): Uint8Array<ArrayBuffer> {
   return msg;
 }
 
+/** cmd/server CloseOutdated: this page speaks another protocol version. */
+export const CLOSE_OUTDATED = 4010;
+
 export const CLOSE_STATUS: Readonly<Record<number, NetStatus | undefined>> = {
   4003: "desconectado por inactividad",
   4004: "demasiados mensajes",
   4005: "nadie se unió a la sala",
   4006: "iniciá sesión",
-  4010: "versión distinta, recargá",
+  [CLOSE_OUTDATED]: "versión distinta, recargá",
 };
-
-/** cmd/server CloseOutdated: this page speaks another protocol version. */
-export const CLOSE_OUTDATED = 4010;
 
 /** cmd/server closeGone: the held seat is gone (match over or the hold ran out). */
 export const CLOSE_GONE = 4007;
