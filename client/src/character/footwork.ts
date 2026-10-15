@@ -102,5 +102,5 @@ export function applyRitual(b: Bones, time: number, k: number): void {
   b.legL.rotation.x += RITUAL_KNEE * bob;
   b.legR.rotation.x += RITUAL_KNEE * bob;
   b.upperArmL.rotation.z += RITUAL_SHOULDER * roll;
-  b.upperArmR.rotation.z += RITUAL_SHOULDER * roll;
+  b.upperArmR.rotation.z -= RITUAL_SHOULDER * roll; // mirrored: a symmetric shoulder roll
 }

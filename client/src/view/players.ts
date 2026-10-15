@@ -162,7 +162,8 @@ export class PlayersView {
     p.charge = curr[e + Extra.Charge];
     s.dashT = Math.max(0, s.dashT - dt / DASH_S);
     const serving = curr[Snap.Phase] === Phase.Serve && curr[Snap.ServerPlayer] === i && curr[Snap.BallTossed] === 0 ? 1 : 0;
-    p.ritual = s.ritualW += (serving - s.ritualW) * Math.min(1, dt * RITUAL_EASE);
+    s.ritualW += (serving - s.ritualW) * Math.min(1, dt * RITUAL_EASE);
+    p.ritual = s.ritualW;
     s.body.update(p, dt);
     p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
     steer(s.steer, vx, vz, p.speed, p.airborne, teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X, dt);
