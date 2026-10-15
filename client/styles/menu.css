@@ -101,6 +101,9 @@
 .fx-btn--hero:hover { background: var(--fx-ball); color: var(--fx-ball-ink); border-color: var(--fx-line); transform: translateY(-2px); }
 .fx-btn--hero:focus-visible { outline: none; background: var(--fx-line); color: var(--fx-ball-ink); border-color: var(--fx-line); transform: translateY(-3px); }
 .fx-btn--ghost { background: transparent; color: var(--fx-muted); }
+.fx-btn--danger { border-color: var(--fx-hot); color: var(--fx-hot); }
+.fx-btn--danger:hover, .fx-btn--danger:focus-visible { background: var(--fx-hot); border-color: var(--fx-hot); color: #fff; }
+.fx-btn--danger:disabled { cursor: wait; opacity: .6; transform: none; }
 .fx-btn--soon, .fx-btn--soon:hover { cursor: not-allowed; opacity: .45; transform: none; background: transparent; color: var(--fx-muted); border-style: dashed; }
 .fx-badge {
   margin-left: 10px; padding: 3px 8px; border-radius: 999px; font-size: 12px; text-transform: uppercase;

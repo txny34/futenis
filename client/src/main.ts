@@ -139,6 +139,7 @@ function lobbyMenu(app: () => App, menu: MenuUI, account: Account): void {
       account.playersItem(),
       { label: t("Reportar un bug", "Report a bug"), run: () => menu.openReport() },
       account.menuItem(),
+      ...account.accountItems(),
     ],
   }));
 }
