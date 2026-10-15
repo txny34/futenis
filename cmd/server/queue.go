@@ -116,6 +116,9 @@ func (h *hub) queueRoom(mode, key string, elo int) (code string, ok bool) {
 		best = &openRoom{code: fmt.Sprintf("mm-%s-%x", mode, h.queueSeq), elo: elo, since: now, owners: map[string]bool{}}
 		q.open = append(q.open, best)
 	}
+	// Reserve now, under the same lock: a second connection of the same network
+	// that arrives before this one is seated must be refused, not paired with it.
+	best.owners[key] = true
 	return best.code, true
 }
 
@@ -172,8 +175,10 @@ func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int, m *match
 		r, slot, start, humans, conflict := h.joinAs(code, queueModes[mode], p, m)
 		switch {
 		case r == nil:
+			h.leaveQueue(mode, code, key)
 			return code, nil, -1, false, 0, errBusy
 		case conflict:
+			h.leaveQueue(mode, code, key)
 			return code, nil, -1, false, 0, errSameNet
 		}
 		switch {
@@ -183,6 +188,7 @@ func (h *hub) joinQueue(mode string, p match.Peer, key string, elo int, m *match
 		case slot >= 0 && h.settleWait(mode, code, key, r):
 			return code, r, slot, false, humans, nil
 		case slot >= 0:
+			h.leaveQueue(mode, code, key)
 			r.Leave(slot, p, false)
 			if r.IsClosed() {
 				h.forget(code, r)
