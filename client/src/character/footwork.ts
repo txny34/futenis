@@ -65,7 +65,7 @@ export function applyFidget(b: Bones, kind: Fidget, u: number, k: number): void 
 }
 
 const DASH_LEAN = 0.5;
-const DASH_ARMS_BACK = 0.9;
+const DASH_ARMS_BACK = 0.4; // on top of a damped run swing (animator.ts): stays behind the hip, never past the shoulder
 const DASH_LEAD_THIGH = 0.6;
 const DASH_TRAIL_THIGH = 0.4;
 

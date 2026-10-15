@@ -120,7 +120,7 @@ export class PlayersView {
     else if (kind === EventKind.Toss || kind === EventKind.Feed) this.ballDead = false;
   }
 
-  resetReactions(): void { for (const s of this.slots) s.body.reset(); }
+  resetReactions(): void { for (const s of this.slots) { s.body.reset(); s.dashT = 0; } }
   /** My lobby emote (lobby/emotes.ts). */
   emote(kind: Kind): void { this.slots[HUMAN_SLOT].body.trigger(kind, EMOTE_S); }
 
@@ -159,12 +159,13 @@ export class PlayersView {
     p.verticalVel = (curr[PLAYER_POS[i] + 1] - prev[PLAYER_POS[i] + 1]) * TICK_RATE;
     p.charge = curr[e + Extra.Charge];
     s.dashT = Math.max(0, s.dashT - dt / DASH_S);
-    p.dash = Math.sin(Math.PI * s.dashT); // bell: in and out of the burst
     s.body.update(p, dt);
     p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
     steer(s.steer, vx, vz, p.speed, p.airborne, teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X, dt);
     p.strafe = s.steer.strafe; // padel side step facing the net (view/steer.ts)
     p.facing = s.steer.facing;
+    const fwd = speed > 0.1 ? (vx * Math.sin(p.facing) + vz * Math.cos(p.facing)) / speed : 0;
+    p.dash = Math.sin(Math.PI * s.dashT) * Math.max(0, fwd); // bell; lunge only into a dash toward where the body faces
     this.advanceStrike(s, dt);
     s.character.update(p, dt);
   }
