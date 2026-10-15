@@ -10,7 +10,7 @@ import { moodFor } from "./player-moods";
 import { BodyReaction, EMOTE_S, Kind, reactionFor } from "./body-reaction";
 import { Steer, steer } from "./steer";
 import {
-  EventKind, Extra, MAX_PLAYERS, Mode, PART_NAMES, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
+  EventKind, Extra, MAX_PLAYERS, Mode, PART_NAMES, Phase, PLAYER_EXTRA, PLAYER_POS, Quality, SimEvent, Snap, teamOf,
 } from "../snapshot";
 
 const KITS = THEME.kits;
@@ -20,6 +20,7 @@ const FACE_POS_X = Math.PI / 2; // facing +X (team 0 looks at the net)
 const STRIKE_DURATION_S = 0.45;
 const STRIKE_START_T = IMPACT_T * 0.5; // events arrive at impact: show the tail of the wind-up
 const DASH_S = 0.28; // dash burst clip
+const RITUAL_EASE = 5; // 1/s: the pre-serve bounce eases in and out
 const BALL_DEAD = new Set<number>([EventKind.Point, EventKind.ServeFault, EventKind.Let, EventKind.GameOver, EventKind.ReturnFail]);
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
@@ -33,6 +34,7 @@ interface Slot {
   readonly steer: Steer;
   strikeT: number;
   dashT: number; // 1 at the dash event, down to 0 over DASH_S
+  ritualW: number;
   strikeTier: StrikeTier;
   strikePerfect: boolean;
   hasContact: boolean;
@@ -57,7 +59,7 @@ function makeSlot(scene: THREE.Scene, i: number): Slot {
   const pose: CharacterPose = {
     speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: FACE_POS_X,
   };
-  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), body: new BodyReaction(), steer: { side: false, strafe: 0, facing: i === HUMAN_SLOT ? FACE_POS_X : -FACE_POS_X }, strikeT: 0, dashT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
+  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), body: new BodyReaction(), steer: { side: false, strafe: 0, facing: i === HUMAN_SLOT ? FACE_POS_X : -FACE_POS_X }, strikeT: 0, dashT: 0, ritualW: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
 }
 
 /** Up to 4 procedural characters posed from the interpolated snapshot. Allocation-free per frame. */
@@ -159,6 +161,8 @@ export class PlayersView {
     p.verticalVel = (curr[PLAYER_POS[i] + 1] - prev[PLAYER_POS[i] + 1]) * TICK_RATE;
     p.charge = curr[e + Extra.Charge];
     s.dashT = Math.max(0, s.dashT - dt / DASH_S);
+    const serving = curr[Snap.Phase] === Phase.Serve && curr[Snap.ServerPlayer] === i && curr[Snap.BallTossed] === 0 ? 1 : 0;
+    p.ritual = s.ritualW += (serving - s.ritualW) * Math.min(1, dt * RITUAL_EASE);
     s.body.update(p, dt);
     p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
     steer(s.steer, vx, vz, p.speed, p.airborne, teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X, dt);

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { StrikeTier } from "./config";
 import { applyContactIk } from "./contact";
 import { applyCheer, applyDance, applySlump, applyWave, cheerHop } from "./gestures";
-import { applyDash, applyFidget, applyShuffle, applySkid } from "./footwork";
+import { applyDash, applyFidget, applyRitual, applyShuffle, applySkid } from "./footwork";
 import { FootworkClock } from "./footwork-clock";
 import { applyAir, applyIdle, applyLocomotion, applyRest } from "./poses";
 import { BROW_REST_Y, Rig, groundSnap, resetRig } from "./rig";
@@ -50,6 +50,8 @@ export interface CharacterPose {
   strafe?: number;
   /** Dash burst 0..1 (a bell over the burst, view/players.ts). */
   dash?: number;
+  /** Server waiting to drop the ball 0..1 (eased): the pre-serve bounce. */
+  ritual?: number;
 }
 
 const TAU = Math.PI * 2;
@@ -118,6 +120,7 @@ export function createAnimator(rig: Rig): Animator {
     const gesture = Math.max(pose.cheer ?? 0, pose.slump ?? 0, pose.wave ?? 0, pose.dance ?? 0); // a reaction replaces the ready stance
     const still = k * (1 - speed) * (1 - air) * (1 - gesture);
     applyIdle(rig.bones, time, still);
+    applyRitual(rig.bones, time, still * (pose.ritual ?? 0));
     // Looking around would fight the eyes on the ball (look.ts): with a ball only the stretch plays.
     if (feet.fidget === "stretch" || !pose.lookAt) applyFidget(rig.bones, feet.fidget, feet.fidgetU, still * feet.fidgetW);
     // A charged kick takes over the legs: the run fades so the cocked heel never folds through the thigh.
