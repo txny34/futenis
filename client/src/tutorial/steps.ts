@@ -3,17 +3,15 @@ import { t } from "../i18n/t";
 import { HUMAN_SLOT } from "../loop";
 import { EventKind, Quality, SimEvent } from "../snapshot";
 import { keyHint, moveHint } from "../ui/key-hints";
+import type { StepRule } from "./progress";
 
 // Tutorial (~2 min) over the ball machine: each step completes from the sim
 // event stream only (the client never decides rules, it just watches).
 
-export interface TutorialStep {
+export interface TutorialStep extends StepRule {
   readonly title: string;
   /** Built when shown: key names follow Ajustes > Controles. */
   readonly text: () => string;
-  /** Matching events needed to complete the step. */
-  readonly count: number;
-  readonly match: (e: SimEvent) => boolean;
 }
 
 const mine = (e: SimEvent): boolean => e.player === HUMAN_SLOT;
@@ -34,6 +32,15 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Return 3 balls to the opponent's court. Aim with the mouse (right stick).",
     ),
     count: 3, match: (e) => e.kind === EventKind.ReturnOK,
+  },
+  {
+    title: t("Pared", "Wall"),
+    text: () => t(
+      "Devolvé una pelota después de que rebote en una pared de tu lado (fondo o lateral): la pared te da tiempo.",
+      "Return a ball after it comes off a wall on your side (back or side glass): the wall buys you time.",
+    ),
+    count: 1, match: (e) => e.kind === EventKind.ReturnOK,
+    armedBy: (e) => e.kind === EventKind.HitWall && e.side === 0,
   },
   {
     title: t("Salto", "Jump"),
@@ -63,29 +70,3 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   },
 ];
 
-/** Step cursor. onEvent returns true when the visible state changed. */
-export class TutorialProgress {
-  private stepIdx = 0;
-  private hitCount = 0;
-
-  get step(): number { return this.stepIdx; }
-  get hits(): number { return this.hitCount; }
-
-  get done(): boolean { return this.step >= TUTORIAL_STEPS.length; }
-
-  reset(): void {
-    this.stepIdx = 0;
-    this.hitCount = 0;
-  }
-
-  onEvent(e: SimEvent): boolean {
-    const s = TUTORIAL_STEPS[this.stepIdx];
-    if (!s || !s.match(e)) return false;
-    this.hitCount++;
-    if (this.hitCount >= s.count) {
-      this.stepIdx++;
-      this.hitCount = 0;
-    }
-    return true;
-  }
-}

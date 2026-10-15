@@ -1,14 +1,15 @@
 import { t } from "../i18n/t";
 import { SimEvent } from "../snapshot";
-import { TUTORIAL_STEPS, TutorialProgress } from "./steps";
+import { TutorialProgress } from "./progress";
+import { TUTORIAL_STEPS } from "./steps";
 
 // Tutorial overlay: step card (title, instruction, progress pips) over the
 // ball machine. Touches the DOM only when the progress changes.
 const DONE_KEY = "futenis.tutorial.done";
 const DONE_TITLE = t("¡Listo!", "Done!");
 const DONE_TEXT = t(
-  "Ya sabés lo básico. Esc → «Volver al lobby» y jugar contra bots.",
-  "You know the basics now. Esc → \"Back to lobby\" to play against bots.",
+  "Ya sabés lo básico. En partido, el saque: click suelta la pelota, pica detrás de la línea y le pegás al cuadro en diagonal. Esc → «Volver al lobby» y a jugar.",
+  "You know the basics. In a match, the serve: click drops the ball, it bounces behind the line and you kick it into the diagonal box. Esc → \"Back to lobby\" and play.",
 );
 
 function node(tag: "div" | "span", cls: string): HTMLElement {
@@ -32,7 +33,7 @@ export class Tutorial {
   private readonly title = node("div", "tut__title");
   private readonly text = node("div", "tut__text");
   private readonly pips = node("div", "tut__pips");
-  private readonly progress = new TutorialProgress();
+  private readonly progress = new TutorialProgress(TUTORIAL_STEPS);
   private active = false;
 
   constructor(parent: HTMLElement) {
