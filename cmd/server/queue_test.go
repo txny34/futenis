@@ -183,3 +183,20 @@ func waitNoRooms(ctx context.Context, t *testing.T, h *hub) {
 		}
 	}
 }
+
+// The queue spot is reserved when the room is picked, before the join: a
+// second connection of the same network in that window is refused.
+func TestQueueRoomReservesBeforeJoin(t *testing.T) {
+	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+	code, ok := h.queueRoom("1v1", "10.0.9.1", ranked.EloDefault)
+	if !ok {
+		t.Fatal("first pick refused")
+	}
+	if again, ok := h.queueRoom("1v1", "10.0.9.1", ranked.EloDefault); ok || again != code {
+		t.Fatalf("same network got %q ok=%v, want refused at %q", again, ok, code)
+	}
+	h.leaveQueue("1v1", code, "10.0.9.1")
+	if _, ok := h.queueRoom("1v1", "10.0.9.1", ranked.EloDefault); !ok {
+		t.Fatal("released spot still refused")
+	}
+}
