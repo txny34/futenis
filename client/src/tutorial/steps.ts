@@ -36,8 +36,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     title: t("Pared", "Wall"),
     text: () => t(
-      "Dejá que la pelota pique y rebote en tu vidrio, y recién ahí devolvela: la pared te da tiempo.",
-      "Let the ball bounce and come off your glass, then return it: the wall buys you time.",
+      "Devolvé una pelota después de que rebote en una pared de tu lado (fondo o lateral): la pared te da tiempo.",
+      "Return a ball after it comes off a wall on your side (back or side glass): the wall buys you time.",
     ),
     count: 1, match: (e) => e.kind === EventKind.ReturnOK,
     armedBy: (e) => e.kind === EventKind.HitWall && e.side === 0,
