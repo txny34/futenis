@@ -63,3 +63,26 @@ export function applyFidget(b: Bones, kind: Fidget, u: number, k: number): void 
   b.upperArmR.rotation.z -= STRETCH_ARM * bump;
   b.spine.rotation.x -= STRETCH_LEAN * bump;
 }
+
+const DASH_LEAN = 0.35;
+const DASH_CHEST = 0.15;
+const DASH_HEAD_UP = 0.35; // eyes stay on the court, not on the floor
+const DASH_ARMS_BACK = 0.4; // on top of a damped run swing (animator.ts): stays behind the hip, never past the shoulder
+const DASH_LEAD_THIGH = 0.8;
+const DASH_LEAD_KNEE = 0.7;
+const DASH_TRAIL_THIGH = 0.5;
+const DASH_TRAIL_KNEE = 0.3;
+
+/** Dash burst (sprinter's drive): chest forward, head up, arms back, lead knee driving; weight k. */
+export function applyDash(b: Bones, k: number): void {
+  if (k <= 0) return;
+  b.spine.rotation.x += DASH_LEAN * k;
+  b.chest.rotation.x += DASH_CHEST * k;
+  b.neck.rotation.x -= DASH_HEAD_UP * k;
+  b.upperArmL.rotation.x += DASH_ARMS_BACK * k;
+  b.upperArmR.rotation.x += DASH_ARMS_BACK * k;
+  b.upLegR.rotation.x -= DASH_LEAD_THIGH * k;
+  b.legR.rotation.x += DASH_LEAD_KNEE * k;
+  b.upLegL.rotation.x += DASH_TRAIL_THIGH * k;
+  b.legL.rotation.x += DASH_TRAIL_KNEE * k;
+}

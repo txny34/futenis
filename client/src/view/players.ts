@@ -19,6 +19,8 @@ const SPEED_REF = 7.5; // m/s mapped to pose.speed = 1 (top run speed)
 const FACE_POS_X = Math.PI / 2; // facing +X (team 0 looks at the net)
 const STRIKE_DURATION_S = 0.45;
 const STRIKE_START_T = IMPACT_T * 0.5; // events arrive at impact: show the tail of the wind-up
+const DASH_S = 0.28; // dash burst clip
+const BALL_DEAD = new Set<number>([EventKind.Point, EventKind.ServeFault, EventKind.Let, EventKind.GameOver, EventKind.ReturnFail]);
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
@@ -30,6 +32,7 @@ interface Slot {
   readonly body: BodyReaction;
   readonly steer: Steer;
   strikeT: number;
+  dashT: number; // 1 at the dash event, down to 0 over DASH_S
   strikeTier: StrikeTier;
   strikePerfect: boolean;
   hasContact: boolean;
@@ -54,7 +57,7 @@ function makeSlot(scene: THREE.Scene, i: number): Slot {
   const pose: CharacterPose = {
     speed: 0, airborne: false, verticalVel: 0, charge: 0, strike, facing: FACE_POS_X,
   };
-  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), body: new BodyReaction(), steer: { side: false, strafe: 0, facing: i === HUMAN_SLOT ? FACE_POS_X : -FACE_POS_X }, strikeT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
+  return { character, pose, contact: new THREE.Vector3(), flash: new HitFlash(character.root), body: new BodyReaction(), steer: { side: false, strafe: 0, facing: i === HUMAN_SLOT ? FACE_POS_X : -FACE_POS_X }, strikeT: 0, dashT: 0, strikeTier: "low", strikePerfect: false, hasContact: false };
 }
 
 /** Up to 4 procedural characters posed from the interpolated snapshot. Allocation-free per frame. */
@@ -87,6 +90,7 @@ export class PlayersView {
   onEvent(e: SimEvent): void {
     this.trackBall(e.kind);
     this.react(e);
+    if (e.kind === EventKind.Dash && e.player >= 0 && e.player < MAX_PLAYERS) this.slots[e.player].dashT = 1;
     if (e.kind !== EventKind.Kick && e.kind !== EventKind.BodyHit && e.kind !== EventKind.Whiff) return;
     if (e.kind === EventKind.BodyHit && this.ballDead) return;
     if (e.player < 0 || e.player >= MAX_PLAYERS) return;
@@ -112,22 +116,11 @@ export class PlayersView {
 
   /** Dead between a point/fault and the next toss or machine feed. No reset needed: the sim emits Toss/Feed before any live BodyHit. */
   private trackBall(kind: number): void {
-    switch (kind) {
-      case EventKind.Point:
-      case EventKind.ServeFault:
-      case EventKind.Let:
-      case EventKind.GameOver:
-      case EventKind.ReturnFail:
-        this.ballDead = true;
-        break;
-      case EventKind.Toss:
-      case EventKind.Feed:
-        this.ballDead = false;
-        break;
-    }
+    if (BALL_DEAD.has(kind)) this.ballDead = true;
+    else if (kind === EventKind.Toss || kind === EventKind.Feed) this.ballDead = false;
   }
 
-  resetReactions(): void { for (const s of this.slots) s.body.reset(); }
+  resetReactions(): void { for (const s of this.slots) { s.body.reset(); s.dashT = 0; } }
   /** My lobby emote (lobby/emotes.ts). */
   emote(kind: Kind): void { this.slots[HUMAN_SLOT].body.trigger(kind, EMOTE_S); }
 
@@ -165,11 +158,14 @@ export class PlayersView {
     p.airborne = curr[e + Extra.OnGround] === 0;
     p.verticalVel = (curr[PLAYER_POS[i] + 1] - prev[PLAYER_POS[i] + 1]) * TICK_RATE;
     p.charge = curr[e + Extra.Charge];
+    s.dashT = Math.max(0, s.dashT - dt / DASH_S);
     s.body.update(p, dt);
     p.lookAt = curr[Snap.Mode] === Mode.Lobby ? null : this.ball; // the lobby has no ball in play
     steer(s.steer, vx, vz, p.speed, p.airborne, teamOf(i, n) === 0 ? FACE_POS_X : -FACE_POS_X, dt);
     p.strafe = s.steer.strafe; // padel side step facing the net (view/steer.ts)
     p.facing = s.steer.facing;
+    const fwd = speed > 0.1 ? (vx * Math.sin(p.facing) + vz * Math.cos(p.facing)) / speed : 0;
+    p.dash = Math.sin(Math.PI * s.dashT) * Math.max(0, fwd); // bell; lunge only into a dash toward where the body faces
     this.advanceStrike(s, dt);
     s.character.update(p, dt);
   }
