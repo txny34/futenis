@@ -2,6 +2,7 @@ import { EventKind, Quality, SimEvent } from "../snapshot";
 import { Mixer, Volumes } from "./mixer";
 import { arpeggio, noise, NoiseSpec, tone, ToneSpec } from "./voices";
 import { BodyVoice } from "./body-voice";
+import { Music, type Mood } from "./music";
 
 // Event -> sound mapping. Pure reader of the sim event stream (never decides
 // rules). Camera sits behind team 0 looking +X, so +Z is screen right.
@@ -48,6 +49,7 @@ const JINGLE_RANK: Readonly<Record<number, number | undefined>> = {
 export class Sound {
   private readonly mixer = new Mixer();
   private readonly voice = new BodyVoice(this.mixer);
+  private readonly music = new Music(this.mixer);
   private jingle = 0;
   private readonly flushJingle = (): void => {
     arpeggio(this.mixer, JINGLES[this.jingle], JINGLE_STEP_S, JINGLE_GAIN);
@@ -56,6 +58,11 @@ export class Sound {
 
   setVolumes(v: Readonly<Volumes>): void {
     this.mixer.setVolumes(v);
+  }
+
+  /** Background loop: calm in the lobby, driving in a match. */
+  setMusic(mood: Mood): void {
+    this.music.set(mood);
   }
 
   /** Crowd roar: a swelling band of noise, louder for bigger moments (0..1). */

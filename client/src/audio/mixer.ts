@@ -29,6 +29,7 @@ export class Mixer {
   }
 
   get sfx(): AudioNode | null { return this.sfxBus; }
+  get music(): AudioNode | null { return this.musicBus; }
 
   /** 1 s of white noise, shared by every noise voice. */
   get noise(): AudioBuffer | null { return this.noiseBuf; }

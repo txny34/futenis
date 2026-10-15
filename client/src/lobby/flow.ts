@@ -83,6 +83,7 @@ function setup(mode: MatchSetup["mode"], difficulty: Difficulty, pointsToWin: nu
 export function arm(app: App, lobby: boolean): void {
   app.engine.reset();
   app.inLobby = lobby;
+  app.sound.setMusic(lobby ? "lobby" : "match");
   app.state.running = true;
   app.state.paused = false;
   app.controls.releaseAll();
