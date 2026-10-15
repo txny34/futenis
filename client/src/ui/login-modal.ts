@@ -3,6 +3,14 @@ import { chooseGuest, signIn } from "../auth/session";
 import { t } from "../i18n/t";
 import { button, el } from "./dom";
 
+function legalLine(): HTMLElement {
+  const link = (href: string, text: string): HTMLAnchorElement =>
+    el("a", "", text, { href, target: "_blank", rel: "noopener noreferrer" });
+  const p = el("p", "fx-login__note fx-login__legal", t("Al jugar aceptás los ", "By playing you accept the "));
+  p.append(link("terms.html", t("Términos", "Terms")), t(" y la ", " and the "), link("privacy.html", t("Política de privacidad", "Privacy policy")), ".");
+  return p;
+}
+
 // "Iniciá sesión": Discord / Google / Jugar como invitado. Shown in the lobby on
 // a first visit and whenever a guest picks something that needs an account.
 export class LoginModal {
@@ -22,7 +30,7 @@ export class LoginModal {
     const guest = button(t("Jugar como invitado", "Play as guest"), () => { chooseGuest(); this.close(); }, "fx-btn fx-btn--ghost fx-login__guest");
     card.append(el("h2", "fx-card__title", t("Iniciá sesión", "Sign in"), { id: "fx-login-title" }), this.reason, providers,
       el("p", "fx-login__note", t("Con cuenta: clasificatorias con ELO y tu progreso en cualquier dispositivo.", "With an account: ranked with ELO and your progress on any device.")),
-      guest);
+      guest, legalLine());
     this.root.append(card);
     this.root.hidden = true;
     parent.append(this.root);
