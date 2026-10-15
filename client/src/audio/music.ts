@@ -32,20 +32,20 @@ export class Music {
   private next = 0; // ctx time of the next sixteenth
   private step = 0;
   private timer = 0;
+  private faded: Mood = "off"; // mood the fader was last ramped to (a hidden tab skips ramps)
 
   constructor(private readonly m: Mixer) {}
 
   set(mood: Mood): void {
     if (mood === this.mood) return;
     this.mood = mood;
-    const ctx = this.m.ctx;
-    if (ctx && this.bus) this.bus.gain.setTargetAtTime(mood === "off" ? SILENT : LEVEL[mood], ctx.currentTime, FADE_TC_S);
-    if (mood !== "off" && !this.timer) this.timer = window.setInterval(this.tick, TICK_MS);
+    if (!this.timer) this.timer = window.setInterval(this.tick, TICK_MS);
   }
 
   private readonly tick = (): void => {
     const ctx = this.m.ctx;
     const out = this.m.music;
+    if (ctx && this.bus && this.faded !== this.mood) this.fade(ctx, this.bus);
     if (this.mood === "off") {
       window.clearInterval(this.timer);
       this.timer = 0;
@@ -66,10 +66,15 @@ export class Music {
   private fader(ctx: AudioContext, out: AudioNode): GainNode {
     const g = ctx.createGain();
     g.gain.setValueAtTime(SILENT, ctx.currentTime);
-    if (this.mood !== "off") g.gain.setTargetAtTime(LEVEL[this.mood], ctx.currentTime, FADE_TC_S);
     g.connect(out);
     this.bus = g;
+    this.fade(ctx, g);
     return g;
+  }
+
+  private fade(ctx: AudioContext, g: GainNode): void {
+    g.gain.setTargetAtTime(this.mood === "off" ? SILENT : LEVEL[this.mood], ctx.currentTime, FADE_TC_S);
+    this.faded = this.mood;
   }
 
   private play(ctx: AudioContext, bus: AudioNode, mood: Playing, at: number, stepS: number): void {
