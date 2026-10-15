@@ -1,6 +1,7 @@
 import { t } from "../i18n/t";
 import { NetStatus, RemoteEngine } from "../net/remote-engine";
 import { parseRoomCode, randomRoomCode, roomLink } from "../net/room-code";
+import { PROTO_QUERY } from "../net/protocol";
 import { serverBase } from "../net/server-url";
 import { SearchPanel } from "../ui/search-panel";
 import { accessToken, authUser } from "../auth/auth";
@@ -96,7 +97,7 @@ export function startOnline(app: App, mode: QueueMode, ranked = false): void {
   if (ranked && !token) return; // the play modal only offers ranked when signed in
   lastQueue = { mode, ranked };
   shareLink = "";
-  connect(app, mode, `${serverBase()}/ws?queue=${ranked ? `ranked${mode}` : mode}`, token ?? "");
+  connect(app, mode, `${serverBase()}/ws?queue=${ranked ? `ranked${mode}` : mode}&${PROTO_QUERY}`, token ?? "");
 }
 
 let friendCode = ""; // last private room: Revancha meets the same friend there again
@@ -107,7 +108,7 @@ export function startFriendRoom(app: App, code = randomRoomCode(), host = true):
   lastQueue = null;
   friendCode = code;
   shareLink = host ? roomLink(code) : "";
-  connect(app, "1v1", `${serverBase()}/ws?room=${code}`, "");
+  connect(app, "1v1", `${serverBase()}/ws?room=${code}&${PROTO_QUERY}`, "");
 }
 
 /** Boot with ?room=CODE (a friend's link): join that room once the game is up

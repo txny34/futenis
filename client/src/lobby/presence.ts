@@ -1,5 +1,7 @@
 import { t } from "../i18n/t";
 import { CM, FACING_Q, LobbyMsg, MAX_NAME_BYTES, PRESENCE_LEN, ROSTER_Q_HEAD, ROSTER_Q_STRIDE, ROSTER_STRIDE } from "../net/lobby-proto";
+import { CLOSE_OUTDATED } from "../net/net-status";
+import { PROTO_QUERY } from "../net/protocol";
 import { serverBase } from "../net/server-url";
 import { displayName } from "../profile/display-name";
 import { profileStore } from "../profile/store";
@@ -51,14 +53,14 @@ export function startPresence(app: App, remotes: RemotePlayers): Presence {
   };
 
   const open = (): void => {
-    const s = new WebSocket(`${serverBase()}/lobby?v=2`); // compact roster (ROSTER_Q)
+    const s = new WebSocket(`${serverBase()}/lobby?v=2&${PROTO_QUERY}`); // compact roster (ROSTER_Q)
     s.binaryType = "arraybuffer";
     s.onmessage = (m: MessageEvent<ArrayBuffer>) => receive(remotes, new DataView(m.data));
     s.onopen = () => { backoff = RETRY_MIN_MS; };
-    s.onclose = () => { // server down or full: back off (with jitter so clients don't reconnect in sync)
+    s.onclose = (e: CloseEvent) => { // server down or full: back off (with jitter so clients don't reconnect in sync)
       ws = null;
       remotes.clear();
-      retryAt = performance.now() + backoff * (0.5 + Math.random());
+      retryAt = e.code === CLOSE_OUTDATED ? Infinity : performance.now() + backoff * (0.5 + Math.random()); // old page: until reload
       backoff = Math.min(RETRY_MAX_MS, backoff * 2);
     };
     ws = s;
