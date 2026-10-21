@@ -77,6 +77,8 @@ func (r *Room) Run(tick <-chan time.Time) {
 	if err := s.Configure(int(mode), int(ai.Normal), roomPointsToWin, mask); err != nil {
 		panic(err) // arguments are validated constants/masks: a failure is a programming error
 	}
+	tape := newRoomTape(s, mode, mask)
+	tapeSent := false
 	out := make([]float64, game.OutLen)
 	scratch := make([]float64, game.OutLen)
 	view := make([]float64, game.OutLen)
@@ -100,10 +102,15 @@ func (r *Room) Run(tick <-chan time.Time) {
 			mask = now
 			_ = s.SetHumanMask(mask) // someone left: the bot takes the seat
 		}
+		tape.Frame(&in, ticksPerFrame, mask)
 		s.Run(in, ticksPerFrame, out)
 		w, over := gameOverWinner(out)
 		if over {
 			r.markOver()
+		}
+		if over && !tapeSent {
+			tapeSent = true
+			sendTape(peers, tapeMessages(tape.Bytes()))
 		}
 		if over && onOver != nil && r.claimReport() {
 			r.mu.Lock()

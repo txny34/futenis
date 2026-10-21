@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/txny34/futenis/cmd/server/internal/match"
 	"github.com/txny34/futenis/cmd/server/internal/peertest"
 	"github.com/txny34/futenis/cmd/server/internal/ranked"
 	"github.com/txny34/futenis/cmd/server/internal/wire"
@@ -198,5 +199,24 @@ func TestQueueRoomReservesBeforeJoin(t *testing.T) {
 	h.leaveQueue("1v1", code, "10.0.9.1")
 	if _, ok := h.queueRoom("1v1", "10.0.9.1", ranked.EloDefault); !ok {
 		t.Fatal("released spot still refused")
+	}
+}
+
+// A closed room's queue entry goes with the room: re-queuing right after
+// leaving never hits the leaver's own reservation (the handler's deferred
+// leaveQueue may run later than the room is forgotten).
+func TestForgetDropsQueueEntry(t *testing.T) {
+	h := newHub([]string{"*"}, log.New(io.Discard, "", 0))
+	code, ok := h.queueRoom("1v1", "10.0.9.2", ranked.EloDefault)
+	if !ok {
+		t.Fatal("first pick refused")
+	}
+	r := match.NewRoom(sim.Mode1v1, code)
+	p := &peertest.Peer{}
+	r.Join(p)
+	r.Leave(0, p, false)
+	h.forget(code, r)
+	if _, ok := h.queueRoom("1v1", "10.0.9.2", ranked.EloDefault); !ok {
+		t.Fatal("re-queue refused by a forgotten room's reservation")
 	}
 }

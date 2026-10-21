@@ -44,6 +44,14 @@ interface FutenisBridge {
   setConfig(src: Uint8Array): string | null | undefined;
   /** Optional: absent on an older wasm build predating the layout() export. */
   layout?(): WasmLayout;
+  /** configure with Config.FirstServer forced (replays). */
+  configureFirst(mode: number, difficulty: number, pointsToWin: number, humanMask: number, firstServer: number): string | null;
+  /** Changes which slots the client drives, keeping the match (replays: a player left). */
+  setHumanMask(mask: number): string | null;
+  /** Frames as seen from seat (0..3); doubles 1 = 2v2 room. 0 = server space. */
+  setView(seat: number, doubles: number): string | null;
+  /** Config.FirstServer of the configured match (recorded into local tapes). */
+  firstServer(): number;
 }
 
 declare var futenis: FutenisBridge | undefined;

@@ -33,6 +33,17 @@ func (g *Session) Reset() { g.s.reset() }
 // (online: a player who leaves is replaced by the bot).
 func (g *Session) SetHumanMask(mask int) error { return g.s.setHumanMask(mask) }
 
+// ConfigureFirst is Configure with Config.FirstServer forced (replays).
+func (g *Session) ConfigureFirst(mode, difficulty, pointsToWin, humanMask, firstServer int) error {
+	return g.s.configureFirst(mode, difficulty, pointsToWin, humanMask, firstServer)
+}
+
+// FirstServer is the live config's first server (recorded into tapes).
+func (g *Session) FirstServer() int { return int(g.s.cfg.FirstServer) }
+
+// SetView makes Run output frames as seen from seat (online replays); 0 = server space.
+func (g *Session) SetView(seat int, doubles bool) error { return g.s.setView(seat, doubles) }
+
 // RespawnBall asks the ball machine for a feed (playground only).
 func (g *Session) RespawnBall() error { return g.s.respawnBall() }
 
@@ -45,9 +56,15 @@ func (g *Session) ReadConfig(src []byte, scratch []float64) error {
 }
 
 // Run advances n ticks (clamped to MinSteps..MaxSteps) with held inputs, bots
-// filling non-human slots, and writes the frame into out (len OutLen). No allocs.
+// filling non-human slots, and writes the frame into out (len OutLen),
+// rotated for SetView's seat. No allocs.
 func (g *Session) Run(inputs [sim.MaxPlayers]sim.PlayerInput, n int, out []float64) {
-	runFrame(g.s.match, inputs, n, out, &g.s.drv)
+	if g.s.viewSeat == 0 {
+		runFrame(g.s.match, inputs, n, out, &g.s.drv)
+		return
+	}
+	runFrame(g.s.match, inputs, n, g.s.raw[:], &g.s.drv)
+	ViewOut(out, g.s.raw[:], g.s.scratch[:], g.s.viewSeat, g.s.viewDoubles)
 }
 
 // DecodeInputs reads InputLen LE float64s (NaN/Inf -> 0).

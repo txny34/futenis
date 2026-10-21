@@ -119,6 +119,9 @@ func (h *hub) forget(code string, r *match.Room) {
 			delete(h.seats, t)
 		}
 	}
+	for _, q := range h.queues {
+		q.remove(code) // a closed room takes nobody: drop its queue entry (and its owners) now, not when the handler returns
+	}
 	h.mu.Unlock()
 }
 

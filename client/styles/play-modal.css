@@ -55,6 +55,8 @@
 .fx-hist td { padding: 6px 8px; border-top: 1px solid rgba(233, 241, 255, .08); }
 .fx-hist .is-win .fx-hist__result { color: var(--fx-go); }
 .fx-hist .is-loss .fx-hist__result { color: var(--fx-hot); }
+.fx-hist__watch { width: 1%; white-space: nowrap; }
+.fx-hist__play { padding: 2px 10px; font-size: 13px; transform: none; }
 .fx-info__h { margin: 12px 0 6px; color: var(--fx-ball); font-weight: 600; }
 .fx-info__rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .fx-info__keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin: 0; }

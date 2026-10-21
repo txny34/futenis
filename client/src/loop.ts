@@ -32,6 +32,7 @@ export interface LoopState {
   holdUntil: number;
   /** Landing marker allowed for the current match (settings x difficulty). */
   showLanding: boolean;
+  timeScale?: number; // sim speed (replays: 0/0.5/1/2; render keeps real time). Missing = 1
 }
 
 export type { MatchResult } from "./feel/tally";
@@ -132,7 +133,7 @@ export class GameLoop {
     this.human.targetX = input.targetX;
     this.human.targetZ = input.targetZ;
     this.engine.setInput(HUMAN_SLOT, input);
-    this.acc += dt;
+    this.acc += dt * (this.state.timeScale ?? 1);
     const n = Math.min(Math.floor(this.acc / TICK_S), MAX_STEPS);
     if (n > 0) {
       this.acc -= n * TICK_S;

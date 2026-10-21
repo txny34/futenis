@@ -1,8 +1,9 @@
 //go:build js && wasm
 
 // Command wasm is the only bridge between sim and the browser. It exposes a
-// global `futenis` object (init, step, reset, configure, respawnBall,
-// getConfig, setConfig, feed = respawnBall alias). Each frame does a single JS<->Go crossing: inputs
+// global `futenis` object (init, step, reset, configure, configureFirst,
+// respawnBall, getConfig, setConfig, feed = respawnBall alias, setHumanMask,
+// setView, firstServer). Each frame does a single JS<->Go crossing: inputs
 // are copied in, snapshots + events copied out, using pre-allocated
 // package-level buffers. Bots (ai.Bot) for non-human slots run inside step,
 // before every sim tick. Layout and session logic live in package game.
@@ -34,6 +35,10 @@ func main() {
 	api.Set("step", js.FuncOf(stepFn))
 	api.Set("reset", js.FuncOf(resetFn))
 	api.Set("configure", js.FuncOf(configureFn))
+	api.Set("configureFirst", js.FuncOf(configureFirstFn))
+	api.Set("setHumanMask", js.FuncOf(setHumanMaskFn))
+	api.Set("setView", js.FuncOf(setViewFn))
+	api.Set("firstServer", js.FuncOf(func(js.Value, []js.Value) any { return sess.FirstServer() }))
 	api.Set("respawnBall", js.FuncOf(respawnBallFn))
 	api.Set("feed", js.FuncOf(respawnBallFn))
 	api.Set("getConfig", js.FuncOf(getConfigFn))
@@ -75,6 +80,52 @@ func configureFn(_ js.Value, args []js.Value) any {
 		}
 	}
 	if err := sess.Configure(args[0].Int(), args[1].Int(), args[2].Int(), args[3].Int()); err != nil {
+		return err.Error()
+	}
+	return nil
+}
+
+// numArgs checks n numeric arguments for fn; returns "" when valid.
+func numArgs(fn string, args []js.Value, n int) string {
+	if len(args) != n {
+		return fmt.Sprintf("futenis.%s: expected %d numbers", fn, n)
+	}
+	for i, a := range args {
+		if a.Type() != js.TypeNumber {
+			return fmt.Sprintf("futenis.%s: argument %d is not a number", fn, i)
+		}
+	}
+	return ""
+}
+
+// configureFirstFn(mode, difficulty, pointsToWin, humanMask, firstServer) -> null | error string.
+func configureFirstFn(_ js.Value, args []js.Value) any {
+	if e := numArgs("configureFirst", args, 5); e != "" {
+		return e
+	}
+	if err := sess.ConfigureFirst(args[0].Int(), args[1].Int(), args[2].Int(), args[3].Int(), args[4].Int()); err != nil {
+		return err.Error()
+	}
+	return nil
+}
+
+// setHumanMaskFn(mask) -> null | error string (replays: a player left, the bot took the seat).
+func setHumanMaskFn(_ js.Value, args []js.Value) any {
+	if e := numArgs("setHumanMask", args, 1); e != "" {
+		return e
+	}
+	if err := sess.SetHumanMask(args[0].Int()); err != nil {
+		return err.Error()
+	}
+	return nil
+}
+
+// setViewFn(seat, doubles 0/1) -> null | error string.
+func setViewFn(_ js.Value, args []js.Value) any {
+	if e := numArgs("setView", args, 2); e != "" {
+		return e
+	}
+	if err := sess.SetView(args[0].Int(), args[1].Int() != 0); err != nil {
 		return err.Error()
 	}
 	return nil
