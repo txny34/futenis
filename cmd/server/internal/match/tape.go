@@ -37,21 +37,22 @@ func tapeMessages(tape []byte) [][]byte {
 	return wire.EncodeTapeChunks(buf.Bytes())
 }
 
-// sendTape delivers the chunks to every seated peer, off the sim loop.
+// sendTape delivers the chunks to every seated peer, off the sim loop: one
+// sender per peer, so a slow connection never delays the others.
 func sendTape(peers [sim.MaxPlayers]Peer, msgs [][]byte) {
 	if msgs == nil {
 		return
 	}
-	go func() {
-		for _, p := range peers {
-			if p == nil {
-				continue
-			}
+	for _, p := range peers {
+		if p == nil {
+			continue
+		}
+		go func(p Peer) {
 			for _, m := range msgs {
 				if p.Send(m) != nil {
-					break // gone or too slow: the replay is a bonus, never block
+					return // gone or too slow: the replay is a bonus, never block
 				}
 			}
-		}
-	}()
+		}(p)
+	}
 }

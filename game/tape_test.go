@@ -143,3 +143,79 @@ func TestTapeReplaysSession(t *testing.T) {
 		t.Fatal("replayed session diverged")
 	}
 }
+
+// What online replays rely on: a server-recorded 2v2 with first server 1 and
+// a bot taking a seat mid-match replays identically from the tape alone.
+func TestTapeReplaysFirstServerAndMaskChange(t *testing.T) {
+	g := NewSession()
+	if err := g.ConfigureFirst(int(sim.Mode2v2), int(ai.Normal), 5, 0b0101, 1); err != nil {
+		t.Fatal(err)
+	}
+	cfg, scratch := make([]byte, CfgBytes), make([]float64, sim.CfgLen)
+	g.WriteConfig(cfg, scratch)
+	w := NewTapeWriter(TapeSetup{Mode: int(sim.Mode2v2), Difficulty: int(ai.Normal), PointsToWin: 5, Mask: 0b0101, FirstServer: g.FirstServer()}, cfg, 1<<20)
+	out := make([]float64, OutLen)
+	var in [sim.MaxPlayers]sim.PlayerInput
+	mask := 0b0101
+	for f := 0; f < 900; f++ {
+		if f == 400 {
+			mask = 0b0001 // slot 2 left: the bot plays it
+			in[2] = sim.PlayerInput{}
+			if err := g.SetHumanMask(mask); err != nil {
+				t.Fatal(err)
+			}
+		}
+		in[0] = sim.PlayerInput{MoveX: float64(f%5) / 5, TargetX: 6, TargetZ: float64(f%7) - 3}
+		if mask&0b0100 != 0 {
+			in[2] = sim.PlayerInput{MoveZ: float64(f%3) - 1, TargetX: -6}
+		}
+		if f%50 < 8 {
+			in[0].Buttons = sim.BtnStrike
+		}
+		w.Frame(&in, 2, mask)
+		g.Run(in, 2, out)
+	}
+	want := append([]float64(nil), out[outCurr:outEventCount]...)
+	s, c, steps, err := DecodeTape(w.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewSession()
+	if err := r.Configure(int(sim.Mode1v1), int(ai.Easy), 3, 1); err != nil { // a used session: parity must not matter
+		t.Fatal(err)
+	}
+	if err := r.ConfigureFirst(s.Mode, s.Difficulty, s.PointsToWin, s.Mask, s.FirstServer); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ReadConfig(c, scratch); err != nil {
+		t.Fatal(err)
+	}
+	r.Reset()
+	cur := s.Mask
+	for _, st := range steps {
+		if st.Mask != cur {
+			cur = st.Mask
+			if err := r.SetHumanMask(cur); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for left := st.Ticks; left > 0; left -= MaxSteps {
+			r.Run(st.In, min(left, MaxSteps), out)
+		}
+	}
+	if !slices.Equal(want, out[outCurr:outEventCount]) {
+		t.Fatal("replay with first server 1 and a mid-match bot diverged")
+	}
+}
+
+func TestTapeTooBigIsNil(t *testing.T) {
+	w := NewTapeWriter(TapeSetup{Mask: 1}, make([]byte, CfgBytes), 1<<30)
+	var in [sim.MaxPlayers]sim.PlayerInput
+	for f := 0; w.Bytes() != nil && f < TapeMaxBytes; f++ {
+		in[0].TargetX = float64(f) // a new aim every frame
+		w.Frame(&in, 1, 1)
+	}
+	if w.Bytes() != nil {
+		t.Fatal("a tape over TapeMaxBytes must be dropped")
+	}
+}

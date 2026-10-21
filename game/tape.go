@@ -19,6 +19,9 @@ const (
 	TapeHeaderLen   = 16 + CfgBytes
 	tapeMaxRunTicks = 0xFFFF
 	tapeInputBytes  = 6 * 8
+	// TapeMaxBytes caps a tape's memory (a client that changes its aim every
+	// frame grows it ~100 B per human per frame); past it the tape is dropped.
+	TapeMaxBytes = 8 << 20
 )
 
 var ErrBadTape = errors.New("game: malformed tape")
@@ -72,6 +75,9 @@ func (w *TapeWriter) Frame(in *[sim.MaxPlayers]sim.PlayerInput, n, mask int) {
 		}
 	}
 	w.appendRecord(in, n, m, changed)
+	if len(w.buf) > TapeMaxBytes {
+		w.buf, w.ticks = nil, w.maxTicks+1 // too big: free it, no tape
+	}
 }
 
 func (w *TapeWriter) appendRecord(in *[sim.MaxPlayers]sim.PlayerInput, n int, m, changed uint8) {
@@ -100,7 +106,7 @@ func appendInput(b []byte, p sim.PlayerInput) []byte {
 
 // Bytes finalizes the record count and returns the tape (nil when too long).
 func (w *TapeWriter) Bytes() []byte {
-	if w.ticks > w.maxTicks {
+	if w.ticks > w.maxTicks || w.buf == nil {
 		return nil
 	}
 	binary.LittleEndian.PutUint32(w.buf[12:], w.records)
