@@ -57,6 +57,10 @@ type session struct {
 	// Config.FirstServer so consecutive matches alternate who opens serve
 	// (deterministic, no RNG).
 	configured int
+
+	viewSeat     int // 0 = server space; else Run rotates the frame for that seat (game/view.go)
+	viewDoubles  bool
+	raw, scratch [outLen]float64 // view buffers (no per-frame allocs)
 }
 
 func defaultSession() session {
@@ -105,6 +109,30 @@ func applyMatchFormat(cfg *sim.Config, n int) {
 	if cfg.Mode == sim.Mode1v1 || cfg.Mode == sim.Mode2v2 {
 		cfg.SetsToWin = matchSetsToWin
 	}
+}
+
+// configureFirst is configure with an explicit first server (replays: the
+// recorded match's Config.FirstServer, not this session's call parity).
+func (ss *session) configureFirst(mode, difficulty, pointsToWin, humanMask, first int) error {
+	if first != 0 && first != 1 {
+		return fmt.Errorf("futenis.configureFirst: firstServer %d not 0/1", first)
+	}
+	saved := ss.configured
+	ss.configured = first // applyMatchFormat uses its parity
+	if err := ss.configure(mode, difficulty, pointsToWin, humanMask); err != nil {
+		ss.configured = saved
+		return err
+	}
+	ss.configured = saved + 1
+	return nil
+}
+
+func (ss *session) setView(seat int, doubles bool) error {
+	if seat < 0 || seat >= sim.MaxPlayers {
+		return fmt.Errorf("futenis.setView: seat %d not in 0..%d", seat, sim.MaxPlayers-1)
+	}
+	ss.viewSeat, ss.viewDoubles = seat, doubles
+	return nil
 }
 
 func (ss *session) setHumanMask(mask int) error {
