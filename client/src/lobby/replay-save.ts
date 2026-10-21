@@ -14,12 +14,18 @@ const LOCAL_MASK = 1; // the single local human on slot 0
 
 // Online: the result (meta) and the server's tape arrive in any order; the second one saves.
 let pending: { meta?: ReplayMeta; tape?: Uint8Array } = {};
+// Bumped on every new match: a tape still being unzipped for an older match is dropped.
+let generation = 0;
 
 /** New match (local or online): forget the previous match's replay state. */
 export function resetReplayState(app: App): void {
   pending = {};
+  generation++;
   app.lastReplay = null;
 }
+
+/** The current match's generation: hand it to noteTape so late tapes of older matches are dropped. */
+export const replayGeneration = (): number => generation;
 
 /** Match start: a fresh tape for 1v1/2v2 against bots, none otherwise. Call after configure. */
 export function beginLocalTape(app: App, o: MatchOptions): void {
@@ -54,7 +60,8 @@ export function noteResult(app: App, meta: ReplayMeta): void {
 }
 
 /** RemoteEngine.onTape: the server's gunzipped tape, rewritten to view from our seat. */
-export function noteTape(app: App, tape: Uint8Array, seat: number): void {
+export function noteTape(app: App, tape: Uint8Array, seat: number, gen: number): void {
+  if (gen !== generation) return; // a newer match started while this tape was in flight
   setTapeSeat(tape, seat);
   if (pending.meta) { store(app, pending.meta, tape); pending = {}; }
   else pending = { tape };

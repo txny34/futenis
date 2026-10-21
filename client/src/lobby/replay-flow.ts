@@ -24,8 +24,13 @@ export function startReplay(app: App): void {
 }
 
 /** Historial ▶: a replay saved in this browser. */
+let openRequest = 0;
+
+/** Historial ▶. Dropped if the player started something else while it loaded. */
 export async function openStoredReplay(app: App, id: number): Promise<void> {
+  const mine = ++openRequest;
   const r = await loadReplay(id);
+  if (mine !== openRequest || !app.inLobby || isOnline()) return;
   if (!r) { app.hud.error(t("No se encontró la repetición.", "Replay not found.")); return; }
   try { app.replay.play(r.tape, r.meta); } catch {
     app.hud.error(t("No se pudo abrir la repetición (versión vieja del juego).", "Couldn't open the replay (older game version)."));

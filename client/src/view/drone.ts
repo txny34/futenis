@@ -14,6 +14,8 @@ const UI = "button, input, select, textarea, .fx-replay";
 
 export class DroneCam {
   active = false;
+  /** A menu is over the replay: input is ignored (and held keys dropped). */
+  blocked = false;
   private yaw = 0;
   private pitch = 0;
   private speed = SPEED_DEFAULT;
@@ -24,14 +26,14 @@ export class DroneCam {
   private readonly look = new THREE.Vector3();
 
   constructor() {
-    window.addEventListener("keydown", (e) => { if (this.active && !inField(e.target)) this.keys.add(e.code); });
+    window.addEventListener("keydown", (e) => { if (this.active && !this.blocked && !inField(e.target)) this.keys.add(e.code); });
     window.addEventListener("keyup", (e) => { this.keys.delete(e.code); });
     window.addEventListener("blur", () => { this.keys.clear(); this.dragging = false; });
-    window.addEventListener("pointerdown", (e) => { if (this.active && !isUi(e.target)) this.dragging = true; });
+    window.addEventListener("pointerdown", (e) => { if (this.active && !this.blocked && !isUi(e.target)) this.dragging = true; });
     window.addEventListener("pointerup", () => { this.dragging = false; });
     window.addEventListener("pointermove", (e) => { if (this.active && this.dragging) this.turn(e.movementX, e.movementY); });
     window.addEventListener("wheel", (e) => {
-      if (!this.active || isUi(e.target)) return;
+      if (!this.active || this.blocked || isUi(e.target)) return;
       const k = e.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP;
       this.speed = Math.max(SPEED_MIN, Math.min(SPEED_MAX, this.speed * k));
     }, { passive: true });
@@ -44,6 +46,12 @@ export class DroneCam {
     this.yaw = Math.atan2(this.dir.z, this.dir.x);
     this.pitch = Math.asin(Math.max(-1, Math.min(1, this.dir.y)));
     this.active = true;
+  }
+
+  /** Drops held keys and any drag (a menu took the input). */
+  stopMoving(): void {
+    this.keys.clear();
+    this.dragging = false;
   }
 
   stop(): void {

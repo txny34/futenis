@@ -7,7 +7,6 @@ export type ReplaySpeed = 0.5 | 1 | 2;
 const SPEEDS: readonly ReplaySpeed[] = [0.5, 1, 2];
 const SKIP_S = 10;
 const SCRUB_MAX = 1000;
-const SCRUB_THROTTLE_MS = 200;
 const HINT_MS = 2000;
 
 export interface ReplayControls {
@@ -37,10 +36,14 @@ export class ReplayBar {
   private readonly scrub = el("input", "fx-replay__scrub", "", { type: "range", min: "0", max: String(SCRUB_MAX), step: "1", "aria-label": t("Posición", "Position") });
   private readonly time = el("span", "fx-replay__time", "0:00 / 0:00");
   private dragging = false;
-  private lastSeek = 0;
   private shown = false;
-  private key = ""; // last rendered state (DOM writes only on change)
+  private blocked = false; // a menu is over the replay: keys belong to it
   private droneOn = false;
+  // Last rendered values: the DOM (and any string) is touched only when one changes.
+  private lastScrub = -1;
+  private lastSec = -1;
+  private lastTotal = -1;
+  private lastFlags = -1;
   private hintTimer = 0;
 
   constructor(parent: HTMLElement, private readonly c: ReplayControls) {
@@ -67,20 +70,30 @@ export class ReplayBar {
   show(on: boolean): void {
     this.shown = on;
     this.root.hidden = !on;
-    this.key = "";
+    this.lastScrub = this.lastSec = this.lastTotal = this.lastFlags = -1;
     if (!on) this.hint.hidden = true;
   }
+
+  /** Pause menu open over the replay: ignore the replay keys. */
+  setBlocked(on: boolean): void { this.blocked = on; }
 
   update(s: Readonly<ReplayStatus>): void {
     if (!this.shown) return;
     this.droneOn = s.drone;
-    if (!this.dragging && s.total > 0) this.scrub.value = String(Math.round((s.tick / s.total) * SCRUB_MAX));
+    const pos = s.total > 0 ? Math.round((s.tick / s.total) * SCRUB_MAX) : 0;
+    if (!this.dragging && pos !== this.lastScrub) { this.lastScrub = pos; this.scrub.value = String(pos); }
     const sec = Math.floor(s.tick / TICK_RATE);
-    const key = `${sec}|${s.total}|${s.paused}|${s.speed}|${s.drone}|${s.hudHidden}`;
-    if (key === this.key) return;
-    const wasHidden = this.key.endsWith("|true");
-    this.key = key;
-    if (!this.dragging) this.time.textContent = `${clock(s.tick)} / ${clock(s.total)}`;
+    if (!this.dragging && (sec !== this.lastSec || s.total !== this.lastTotal)) {
+      this.lastSec = sec; this.lastTotal = s.total;
+      this.time.textContent = `${clock(s.tick)} / ${clock(s.total)}`;
+    }
+    const flags = (s.paused ? 1 : 0) | (s.drone ? 2 : 0) | (s.hudHidden ? 4 : 0) | (SPEEDS.indexOf(s.speed) << 3);
+    if (flags !== this.lastFlags) this.renderFlags(s, flags);
+  }
+
+  private renderFlags(s: Readonly<ReplayStatus>, flags: number): void {
+    const wasHidden = this.lastFlags >= 0 && (this.lastFlags & 4) !== 0;
+    this.lastFlags = flags;
     this.play.textContent = s.paused ? "▶" : "⏸";
     this.play.setAttribute("aria-label", s.paused ? t("Reproducir", "Play") : t("Pausa", "Pause"));
     SPEEDS.forEach((v, i) => this.speedBtns[i].classList.toggle("is-on", v === s.speed));
@@ -96,25 +109,23 @@ export class ReplayBar {
     this.hintTimer = window.setTimeout(() => { this.hint.hidden = true; }, HINT_MS);
   }
 
+  /** Dragging previews the time; the seek (a re-simulation) happens on release. */
   private wireScrub(): void {
     const target = (): number => Number(this.scrub.value) / SCRUB_MAX;
     this.scrub.addEventListener("pointerdown", () => { this.dragging = true; });
     this.scrub.addEventListener("input", () => {
       this.dragging = true;
-      const now = performance.now();
-      if (now - this.lastSeek < SCRUB_THROTTLE_MS) return;
-      this.lastSeek = now;
-      this.c.seekFraction(target());
+      if (this.lastTotal > 0) this.time.textContent = `${clock(target() * this.lastTotal)} / ${clock(this.lastTotal)}`;
     });
     this.scrub.addEventListener("change", () => {
       this.dragging = false;
-      this.lastSeek = performance.now();
+      this.lastSec = -1;
       this.c.seekFraction(target());
     });
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (!this.shown || (e.repeat && e.code !== "ArrowLeft" && e.code !== "ArrowRight")) return;
+    if (!this.shown || this.blocked || (e.repeat && e.code !== "ArrowLeft" && e.code !== "ArrowRight")) return;
     const tgt = e.target;
     if ((tgt instanceof HTMLInputElement && tgt !== this.scrub) || tgt instanceof HTMLTextAreaElement) return;
     const c = this.c;

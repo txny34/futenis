@@ -22,6 +22,12 @@ export class ReplayPlayer implements ReplayControls {
 
   constructor(private readonly app: () => App, private readonly hudRoot: HTMLElement) {}
 
+  /** Pause menu open/closed while replaying: the bar and the drone yield the input. */
+  setBlocked(on: boolean): void {
+    this.bar?.setBlocked(on);
+    this.app().view.rig.setDroneBlocked(on);
+  }
+
   /** Late-bound: the bar needs the player as its controls. */
   attach(bar: ReplayBar): void { this.bar = bar; }
 
@@ -59,6 +65,7 @@ export class ReplayPlayer implements ReplayControls {
     const app = this.app();
     app.state.timeScale = 1;
     app.view.rig.setDrone(false);
+    this.setBlocked(false);
     this.bar?.show(false);
     this.hudRoot.classList.remove(HUD_OFF);
     app.engine.setView(0, false);

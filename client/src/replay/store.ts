@@ -1,4 +1,5 @@
 import type { Looks } from "../net/style-wire";
+import { canZip, gunzip, gzip } from "./gzip";
 
 // Replays of the last matches (IndexedDB futenis-replays, this browser only):
 // gzipped tape v2 + what Historial shows. Keyed by the history record's `at`.
@@ -46,13 +47,6 @@ async function withStore<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) =>
   }
 }
 
-async function pipe(data: Uint8Array, t: CompressionStream | DecompressionStream): Promise<Uint8Array> {
-  const out = new Response(new Blob([data.slice()]).stream().pipeThrough(t));
-  return new Uint8Array(await out.arrayBuffer());
-}
-
-const canZip = (): boolean => typeof CompressionStream === "function" && typeof DecompressionStream === "function";
-
 function isRow(v: unknown): v is Row {
   const r = v as Partial<Row> | null;
   const m = r?.meta as Partial<ReplayMeta> | undefined;
@@ -65,7 +59,7 @@ function isRow(v: unknown): v is Row {
 export async function saveReplay(meta: ReplayMeta, tape: Uint8Array): Promise<boolean> {
   try {
     const gz = canZip();
-    const data = gz ? await pipe(tape, new CompressionStream("gzip")) : tape.slice();
+    const data = gz ? await gzip(tape) : tape.slice();
     const row: Row = { id: meta.id, meta, gz, data };
     await withStore("readwrite", async (s) => {
       await done(s.put(row));
@@ -82,7 +76,8 @@ export async function loadReplay(id: number): Promise<{ meta: ReplayMeta; tape: 
   try {
     const row: unknown = await withStore("readonly", (s) => done(s.get(id)));
     if (!isRow(row)) return null;
-    const tape = row.gz ? await pipe(row.data, new DecompressionStream("gzip")) : row.data;
+    const tape = row.gz ? await gunzip(row.data) : row.data;
+    if (!tape) return null;
     return { meta: row.meta, tape };
   } catch {
     return null;

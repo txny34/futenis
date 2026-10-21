@@ -1,3 +1,4 @@
+import { gunzip } from "../replay/gzip";
 import { HEADER, Msg, PROTO_VERSION } from "./protocol";
 
 // TAPE (cmd/server/internal/wire/tape.go): the finished match's gzipped replay
@@ -32,17 +33,6 @@ export class TapeAssembler {
   }
 
   private reset(): void { this.parts = []; this.count = 0; this.bytes = 0; }
-}
-
-/** gunzip; null when the browser can't or the data is bad. */
-export async function gunzip(gz: Uint8Array): Promise<Uint8Array | null> {
-  if (typeof DecompressionStream !== "function") return null;
-  try {
-    const stream = new Blob([gz.slice()]).stream().pipeThrough(new DecompressionStream("gzip"));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
-  } catch {
-    return null;
-  }
 }
 
 /** Assembles + gunzips TAPE chunks and fires onDone once per completed tape, with the seat at receive time. */

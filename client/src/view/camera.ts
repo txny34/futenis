@@ -57,6 +57,12 @@ export class CameraRig {
 
   get droneOn(): boolean { return this.drone.active; }
 
+  /** Pause menu over a replay: the drone ignores input and drops held keys. */
+  setDroneBlocked(on: boolean): void {
+    this.drone.blocked = on;
+    if (on) this.drone.stopMoving();
+  }
+
   /** Replays: free camera on/off (orbit/fixed resumes when off). */
   setDrone(on: boolean): void {
     if (on === this.drone.active) return;

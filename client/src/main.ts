@@ -65,6 +65,7 @@ function wire(app: App, menu: MenuUI): void {
   menu.onPauseChange((paused) => {
     app.state.paused = paused && !isOnline(); // the server never pauses: keep stepping, send neutral input
     app.controls.enabled = !paused && app.state.running && !app.replaying; // the tape drives a replay
+    app.replay.setBlocked(paused && app.replaying);
     app.controls.releaseAll();
   });
   menu.onQuit(() => {

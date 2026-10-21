@@ -113,6 +113,7 @@ export function decodeTape(b: Uint8Array): DecodedTape {
   };
   if (header.mode > 1 || header.seat >= MAX_PLAYERS || header.firstServer > 1) throw new Error("tape: bad setup");
   const count = v.getUint32(12, true);
+  if (count > (b.byteLength - TAPE_HEADER_LEN) / 4) throw new Error("tape: bad record count"); // every record is ≥ 4 bytes: never allocate from a forged count
   const cfg = new Float64Array(CFG_LEN);
   for (let i = 0; i < CFG_LEN; i++) cfg[i] = v.getFloat64(16 + i * 8, true);
   return decodeRecords(v, header, cfg, count);

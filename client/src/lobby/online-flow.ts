@@ -12,7 +12,7 @@ import type { QueueMode } from "../ui/play-modal/play-modal";
 import { arm, enterLobby, landingAllowed, type App } from "./flow";
 import { cancelIntro } from "./intro";
 import { endReplay } from "./replay-state";
-import { noteTape, resetReplayState } from "./replay-save";
+import { noteTape, replayGeneration, resetReplayState } from "./replay-save";
 import { extraOverlayOpen } from "../ui/overlays";
 import { isCurrent, isOnline, leaveOnline, onLeaveOnline, onlineOver, setRemote } from "./online-state";
 
@@ -154,8 +154,9 @@ function connect(app: App, mode: QueueMode, url: string, token: string): void {
   remote.onResult = (before, after) => onRanked(app, mode, before, after);
   remote.onStatus = (s, ping) => onStatus(app, remote, s, ping);
   remote.looks.onLooks = (looks) => { app.onlineLooks = looks; app.view.players.setLooks(looks); };
-  remote.onTape = (tape, seat) => noteTape(app, tape, seat);
   resetReplayState(app);
+  const gen = replayGeneration();
+  remote.onTape = (tape, seat) => noteTape(app, tape, seat, gen);
   app.onlineLooks = null;
   app.onlineRanked = lastQueue?.ranked ?? false;
   setRemote(remote);
