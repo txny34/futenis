@@ -29,6 +29,7 @@ export class PlayModal {
   private readonly openCbs: Array<(open: boolean) => void> = [];
   private needAccount: () => void = () => undefined;
   private friend: () => void = () => undefined;
+  private replay: (id: number) => void = () => undefined;
   private pick: PlayPick | null = null;
   private toastTimer = 0;
 
@@ -49,7 +50,7 @@ export class PlayModal {
     right.append(
       this.swap,
       button(t("Jugar con un amigo", "Play with a friend"), () => { this.close(); this.friend(); }, "fx-play__side"),
-      button(t("Historial", "History"), () => this.showSheet(t("Historial", "History"), historyPanel()), "fx-play__side"),
+      button(t("Historial", "History"), () => this.showSheet(t("Historial", "History"), historyPanel((id) => { this.close(); this.replay(id); })), "fx-play__side"),
       button(t("Información", "Info"), () => this.showSheet(t("Información", "Info"), infoPanel()), "fx-play__side"),
       button(t("Recompensas", "Rewards"), () => this.soon(), "fx-play__side"),
     );
@@ -73,6 +74,8 @@ export class PlayModal {
   onNeedAccount(cb: () => void): void { this.needAccount = cb; }
   /** "Jugar con un amigo": the caller opens a private room. */
   onFriend(cb: () => void): void { this.friend = cb; }
+  /** Historial ▶: play a saved replay (lobby/replay-player.ts). */
+  onReplay(cb: (id: number) => void): void { this.replay = cb; }
 
   /** preselect: the pad's card; JUGAR opens with nothing selected. Always opens online. */
   open(preselect: PlayPick | null = null): void {

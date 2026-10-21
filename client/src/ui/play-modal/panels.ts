@@ -1,6 +1,7 @@
 import { keyHint, moveHint } from "../key-hints";
 import { loadHistory, MatchRecord } from "../../profile/history";
-import { el } from "../dom";
+import { button, el } from "../dom";
+import { replayIds } from "../../replay/store";
 import { t } from "../../i18n/t";
 
 // Sub-panels of "Elegí un modo": real local history and a short rules/controls sheet.
@@ -13,6 +14,7 @@ function deltaText(r: MatchRecord): string {
 
 function historyRow(r: MatchRecord): HTMLElement {
   const tr = el("tr", r.won ? "is-win" : "is-loss");
+  tr.dataset.at = String(r.at);
   tr.append(
     el("td", "", DATE_FMT.format(r.at)),
     el("td", "", r.queue),
@@ -20,11 +22,26 @@ function historyRow(r: MatchRecord): HTMLElement {
     el("td", "fx-hist__result", r.won ? t("Victoria", "Win") : t("Derrota", "Loss")),
     el("td", "", `${r.games0} – ${r.games1}`),
     el("td", "fx-hist__delta", deltaText(r)),
+    el("td", "fx-hist__watch"),
   );
   return tr;
 }
 
-export function historyPanel(): HTMLElement {
+/** Fills the ▶ cells once the stored replay ids are known. */
+function addReplayButtons(body: HTMLElement, onReplay: (id: number) => void): void {
+  void replayIds().then((ids) => {
+    for (const tr of Array.from(body.querySelectorAll<HTMLTableRowElement>("tr[data-at]"))) {
+      const id = Number(tr.dataset.at);
+      const cell = tr.querySelector(".fx-hist__watch");
+      if (!cell || !ids.has(id)) continue;
+      const b = button("▶", () => onReplay(id), "fx-btn fx-hist__play");
+      b.setAttribute("aria-label", t("Ver repetición", "Watch replay"));
+      cell.append(b);
+    }
+  });
+}
+
+export function historyPanel(onReplay: (id: number) => void): HTMLElement {
   const list = loadHistory();
   const box = el("div", "fx-play__sheet-body");
   if (list.length === 0) {
@@ -34,7 +51,7 @@ export function historyPanel(): HTMLElement {
   const table = el("table", "fx-hist");
   const head = el("tr");
   const columns: ReadonlyArray<readonly [string, string]> = [
-    ["Fecha", "Date"], ["Modo", "Mode"], ["Tipo", "Type"], ["Resultado", "Result"], ["Juegos", "Games"], ["ELO", "ELO"],
+    ["Fecha", "Date"], ["Modo", "Mode"], ["Tipo", "Type"], ["Resultado", "Result"], ["Juegos", "Games"], ["ELO", "ELO"], ["Ver", "Watch"],
   ];
   for (const [es, en] of columns) head.append(el("th", "", t(es, en)));
   const body = el("tbody");
@@ -42,9 +59,10 @@ export function historyPanel(): HTMLElement {
   const thead = el("thead");
   thead.append(head);
   table.append(thead, body);
+  addReplayButtons(body, onReplay);
   box.append(table, el("p", "fx-note", t(
-    `Últimos ${list.length} partidos (se guardan en este navegador).`,
-    `Last ${list.length} matches (saved in this browser).`,
+    `Últimos ${list.length} partidos (se guardan en este navegador). Las repeticiones de los últimos 10 partidos también.`,
+    `Last ${list.length} matches (saved in this browser). Replays of the last 10 too.`,
   )));
   return box;
 }
