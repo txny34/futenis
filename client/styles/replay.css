@@ -1,0 +1,25 @@
+/* client/styles/replay.css — replay mini HUD (ui/replay-bar.ts) */
+.fx-replay {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  width: min(760px, calc(100vw - 32px)); padding: 10px 14px 12px;
+  display: grid; grid-template-columns: auto 1fr auto; gap: 8px 12px; align-items: center;
+  background: var(--fx-card); border: 1px solid rgba(233, 241, 255, 0.14); border-radius: 14px;
+  color: var(--fx-line); font-family: Rubik, sans-serif; z-index: 30; backdrop-filter: blur(6px);
+}
+.fx-replay[hidden], .fx-replay__hint[hidden] { display: none; }
+.fx-replay__tag { font-family: Bungee, sans-serif; font-size: 13px; color: var(--fx-hot); letter-spacing: 1px; }
+.fx-replay__time { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--fx-muted); }
+.fx-replay__scrub { width: 100%; accent-color: var(--fx-ball); cursor: pointer; }
+.fx-replay__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.fx-replay__btn { padding: 6px 10px; font-size: 14px; min-width: 44px; text-align: center; transform: none; }
+.fx-replay__btn:hover, .fx-replay__btn:active { transform: none; }
+.fx-replay__btn.is-on { background: var(--fx-ball); color: var(--fx-ball-ink); border-color: var(--fx-ball); }
+.fx-replay__exit { margin-left: auto; }
+.fx-replay__hint {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 30;
+  padding: 6px 12px; border-radius: 999px; background: var(--fx-card); color: var(--fx-muted); font-size: 13px;
+}
+@media (max-width: 560px) {
+  .fx-replay { grid-template-columns: 1fr; }
+  .fx-replay__tag { display: none; }
+}
