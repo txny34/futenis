@@ -20,7 +20,8 @@ import { App, enterLobby, errText, landingAllowed, lobbyOptions, tutorialOptions
 import { hookLoop } from "./loop-hooks";
 import { startOnline } from "./lobby/online-flow";
 import { isOnline } from "./lobby/online-state";
-import { Tape } from "./replay/tape";
+import { setupReplays, wireStoredReplays } from "./lobby/replay-player";
+import { beginLocalTape } from "./lobby/replay-save";
 import { CourtView } from "./render";
 import { MatchScreens } from "./ui/match-screens";
 import { MenuUI, Settings } from "./ui/menu";
@@ -87,7 +88,7 @@ function wire(app: App, menu: MenuUI): void {
     if (code === FEED_KEY && app.mode === "playground") app.engine.respawnBall();
     if (code === RESET_KEY && !app.inLobby) {
       app.engine.reset();
-      app.tape.clear(app.engine.getConfig());
+      if (app.last) beginLocalTape(app, app.last);
       app.loop?.rearm();
       app.hud.resetMatch();
       if (app.mode === "playground" && !app.last?.tutorial) app.challenges.begin(); // the sim's streak restarted too
@@ -148,20 +149,22 @@ function boot(): void {
   captureErrors();
   document.documentElement.lang = LANG;
   applyThemeCss(document.documentElement); // --hud-* for overlays outside #hud (VS card, menus)
-  const hud = new Hud(requireElement("hud"));
+  const hudRoot = requireElement("hud");
+  const hud = new Hud(hudRoot);
   const menu = new MenuUI(requireElement("ui"));
   const view = new CourtView(requireElement("app"));
   const controls = new Controls();
   controls.attach(view.canvas);
-  const state: LoopState = { running: false, paused: false, fpsCap: 0, cameraShake: true, holdUntil: 0, showLanding: false };
+  const state: LoopState = { running: false, paused: false, fpsCap: 0, cameraShake: true, holdUntil: 0, showLanding: false, timeScale: 1 };
   const engine = new Engine();
   let ref: App | null = null;
   const get = (): App => { if (!ref) throw new Error(t("app no inicializada", "app not initialized")); return ref; };
   const app: App = {
-    engine, view, hud, sound: new Sound(), tutorial: new Tutorial(requireElement("hud")), challenges: new ChallengeSession(), tape: new Tape(), replaying: false, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
+    engine, view, hud, sound: new Sound(), tutorial: new Tutorial(requireElement("hud")), challenges: new ChallengeSession(), tape: null, replaying: false, replay: setupReplays(get, hudRoot), lastReplay: null, onlineLooks: null, onlineRanked: false, controls, state, bar: lobbyBar(get), profile: new ProfileCard(document.body), screens: new MatchScreens(document.body), menu, play: playModal(get),
     mode: null, inLobby: true, pending: null, refreshDev: null, loop: null, last: null,
   };
   ref = app;
+  wireStoredReplays(app);
   const loop = new GameLoop(engine, view, hud, controls, state);
   hookLoop(app, loop);
   app.loop = loop;

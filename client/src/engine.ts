@@ -135,6 +135,17 @@ export class Engine implements StepEngine {
     check("configure", this.requireBridge().configure(s.mode, s.difficulty, s.pointsToWin, s.humanMask));
   }
 
+  configureFirst(s: MatchSetup, firstServer: number): void {
+    check("configureFirst", this.requireBridge().configureFirst(s.mode, s.difficulty, s.pointsToWin, s.humanMask, firstServer));
+  }
+
+  setHumanMask(mask: number): void { check("setHumanMask", this.requireBridge().setHumanMask(mask)); }
+
+  /** Online replays: render from the viewer's seat (game.ViewOut). Back to 0 after a replay. */
+  setView(seat: number, doubles: boolean): void { check("setView", this.requireBridge().setView(seat, doubles ? 1 : 0)); }
+
+  firstServer(): number { return this.requireBridge().firstServer(); }
+
   /** Playground: asks the ball machine for a feed now (wasm feed(), training.md §4). */
   respawnBall(): void {
     const b = this.requireBridge();

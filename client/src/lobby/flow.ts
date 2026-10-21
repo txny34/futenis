@@ -1,8 +1,8 @@
 import { Sound } from "../audio/sound";
 import type { Engine, MatchSetup } from "../engine";
 import type { ChallengeSession } from "../profile/challenges";
-import type { Tape } from "../replay/tape";
-import { endReplay } from "./replay-state";
+import { endReplay, type ReplayAppFields } from "./replay-state";
+import { beginLocalTape } from "./replay-save";
 import { leaveOnline } from "./online-state";
 import type { Tutorial } from "../tutorial/tutorial";
 import { recorder } from "../profile/recorder";
@@ -32,7 +32,7 @@ const LOADING_TEXT = t("Cargando…", "Loading…");
 const MODE_ID: Readonly<Record<GameMode, MatchSetup["mode"]>> = { "1v1": 0, "2v2": 1, playground: 2 };
 const LOBBY_MODE_ID: MatchSetup["mode"] = Mode.Lobby;
 const LOBBY_BOT: Difficulty = "normal"; // the lobby has no bot; any valid id
-const DIFFICULTY_ID: Readonly<Record<Difficulty, number>> = { easy: 0, normal: 1, hard: 2, pro: 3 };
+export const DIFFICULTY_ID: Readonly<Record<Difficulty, number>> = { easy: 0, normal: 1, hard: 2, pro: 3 };
 // Single local human on slot 0 in every mode: rivals/partner are AI (filled inside wasm).
 const HUMAN_MASK = 1;
 const CFG_DASH_COOLDOWN = 49; // sim/config_layout.go cfgDashCooldownTime
@@ -42,16 +42,13 @@ const YAW_COURT = 0; // behind the human, toward the rival (+X)
 
 export const errText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
-export interface App {
+export interface App extends ReplayAppFields {
   engine: Engine;
   view: CourtView;
   hud: Hud;
   sound: Sound;
   tutorial: Tutorial;
   challenges: ChallengeSession;
-  /** Last real match (replay tape) and whether it is playing back now. */
-  tape: Tape;
-  replaying: boolean;
   controls: Controls;
   state: LoopState;
   bar: BottomBar;
@@ -140,7 +137,7 @@ export function startMatch(app: App, o: MatchOptions): void {
   configureMatch(app, o);
   const training = o.training ?? DEFAULT_TRAINING; // ball machine: live Config, kept by reset()
   if (o.mode === "playground") applyTraining(app.engine, training);
-  app.tape.clear(app.engine.getConfig());
+  beginLocalTape(app, o);
   app.last = o;
   recorder().end();
   recorder().begin(o.mode === "playground" ? "training" : o.mode, o.difficulty, o.ranked);

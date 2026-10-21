@@ -50,14 +50,14 @@ class Recorder {
 
   /** Fin de un partido con puntuación (GameLoop.onMatchOver); games = juegos local/visita. */
   /** Records the result; returns the queue's ELO before/after for ranked matches (rank note), else null. */
-  matchOver(won: boolean, games0: number, games1: number): { before: number; after: number } | null {
+  matchOver(won: boolean, games0: number, games1: number, at = Date.now()): { before: number; after: number } | null {
     const a = this.activity;
     if (a !== "1v1" && a !== "2v2") return null;
     this.activity = null;
     const w = profileWriter();
     const before = w.get().elo[a];
     w.update((s) => applyMatch(s, a, this.bot, won, this.ranked));
-    pushHistory({ at: Date.now(), queue: a, ranked: this.ranked, won, games0, games1, eloDelta: w.get().elo[a] - before });
+    pushHistory({ at, queue: a, ranked: this.ranked, won, games0, games1, eloDelta: w.get().elo[a] - before });
     missions().record("match", 1);
     if (won) missions().record("win", 1);
     return this.ranked ? { before, after: w.get().elo[a] } : null;

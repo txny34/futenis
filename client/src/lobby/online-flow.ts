@@ -12,12 +12,13 @@ import type { QueueMode } from "../ui/play-modal/play-modal";
 import { arm, enterLobby, landingAllowed, type App } from "./flow";
 import { cancelIntro } from "./intro";
 import { endReplay } from "./replay-state";
+import { noteTape, resetReplayState } from "./replay-save";
 import { extraOverlayOpen } from "../ui/overlays";
 import { isCurrent, isOnline, leaveOnline, onLeaveOnline, onlineOver, setRemote } from "./online-state";
 
 // Online casual match from "Elegí un modo": the server pairs whoever is queued
 // (cmd/server/queue.go) and the loop renders its frames instead of the local sim.
-// Casual: no ELO, no profile stats, no replay (the tape needs the local sim).
+// The server sends the match tape at game over (replay-save.ts noteTape).
 
 function statusText(s: NetStatus): string {
   switch (s) {
@@ -152,7 +153,11 @@ function connect(app: App, mode: QueueMode, url: string, token: string): void {
   const remote = new RemoteEngine(url, 0, token);
   remote.onResult = (before, after) => onRanked(app, mode, before, after);
   remote.onStatus = (s, ping) => onStatus(app, remote, s, ping);
-  remote.looks.onLooks = (looks) => app.view.players.setLooks(looks);
+  remote.looks.onLooks = (looks) => { app.onlineLooks = looks; app.view.players.setLooks(looks); };
+  remote.onTape = (tape, seat) => noteTape(app, tape, seat);
+  resetReplayState(app);
+  app.onlineLooks = null;
+  app.onlineRanked = lastQueue?.ranked ?? false;
   setRemote(remote);
   app.mode = mode;
   app.last = null; // Revancha requeues (see showResult); never a bot rematch
