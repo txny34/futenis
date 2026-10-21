@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { DroneCam } from "./drone";
 
 // Roblox-style third-person orbit camera around the human. Yaw/pitch come
 // straight from mouse deltas (pointer lock) and are applied immediately; only
@@ -50,8 +51,18 @@ export class CameraRig {
   private readonly introFrom = new THREE.Vector3(INTRO_FROM.x, INTRO_FROM.y, INTRO_FROM.z);
   private readonly introLook = new THREE.Vector3(INTRO_LOOK.x, INTRO_LOOK.y, INTRO_LOOK.z);
   private readonly look3 = new THREE.Vector3();
+  private readonly drone = new DroneCam();
 
   constructor() { this.applyFixed(); }
+
+  get droneOn(): boolean { return this.drone.active; }
+
+  /** Replays: free camera on/off (orbit/fixed resumes when off). */
+  setDrone(on: boolean): void {
+    if (on === this.drone.active) return;
+    if (on) this.drone.start(this.camera);
+    else { this.drone.stop(); this.hasTarget = false; }
+  }
 
   shake(): void { this.shakeLeft = SHAKE_DURATION_S; }
 
@@ -83,6 +94,7 @@ export class CameraRig {
   /** human = interpolated feet (null if no human on court); ball = ball center (unused, kept for API). */
   update(human: THREE.Vector3 | null, _ball: THREE.Vector3, dt: number): void {
     this.time += dt;
+    if (this.drone.active) { this.drone.update(this.camera, dt); return; }
     if (this.dynamic && human) this.orbit(human, dt);
     else {
       this.hasTarget = false;
