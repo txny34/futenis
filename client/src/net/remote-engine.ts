@@ -6,6 +6,7 @@ import {
 } from "./net-status";
 import { HEADER, INPUT_MSG_LEN, Msg, PING_MSG_LEN, PROTO_VERSION, f64At, setF64At, writeHeader } from "./protocol";
 import { StyleLink } from "./style-wire";
+import { TapeReceiver } from "./tape-chunks";
 export type { NetStatus } from "./net-status";
 
 const FRAME_BYTES = HEADER + OUT_LEN * 8;
@@ -24,10 +25,13 @@ export class RemoteEngine implements StepEngine {
   onStatus: (s: NetStatus, pingMs: number) => void = () => undefined;
   /** Ranked: the server's ELO before/after the match (cmd/server/ranked.go RESULT). */
   onResult: (before: number, after: number) => void = () => undefined;
+  /** The finished match's replay tape (raw tape v2) and this client's server seat. */
+  onTape: (tape: Uint8Array, seat: number) => void = () => undefined;
+  private seat = 0;
+  private readonly tapes = new TapeReceiver((tape, s) => this.onTape(tape, s));
   private ws: WebSocket | null = null;
   private status: NetStatus = "conectando";
-  private ping = 0;
-  private lastPingSentAt = -Infinity;
+  private ping = 0; private lastPingSentAt = -Infinity;
   private readonly out = new Float64Array(OUT_LEN);
   private readonly frameIn = new Float64Array(OUT_LEN);
   private readonly pool: SimEvent[] = Array.from({ length: MAX_EVENTS }, emptyEvent);
@@ -42,8 +46,7 @@ export class RemoteEngine implements StepEngine {
   private lastInputAt = -Infinity;
   private pending = 0; // events accumulated since the last step
   private token = ""; // this seat's rejoin secret (SEAT)
-  private retryUntil = 0; // end of the rejoin window (performance.now ms)
-  private retryTimer = 0;
+  private retryUntil = 0; private retryTimer = 0; // end of the rejoin window (performance.now ms)
   private awayUntil = 0; // when the dropped rival's hold runs out
   /** Every seat's look (STYLES); set its onLooks. */
   readonly looks = new StyleLink((msg) => this.up.push(msg, performance.now()));
@@ -54,8 +57,7 @@ export class RemoteEngine implements StepEngine {
     this.down = new LagQueue(QUEUE_CAP, FRAME_BYTES, lagMs / 2);
     this.control = new LagQueue(CONTROL_CAP, CONTROL_SLOT, lagMs / 2);
     this.result = { prev: this.out.subarray(0, SNAP_LEN), curr: this.out.subarray(SNAP_LEN, 2 * SNAP_LEN), events: this.pool, eventCount: 0 };
-    writeHeader(this.inputView, Msg.Input);
-    writeHeader(this.pingView, Msg.Ping);
+    writeHeader(this.inputView, Msg.Input); writeHeader(this.pingView, Msg.Ping);
   }
 
   /** True while the socket is open: GameLoop must keep calling step() so WAITING/WELCOME get drained. */
@@ -72,6 +74,7 @@ export class RemoteEngine implements StepEngine {
     ws.onopen = () => { if (this.auth && url === this.url) ws.send(authMessage(this.auth)); };
     ws.onmessage = (m: MessageEvent<ArrayBuffer>) => {
       const b = new Uint8Array(m.data);
+      if (b[0] === Msg.Tape) { this.tapes.push(b, this.seat); return; } // big: never through the fixed-slot queues
       (b[0] === Msg.Frame ? this.down : this.control).push(b, performance.now());
     };
     ws.onclose = (e: CloseEvent) => { if (this.ws === ws) this.closed(e.code); };
@@ -142,6 +145,7 @@ export class RemoteEngine implements StepEngine {
           this.ws?.close();
         } else {
           this.setStatus("jugando");
+          this.seat = msg[2] & 3;
           this.looks.welcome(msg[2]);
         }
         break;
@@ -173,14 +177,10 @@ export class RemoteEngine implements StepEngine {
     }
   };
 
+  /** Also appends the frame's events after any already pending this step, up to MAX_EVENTS. */
   private receiveFrame(view: DataView): void {
     for (let i = 0; i < OUT_LEN; i++) this.frameIn[i] = view.getFloat64(HEADER + i * 8, true);
     this.out.set(this.frameIn);
-    this.appendEvents();
-  }
-
-  /** Appends the frame's events after any already pending this step, up to MAX_EVENTS. */
-  private appendEvents(): void {
     readEventsInto(this.frameIn, this.pool, this.result, this.pending);
     this.pending = this.result.eventCount;
   }

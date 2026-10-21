@@ -5,7 +5,7 @@ export const PROTO_QUERY = `proto=${PROTO_VERSION}`;
 export const HEADER = 8;
 export const Msg = {
   Input: 0x01, Ping: 0x02, Auth: 0x03, Style: 0x04, Welcome: 0x81, Waiting: 0x82, Frame: 0x83, Pong: 0x84, PeerLeft: 0x85, Result: 0x86,
-  Seat: 0x87, PeerAway: 0x88, PeerBack: 0x89, Styles: 0x8a,
+  Seat: 0x87, PeerAway: 0x88, PeerBack: 0x89, Styles: 0x8a, Tape: 0x8b,
 } as const;
 export const INPUT_MSG_LEN = HEADER + 6 * 8;
 export const PING_MSG_LEN = HEADER + 8;
